@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0",
+  "notes": "Read by sdp-hook-log.ps1 on every PreToolUse/PostToolUse hook firing to decide whether a log entry is written, and (see the truncation block below) how much of each field's content survives. The hooks always fire (catch-all matcher, no per-tool exclusion in settings.local.json); this file gates the write, not the firing. This list is a complete enumeration of every tool known as of 2026-07-17 - defaultForUnlistedTools exists only as a tripwire for tools that appear later and have not been classified yet, not as the normal path. Level taxonomy: TIMING = real duration variance worth tracking for optimization (scripts, dispatches, network I/O); AUDIT = fast state-changing action worth a what-changed trail; HUMAN_WAIT = duration includes human response time, kept out of TIMING analysis; DEBUG = high-volume, low-signal inspection calls, captured in full but filterable at read time.",
+  "truncation": {
+    "notes": "Controls per-field truncation of tool_input/tool_output content in sdp-hook-log.ps1. maxFieldChars: character cap applied to each individual string leaf (not the whole log entry) before it is wrapped as {_truncated:true, value:...}; default 1000 if this block is absent, or maxFieldChars is missing/non-numeric/not positive. debugFullCapture: when true, truncation is skipped entirely - every field is written at full length regardless of maxFieldChars. Intended as a temporary toggle for investigating something that needs full fidelity (e.g. a truncated subagent dispatch prompt); flip back to false afterward - left on, a single large Bash/WebFetch output writes its full content to the log. Deliberately placed in this file rather than SDP-Config.json: sdp-hook-log.ps1 already reads this file's config object on every firing (the per-tool gates below), and hooks fire on every tool call across a session - a second file read here would double this script's I/O at that frequency for no benefit. Also applies to the prompt field on userPromptSubmit entries below - same truncation function, same reasoning.",
+    "maxFieldChars": 1000,
+    "debugFullCapture": false
+  },
+  "userPromptSubmit": {
+    "notes": "Controls sdp-hook-log.ps1 logging of the UserPromptSubmit event - fires once per human-submitted turn in the top-level session only (confirmed against the Claude Code hooks reference: never fires for subagent dispatch, so no subagent-origin filter is needed here the way tools.*.includeSubagentOrigin provides for tool calls). Not a tool call - no tool_name, no Pre/Post direction - so it has its own gating block rather than living in the tools map below. enabled: master on/off. level: same TIMING/AUDIT/HUMAN_WAIT/DEBUG taxonomy as the tools block; default AUDIT if absent (a turn-starting, state-changing event worth a trail, not high-volume noise).",
+    "enabled": true,
+    "level": "AUDIT"
+  },
+  "defaultForUnlistedTools": {
+    "level": "DEBUG",
+    "logPre": true,
+    "logPost": true,
+    "includeSubagentOrigin": true
+  },
+  "tools": {
+    "Agent":            { "level": "TIMING",     "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "Artifact":          { "level": "AUDIT",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "AskUserQuestion":   { "level": "HUMAN_WAIT", "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "Bash":              { "level": "TIMING",     "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "Edit":              { "level": "AUDIT",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "Glob":              { "level": "DEBUG",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "Grep":              { "level": "DEBUG",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "PowerShell":        { "level": "TIMING",     "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "Read":              { "level": "DEBUG",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "ReportFindings":    { "level": "AUDIT",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "ScheduleWakeup":    { "level": "AUDIT",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "Skill":             { "level": "TIMING",     "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "ToolSearch":        { "level": "DEBUG",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "Workflow":          { "level": "TIMING",     "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "Write":             { "level": "AUDIT",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+
+    "CronCreate":        { "level": "AUDIT",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "CronDelete":        { "level": "AUDIT",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "CronList":          { "level": "DEBUG",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "DesignSync":        { "level": "TIMING",     "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "EndConversation":   { "level": "AUDIT",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "EnterPlanMode":     { "level": "HUMAN_WAIT", "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "EnterWorktree":     { "level": "TIMING",     "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "ExitPlanMode":      { "level": "HUMAN_WAIT", "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "ExitWorktree":      { "level": "TIMING",     "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "Monitor":           { "level": "TIMING",     "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "NotebookEdit":      { "level": "AUDIT",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "PushNotification":  { "level": "AUDIT",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "RemoteTrigger":     { "level": "TIMING",     "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "SendMessage":       { "level": "AUDIT",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "TaskCreate":        { "level": "AUDIT",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "TaskGet":           { "level": "DEBUG",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "TaskList":          { "level": "DEBUG",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "TaskOutput":        { "level": "DEBUG",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "TaskStop":          { "level": "AUDIT",      "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "WebFetch":          { "level": "TIMING",     "logPre": true, "logPost": true, "includeSubagentOrigin": true },
+    "WebSearch":         { "level": "TIMING",     "logPre": true, "logPost": true, "includeSubagentOrigin": true }
+  }
+}

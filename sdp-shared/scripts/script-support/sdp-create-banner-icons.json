@@ -1,0 +1,380 @@
+﻿[
+  {
+    "name": "error",
+    "glyph": "⛔",
+    "codepoint": "U+26D4",
+    "width": 2,
+    "meaning": "error / blocked"
+  },
+  {
+    "name": "success",
+    "glyph": "✅",
+    "codepoint": "U+2705",
+    "width": 2,
+    "meaning": "success / ready"
+  },
+  {
+    "name": "warning",
+    "glyph": "⚠",
+    "codepoint": "U+26A0",
+    "width": 2,
+    "meaning": "warning, plain style"
+  },
+  {
+    "name": "pending",
+    "glyph": "⏳",
+    "codepoint": "U+23F3",
+    "width": 2,
+    "meaning": "pending / waiting"
+  },
+  {
+    "name": "verified",
+    "glyph": "✔",
+    "codepoint": "U+2714",
+    "width": 1,
+    "meaning": "check, plainer/narrower than ✅"
+  },
+  {
+    "name": "mistake",
+    "glyph": "✖",
+    "codepoint": "U+2716",
+    "width": 1,
+    "meaning": "X, plainer/narrower than ❌"
+  },
+  {
+    "name": "confirmed",
+    "glyph": "☑",
+    "codepoint": "U+2611",
+    "width": 1,
+    "meaning": "checked box"
+  },
+  {
+    "name": "info",
+    "glyph": "ℹ",
+    "codepoint": "U+2139",
+    "width": 1,
+    "meaning": "information"
+  },
+  {
+    "name": "question",
+    "glyph": "❓",
+    "codepoint": "U+2753",
+    "width": 2,
+    "meaning": "question / unclear"
+  },
+  {
+    "name": "active",
+    "glyph": "▶",
+    "codepoint": "U+25B6",
+    "width": 1,
+    "meaning": "running / active"
+  },
+  {
+    "name": "paused",
+    "glyph": "⏸",
+    "codepoint": "U+23F8",
+    "width": 1,
+    "meaning": "paused"
+  },
+  {
+    "name": "skipped",
+    "glyph": "⏭",
+    "codepoint": "U+23ED",
+    "width": 1,
+    "meaning": "skip"
+  },
+  {
+    "name": "n/a",
+    "glyph": "➖",
+    "codepoint": "U+2796",
+    "width": 1,
+    "meaning": "not applicable / none"
+  },
+  {
+    "name": "high-load",
+    "glyph": "⚡",
+    "codepoint": "U+26A1",
+    "width": 2,
+    "meaning": "performance spike / high resource usage"
+  },
+  {
+    "name": "added",
+    "glyph": "➕",
+    "codepoint": "U+2795",
+    "width": 1,
+    "meaning": "included / added"
+  },
+  {
+    "name": "failure",
+    "glyph": "❌",
+    "codepoint": "U+274C",
+    "width": 2,
+    "meaning": "failure / cross"
+  },
+  {
+    "name": "halt",
+    "glyph": "🚫",
+    "codepoint": "U+1F6AB",
+    "width": 2,
+    "meaning": "prohibited / blocked"
+  },
+  {
+    "name": "stop",
+    "glyph": "🛑",
+    "codepoint": "U+1F6D1",
+    "width": 2,
+    "meaning": "stop"
+  },
+  {
+    "name": "locked",
+    "glyph": "🔒",
+    "codepoint": "U+1F512",
+    "width": 2,
+    "meaning": "locked / restricted"
+  },
+  {
+    "name": "unlocked",
+    "glyph": "🔓",
+    "codepoint": "U+1F513",
+    "width": 2,
+    "meaning": "unlocked"
+  },
+  {
+    "name": "in-progress",
+    "glyph": "🔄",
+    "codepoint": "U+1F504",
+    "width": 2,
+    "meaning": "in progress / retry"
+  },
+  {
+    "name": "flagged",
+    "glyph": "🚩",
+    "codepoint": "U+1F6A9",
+    "width": 2,
+    "meaning": "flagged / escalate"
+  },
+  {
+    "name": "completion",
+    "glyph": "⭐",
+    "codepoint": "U+2B50",
+    "width": 2,
+    "meaning": "highlighted / priority"
+  },
+  {
+    "name": "note",
+    "glyph": "📌",
+    "codepoint": "U+1F4CC",
+    "width": 2,
+    "meaning": "pinned note"
+  },
+  {
+    "name": "caution",
+    "glyph": "⚠️",
+    "codepoint": "U+26A0 + U+FE0F",
+    "width": 2,
+    "meaning": "yield / caution sign — renders identically to `warning` in this project's confirmed environments; kept as a distinct name by explicit decision"
+  },
+  {
+    "name": "critical",
+    "glyph": "🚨",
+    "codepoint": "U+1F6A8",
+    "width": 2,
+    "meaning": "system alert / critical block"
+  },
+  {
+    "name": "maintenance",
+    "glyph": "🚧",
+    "codepoint": "U+1F6A7",
+    "width": 2,
+    "meaning": "feature under construction / maintenance mode"
+  },
+  {
+    "name": "online",
+    "glyph": "🟩",
+    "codepoint": "U+1F7E9",
+    "width": 2,
+    "meaning": "system healthy / online status"
+  },
+  {
+    "name": "deployed",
+    "glyph": "🚀",
+    "codepoint": "U+1F680",
+    "width": 2,
+    "meaning": "deployment successful / app launched"
+  },
+  {
+    "name": "saved",
+    "glyph": "💾",
+    "codepoint": "U+1F4BE",
+    "width": 2,
+    "meaning": "file saved to disk"
+  },
+  {
+    "name": "hint",
+    "glyph": "💡",
+    "codepoint": "U+1F4A1",
+    "width": 2,
+    "meaning": "optimization hint / best-practice suggestion"
+  },
+  {
+    "name": "searching",
+    "glyph": "🔍",
+    "codepoint": "U+1F50D",
+    "width": 2,
+    "meaning": "searching / search in progress"
+  },
+  {
+    "name": "config",
+    "glyph": "⚙️",
+    "codepoint": "U+2699 + U+FE0F",
+    "width": 2,
+    "meaning": "configuration loaded / settings"
+  },
+  {
+    "name": "log",
+    "glyph": "📋",
+    "codepoint": "U+1F4CB",
+    "width": 2,
+    "meaning": "log summary"
+  },
+  {
+    "name": "import",
+    "glyph": "📥",
+    "codepoint": "U+1F4E5",
+    "width": 2,
+    "meaning": "import / download"
+  },
+  {
+    "name": "export",
+    "glyph": "📤",
+    "codepoint": "U+1F4E4",
+    "width": 2,
+    "meaning": "export / dump"
+  },
+  {
+    "name": "deleted",
+    "glyph": "🗑️",
+    "codepoint": "U+1F5D1 + U+FE0F",
+    "width": 2,
+    "meaning": "delete / purge"
+  },
+  {
+    "name": "opened",
+    "glyph": "📂",
+    "codepoint": "U+1F4C2",
+    "width": 2,
+    "meaning": "open / expand"
+  },
+  {
+    "name": "closed",
+    "glyph": "📁",
+    "codepoint": "U+1F4C1",
+    "width": 2,
+    "meaning": "close / collapse"
+  },
+  {
+    "name": "started",
+    "glyph": "🟢",
+    "codepoint": "U+1F7E2",
+    "width": 2,
+    "meaning": "start / run"
+  },
+  {
+    "name": "stopped",
+    "glyph": "🔴",
+    "codepoint": "U+1F534",
+    "width": 2,
+    "meaning": "stop / kill"
+  },
+  {
+    "name": "login",
+    "glyph": "👤",
+    "codepoint": "U+1F464",
+    "width": 2,
+    "meaning": "login / auth"
+  },
+  {
+    "name": "logout",
+    "glyph": "🚶",
+    "codepoint": "U+1F6B6",
+    "width": 2,
+    "meaning": "logout / exit"
+  },
+  {
+    "name": "upload",
+    "glyph": "⬆️",
+    "codepoint": "U+2B06 + U+FE0F",
+    "width": 2,
+    "meaning": "upload / push"
+  },
+  {
+    "name": "download",
+    "glyph": "⬇️",
+    "codepoint": "U+2B07 + U+FE0F",
+    "width": 2,
+    "meaning": "download / pull"
+  },
+  {
+    "name": "connected",
+    "glyph": "🔌",
+    "codepoint": "U+1F50C",
+    "width": 2,
+    "meaning": "connected / online (network)"
+  },
+  {
+    "name": "offline",
+    "glyph": "🟥",
+    "codepoint": "U+1F7E5",
+    "width": 2,
+    "meaning": "system failure / offline"
+  },
+  {
+    "name": "cached",
+    "glyph": "🔋",
+    "codepoint": "U+1F50B",
+    "width": 2,
+    "meaning": "cached / buffered"
+  },
+  {
+    "name": "evicted",
+    "glyph": "🪹",
+    "codepoint": "U+1FA39",
+    "width": 2,
+    "meaning": "evicted / flushed"
+  },
+  {
+    "name": "increasing",
+    "glyph": "📈",
+    "codepoint": "U+1F4C8",
+    "width": 2,
+    "meaning": "overflow / increasing"
+  },
+  {
+    "name": "decreasing",
+    "glyph": "📉",
+    "codepoint": "U+1F4C9",
+    "width": 2,
+    "meaning": "underflow / decreasing"
+  },
+  {
+    "name": "deadlock",
+    "glyph": "💥",
+    "codepoint": "U+1F4A5",
+    "width": 2,
+    "meaning": "collision / deadlock"
+  },
+  {
+    "name": "finished",
+    "glyph": "🏁",
+    "codepoint": "U+1F3C1",
+    "width": 2,
+    "meaning": "leader / finished"
+  },
+  {
+    "name": "logged",
+    "glyph": "🪵",
+    "codepoint": "U+1FAB5",
+    "width": 2,
+    "meaning": "fallback / logged"
+  }
+]

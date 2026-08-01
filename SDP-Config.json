@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0",
+  "loopInterval": {
+    "notes": "Controls the polling interval for the sdp-project-state-loop recurring job started by sdp-auto. interval_minutes sets how often the loop wakes to check workflow state and dispatch the next step. Lower values increase responsiveness but consume more API calls; 5 minutes is a reasonable default for active development.",
+    "interval_minutes": 5
+  },
+  "autoResolveHalt": {
+    "notes": "Controls how sdp-project-state-loop responds when a REVIEWER is detected cycling without progress (eval_cycle_attempts - eval_cycles >= evalCycleAttemptThreshold). evalCycleAttemptThreshold: number of REVIEWER dispatch attempts before halt evaluation fires (default 2). pushOnEvalBlock: when true, automatically runs git push if unpushed commits are the detected cause and resets the counter; when false (default), halts with an actionable message instead.",
+    "evalCycleAttemptThreshold": 2,
+    "pushOnEvalBlock": true
+  },
+  "ci": {
+    "notes": "When enabled, WORKER/REVIEWER confirm the remote CI run for the pushed HEAD commit is green before completion via sdp-github.ps1 ci-status. When disabled or absent, ci-status returns no_ci and completion falls back to local-green with a disclosed caveat. waitTimeoutSeconds bounds the wait before ci-status returns timeout (routed to the Halt Behavior Contract).",
+    "enabled": false,
+    "provider": "github-actions",
+    "waitTimeoutSeconds": 600
+  },
+  "preflight": {
+    "notes": "Max staleness per check tier for sdp-preflight.ps1 (the manifest-driven workspace check engine reading SDP-Workspace-Setup.json). Integrity = drift guards (skills/scripts/GPG), run frequently. Setup = scaffold completeness, stable. interval 0 = always run. The sdp-project-state-loop loop honors these timers; an explicit human COORDINATOR invocation may pass -Force to bypass them. The script reads this block (policy) but never writes it; the matching facts (last-run timestamps) live in .sdp-workflow/state.json.",
+    "setupValidationIntervalHours": 24,
+    "integrityValidationIntervalHours": 1
+  },
+  "materialDecisionEscalation": {
+    "notes": "Gates the Material Decision Escalation rule (bootstrap doc, Dispatch and Halt Contracts section). When enabled, any dispatched session (any role) must halt rather than suggest, select, or introduce an external dependency not already named in .speq, or an architectural pattern with no GPG precedent, until the user resolves it. This field is loop-owned by policy: no skill, in any role, may write it. Changing it requires a human editing SDP-Config.json directly, outside any dispatched session.",
+    "enabled": true
+  },
+  "tones": "Tone/tune configuration moved to SDP-Tones.json (see SDP-Tone-Notifications.md). This key is a pointer only; sdp-tone.ps1 no longer reads SDP-Config.json.",
+  "newTerminalNotes": "The newTerminals array is read by sdp-claude-new-terminal.ps1. initialPrompt is passed as the positional argument to `claude` when a new terminal window is spawned; empty string launches interactive Claude Code with no initial prompt. startingDirectory sets the new window's working directory - absolute path, or relative to the solution root; empty/absent defaults to the solution root. hoursToSaveSessionHistory controls SDP-Terminal-Sessions.json retention: on every invocation the script checks each recorded pid; a process no longer running is marked status=not_running with a notRunningAt timestamp, and any not_running entry older than this many hours is deleted from the registry. Per-profile hoursToSaveSessionHistory, if present, wins; otherwise falls back to newTerminalDefaultHoursToSaveSessionHistory below; if that is also absent/invalid, the script's own last-resort default (168 hours, one week) applies. permissionMode sets the starting permission mode via `claude --permission-mode <value>`; empty string passes no flag (Claude Code's own default). See permissionModeOptions for the exact accepted values.",
+  "newTerminalDefaultHoursToSaveSessionHistory": 168,
+  "newTerminalPermissionModeOptions": "default | manual (alias for default, v2.1.200+) | acceptEdits | plan | auto | dontAsk | bypassPermissions",
+  "newTerminals": [
+      {
+        "id": 0,
+        "name": "go",
+        "initialPrompt": "go",
+        "startingDirectory": "",
+        "hoursToSaveSessionHistory": 72,
+        "permissionMode": "auto"
+      },
+      {
+        "id": 1,
+        "name": "stateLoop",
+        "initialPrompt": "/sdp-state-loop-start",
+        "startingDirectory": "",
+        "hoursToSaveSessionHistory": 72,
+        "permissionMode": "auto"
+      },
+      {
+        "id": 2,
+        "name": "session-respawn",
+        "initialPrompt": "/sdp-claude-session-init --launcherSessionId [x] -thenRun /sdp-state-loop-start",
+        "startingDirectory": "",
+        "hoursToSaveSessionHistory": 72,
+        "permissionMode": "auto"
+      }
+    ]
+}

@@ -1,0 +1,28 @@
+---
+name: sdp-project-worker
+description: Run a WORKER session — load task context, run pre-work verification, implement the assigned task, and record completion.
+---
+
+Do not report this skill complete unless every numbered step and all sub-steps within it have
+been completed. Skipping a step and reporting completion is incorrect behavior — if any conduct
+rules exist in this context, skipping a step is a conduct violation. Any time a step is
+discovered to have been skipped, go back and complete the skipped step from the beginning. If
+that completion attempt fails, raise the issue to the user before proceeding to any subsequent
+step.
+
+**Project resolution:** The full procedure (L2) resolves the target project using a two-level
+priority order at Step 1 before performing any path-dependent operations. All state/session/
+phase file paths are built under `[resolved_project]/`:
+- Level 1: Read `Project:` field from the session dispatch file (written by COORDINATOR at
+  dispatch time — authoritative for formally dispatched subagents).
+- Level 2: If `Project:` is absent (older session file without this field), extract the
+  `sdp-project_*` segment from the session file path as the fallback.
+
+1. Run `./sdp-shared/scripts/sdp-tone.ps1 -skillName "sdp-project-worker" -event "start"` via the PowerShell tool.
+2. Use the Read tool to read `sdp-shared/ai-skills/sdp-project-worker/SKILL.md` from the project
+   root — do this before anything else. If the Read fails, halt and invoke
+   `/sdp-create-banner icon=error row=0 row: Error | sdp-shared/ai-skills/sdp-project-worker/SKILL.md not found — skill cannot execute.`
+3. Execute every numbered step in that SKILL.md in order, completing all sub-steps of a step
+   before moving to the next. Do not report this skill complete until every step and sub-step
+   is done.
+4. Run `./sdp-shared/scripts/sdp-tone.ps1 -skillName "sdp-project-worker" -event "end"` via the PowerShell tool.

@@ -1,0 +1,78 @@
+{
+  "_doc": "Audible tone/tune notifications for SDP skills. Full reference: SDP-Tone-Notifications.md. Set enabled=false to silence everything. Model: palette (atomic notes) + sequences (named note series) + profiles (how a sequence repeats) + assignments (skill start/end single tones) + events (trigger -> sequence + profile). Exact skill match beats wildcard. Unknown/missing/disabled lookups are silent.",
+  "enabled": true,
+  "palette": [
+    { "id": "A", "hz": 262, "ms": 400, "character": "Middle C - warm, low" },
+    { "id": "B", "hz": 330, "ms": 300, "character": "E4 - mellow, brief" },
+    { "id": "C", "hz": 392, "ms": 200, "character": "G4 - gentle, quick" },
+    { "id": "D", "hz": 440, "ms": 150, "character": "A4 - clipped" },
+    { "id": "E", "hz": 220, "ms": 500, "character": "A3 - deep hum" },
+    { "id": "F", "hz": 523, "ms": 100, "character": "C5 - light tap" },
+    { "id": "G", "hz": 659, "ms": 250, "character": "E5 - bright, welcoming cheer" },
+    { "id": "H", "hz": 196, "ms": 450, "character": "G3 - low, sustained (solution-scope start)" },
+    { "id": "I", "hz": 988, "ms": 180, "character": "B5 - high, bright, short (solution-scope end)" }
+  ],
+  "assignments": [
+    { "sdpSkillName": "*", "useAtSkillStart": "B" },
+    { "sdpSkillName": "*", "useAtSkillEnd": "F" },
+    { "sdpSkillName": "sdp-solution-coordinator", "useAtSkillStart": "H", "useAtSkillEnd": "I" },
+    { "sdpSkillName": "sdp-solution-create-prompt", "useAtSkillStart": "H", "useAtSkillEnd": "I" },
+    { "sdpSkillName": "sdp-solution-loop-prep", "useAtSkillStart": "H", "useAtSkillEnd": "I" },
+    { "sdpSkillName": "sdp-solution-phase-coordinator", "useAtSkillStart": "H", "useAtSkillEnd": "I" },
+    { "sdpSkillName": "sdp-solution-phase-gate-review", "useAtSkillStart": "H", "useAtSkillEnd": "I" },
+    { "sdpSkillName": "sdp-solution-phase-reviewer", "useAtSkillStart": "H", "useAtSkillEnd": "I" },
+    { "sdpSkillName": "sdp-solution-phase-worker", "useAtSkillStart": "H", "useAtSkillEnd": "I" },
+    { "sdpSkillName": "sdp-solution-read-docs", "useAtSkillStart": "H", "useAtSkillEnd": "I" },
+    { "sdpSkillName": "sdp-solution-reviewer", "useAtSkillStart": "H", "useAtSkillEnd": "I" },
+    { "sdpSkillName": "sdp-solution-run-prompt", "useAtSkillStart": "H", "useAtSkillEnd": "I" },
+    { "sdpSkillName": "sdp-solution-state-loop", "useAtSkillStart": "H", "useAtSkillEnd": "I" },
+    { "sdpSkillName": "sdp-solution-worker", "useAtSkillStart": "H", "useAtSkillEnd": "I" }
+  ],
+  "sequences": {
+    "phase-fanfare": {
+      "gapMs": 40,
+      "notes": [ { "hz": 523, "ms": 160 }, { "hz": 659, "ms": 160 }, { "hz": 784, "ms": 260 } ]
+    },
+    "victory": {
+      "gapMs": 40,
+      "notes": [
+        { "hz": 523, "ms": 150 }, { "hz": 659, "ms": 150 }, { "hz": 784, "ms": 150 },
+        { "hz": 1046, "ms": 320 }, { "hz": 784, "ms": 120 }, { "hz": 1046, "ms": 420 }
+      ]
+    },
+    "siren": {
+      "gapMs": 0,
+      "notes": [ { "hz": 880, "ms": 220 }, { "hz": 587, "ms": 220 } ]
+    },
+    "klaxon": {
+      "gapMs": 0,
+      "notes": [ { "hz": 740, "ms": 350 }, { "hz": 0, "ms": 120 } ]
+    },
+    "tada": {
+      "gapMs": 30,
+      "notes": [ { "hz": 523, "ms": 130 }, { "hz": 659, "ms": 130 }, { "hz": 784, "ms": 450 } ]
+    },
+    "ta-daa-daaa": {
+      "gapMs": 40,
+      "notes": [ { "hz": 523, "ms": 140 }, { "hz": 746, "ms": 200 }, { "hz": 946, "ms": 500 } ]
+    }
+  },
+  "profiles": {
+    "once": { "repeat": 1, "gapMs": 0 },
+    "burst": { "repeat": 4, "gapMs": 120 },
+    "siren-long": { "repeat": 8, "gapMs": 0 },
+    "nag": { "repeat": 12, "gapMs": 250 }
+  },
+  "events": [
+    { "trigger": "api.error_detected", "sequence": "klaxon", "profile": "siren-long" },
+    { "trigger": "halt.no_progress", "sequence": "siren", "profile": "burst", "repeat": 6 },
+    { "trigger": "halt.generic", "sequence": "siren", "profile": "burst" },
+    { "trigger": "milestone.phase_complete", "sequence": "phase-fanfare", "profile": "once" },
+    { "trigger": "milestone.all_complete", "sequence": "victory", "profile": "once" },
+    { "trigger": "milestone.task_verified", "sequence": "phase-fanfare", "profile": "once", "enabled": true },
+    { "trigger": "gate.blocked", "sequence": "klaxon", "profile": "burst", "enabled": true },
+    { "trigger": "milestone.doc_certified", "sequence": "phase-fanfare", "profile": "once" },
+    { "trigger": "skill.sdp_initialize_sdp_end", "sequence": "tada", "profile": "once", "enabled": true },
+    { "trigger": "audition.ta_daa", "sequence": "ta-daa-daaa", "profile": "once", "enabled": true }
+  ]
+}
