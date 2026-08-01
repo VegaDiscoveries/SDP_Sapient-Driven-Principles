@@ -220,6 +220,9 @@ substitute.
 SPDX-License-Identifier: BUSL-1.1
 ```
 
+See also [`DISCLAIMER.md`](DISCLAIMER.md) for risk, warranty, and liability disclosures specific
+to AI-agent behavior under this Framework.
+
 ---
 
 ## Links
