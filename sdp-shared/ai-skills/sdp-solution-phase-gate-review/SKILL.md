@@ -20,8 +20,9 @@ LLM-judgment phases in between that no script can perform:
   Behavior Contract state on failure.
 - `sdp-solution-phase-gate-review-setup.ps1` (Steps 3-5) — reads the dispatch file, cross-checks
   `current_phase`, reads the phase document, strips any prior Gate Verdict blockquote(s) from the
-  content handed to the LLM's independent assessment, and separately surfaces prior
-  `GATE_BLOCKED` blockquotes for the re-gate check.
+  content handed to the LLM's independent assessment (each surviving line numbered against the
+  real file, Read-tool convention, so findings can cite exact lines without opening it), and
+  separately surfaces prior `GATE_BLOCKED` blockquotes for the re-gate check.
 - `sdp-solution-phase-gate-review-finalize.ps1` (Steps 9-10) — takes the LLM's verdict as an
   explicit `-Verdict` argument (never inferred by the script), updates `phase_gate` state, plays
   the `gate.blocked` tone on a blocked verdict, records a `gate.verdict` entry to
@@ -91,8 +92,10 @@ Parse the single-line JSON result. Branch on `status`:
   matching the dispatch file's `Work Item:` field; or the phase document not found.)
 - **`"success"`** — Record `session_id`, `role_confirmed`, `current_phase`, `phase_gate_status`,
   `gate_eval_cycles`, `phase_document_path`, `is_regate_cycle`, `regate_trigger_reason`,
-  `phase_document_content` (Gate Verdict blockquotes already stripped), and
-  `prior_gate_blocked_blockquotes`. Proceed to Step 6.
+  `phase_document_content` (Gate Verdict blockquotes already stripped; every surviving line
+  prefixed with its original line number from the real file, same convention as the Read tool —
+  cite these numbers directly in findings), and `prior_gate_blocked_blockquotes`. Proceed to
+  Step 6.
 
 ### Material Decision Escalation Check
 
@@ -111,8 +114,11 @@ section (Dispatch and Halt Contracts).
 
 Assess `phase_document_content` from the Step 3 script result independently against all four
 standard criteria, described identically to `sdp-project-gate-review`'s Step 6. This content already has
-any prior Gate Verdict blockquote stripped — do not read the actual phase document file at this
-point, and do not read `prior_gate_blocked_blockquotes` before completing this step.
+any prior Gate Verdict blockquote stripped and every surviving line prefixed with its original
+line number from the real file (same convention as the Read tool) — cite those numbers directly
+in findings. Do not read the actual phase document file at this point (line numbers are already
+available without it), and do not read `prior_gate_blocked_blockquotes` before completing this
+step.
 
 **Every phase reviewed here is solution-scoped by construction** — unlike `sdp-project-gate-review`,
 there is no project-level legacy-migration case to distinguish. **Phase Readiness detection:**
@@ -126,10 +132,18 @@ the bootstrap document's phase structure. No placeholder content remains in subs
 
 **Internal consistency** — no unresolved contradictions between sections.
 
-**GPG alignment** — read
-`standards/GenericProjectGuidlines_Sections/GenericProjectGuidlines_TOC.md`. Cross-reference
-its section titles against this phase document's content and decisions. An undocumented GPG
-divergence is a finding.
+**GPG alignment** — read `standards/GenericProjectGuidlines_Sections/GenericProjectGuidlines_TOC.md`
+and, for chapter applicability, the bootstrap document's GPG Reading Map (Always-Read-by-Phase
+and Conditional-by-Task-Content tables). A chapter is **applicable** to this phase document when
+it is Always-Read for this workflow stage, or its Conditional trigger topic matches what the
+solution actually builds or decides — regardless of whether the phase document happens to
+mention that topic. (No project-level `gpg_excluded_chapters` exclusion applies at this scope —
+that field is populated per-project starting at Phase 7 decomposition; solution-scoped phases
+1-7 have no such list to consult.) For each applicable chapter: verify the document's choices
+align with GPG guidance for that chapter, or that an omission or divergence carries an explicit,
+documented rationale. An applicable chapter the document is simply silent on, with no rationale,
+is itself a finding — not a pass by default. An undocumented GPG divergence is likewise a
+finding, as before.
 
 **Readiness for next phase** — the phase document contains enough detail and enough settled
 decisions for the next phase to begin work without circular dependencies or unresolved
@@ -139,7 +153,7 @@ prerequisites.
 `[phase]_state.json` carries a `source_document` field (a tracked source doc exists for this
 cycle): confirm `sdp_source_coverage.completed` is `true` and its `source_document` value matches
 the tracked reference. Absent or `false` is a finding — this phase cannot pass gate review until
-`sdp-source-coverage-check` has certified. If the field is absent (conversational intake, no
+`sdp-solution-source-coverage-check` has certified. If the field is absent (conversational intake, no
 tracked source for this cycle): not applicable, no finding, standard four criteria only.
 
 **Architecture and Implementation Overview gates only — Pros-Cons-Gaps cycle ran:** read this
@@ -283,7 +297,9 @@ here. Do not spawn subagents. Do not perform `sdp-solution-phase-coordinator` ac
   no `-scope` parameter anywhere in this skill's own procedure or its three backend scripts.
 - Never review at single-task granularity — the phase document is the review unit.
 - Do not read the prior GATE_BLOCKED blockquote before completing the independent assessment in
-  Step 6.
+  Step 6, and do not open the actual phase document file at that point either — the Step 3
+  script's line-numbered `phase_document_content` already provides everything needed to cite
+  findings by line.
 - Do not advance `current_phase`, reset `phase_gate`, or spawn subagents.
 - Do not write `gate_review_attempts` — owned by `sdp-solution-state-loop`.
 - A GATE_PASSED verdict requires all four criteria — five when the Concept/Expanded Concept

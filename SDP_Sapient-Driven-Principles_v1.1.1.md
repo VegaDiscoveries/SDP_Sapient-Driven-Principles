@@ -1,11 +1,13 @@
+<img src="sdp-shared/docs/images/SDP_DocsLogo_WithText_0700x0163.png" alt="SDP Logo" width="375">
+
 # AI-Assisted Development Workflow — Bootstrap Document
 
 | Field | Value |
 |-------|-------|
-| **Version** | 1.1.0 |
+| **Version** | 1.1.1 |
 | **Patterns** | 0 |
-| **Updated** | 2026-07-18 |
-| **File** | `SDP_Sapient-Driven-Principles_v1.1.0.md` |
+| **Updated** | 2026-08-13 |
+| **File** | `SDP_Sapient-Driven-Principles_v1.1.1.md` |
 
 **Purpose:** When this file is read by an agent in a new workspace, it serves as complete instructions
 for setting up the workspace structure and initiating the development workflow described herein.
@@ -147,9 +149,8 @@ Three distinct roles operate in this workflow. A single session must never perfo
   > **Correction — 2026-07-21:** This bullet still named `02_expanded_concept.md` — the filename
   > from before the 2026-07-18 phase renumbering (5→7 phases) moved Expanded Concept from Phase 2
   > to Phase 3. Every other bootstrap-doc reference to this file already reads
-  > `03_expanded_concept.md`; this was the one instance the renumbering task missed. See
-  > `~SDP-Maintenance/~docs/phase-1-3-interactive-capture-design.md` for full rationale (found
-  > while closing the related Phase 1/3 interactive-capture gap below).
+  > `03_expanded_concept.md`; this was the one instance the renumbering task missed (found while
+  > closing the related Phase 1/3 interactive-capture gap below).
 - May run as a persistent orchestration loop or be invoked on demand by the user
 - Writes dispatch instructions to `sessions/session-NNN.md` before handing off
 
@@ -261,8 +262,7 @@ is invisible to future agents and is not part of the audit trail.
 > Neither `sdp-solution-phase-coordinator/SKILL.md` nor `sdp-solution-phase-worker/SKILL.md`
 > contained a single mention of brainstorming before this addition, so every Phase 1 and Phase 3
 > dispatch ran as a fully non-interactive WORKER task — discovered when a user testing SDP in a
-> separate project expected an interactive Phase 3 session and got a silent subagent instead. See
-> `~SDP-Maintenance/~docs/phase-1-3-interactive-capture-design.md` for full rationale.
+> separate project expected an interactive Phase 3 session and got a silent subagent instead.
 
 The Superpowers Integration Policy table above already scopes `/brainstorming` to **COORDINATOR
 only** — WORKER and REVIEWER are both "Role mismatch." The mechanism now matches that scoping:
@@ -271,14 +271,24 @@ only** — WORKER and REVIEWER are both "Role mismatch." The mechanism now match
    Phase 3 (Expanded Concept), it runs `/brainstorming` interactively with the user **in the
    COORDINATOR session itself** — the Role definition's carve-out above exists for exactly this.
 1a. **[2026-07-21 addition]** Before opening the brainstorming session, COORDINATOR reads this
-   cycle's tracked source document — the `source_document` field `sdp-new-concept-intake` writes
+   cycle's tracked source document — the `source_document` field ~~`sdp-new-concept-intake`~~
+   `sdp-solution-new-concept-intake` writes
    to the Concept phase's state file, if this cycle was document-driven (absent for conversational
    intake, in which case this sub-step is skipped) — and brings the source file(s) under
    `sdp-solution-docs/user-design-docs/processed/` into the session, not just the derived Phase 1
    concept document. Phase 1 is a deliberate compression of the source; drafting Phase 1 or Phase 3
    from the compression alone, without the original, risks losing detail the compression already
-   dropped. This is a proactive complement to `sdp-source-coverage-check`, not a replacement for
-   it — that check still runs as the mandatory backstop after drafting.
+   dropped. This is a proactive complement to ~~`sdp-source-coverage-check`~~
+   `sdp-solution-source-coverage-check`, not a replacement for it — that check still runs as the
+   mandatory backstop after drafting.
+
+   > **Correction — 2026-08-08:** `sdp-new-concept-intake` renamed to
+   > `sdp-solution-new-concept-intake` as part of aligning solution-scoped skill names with the
+   > `sdp-solution-` prefix convention (see `project-scope-skill-naming-design.md`).
+
+   > **Correction — 2026-08-08:** `sdp-source-coverage-check` renamed to
+   > `sdp-solution-source-coverage-check` as part of aligning solution-scoped skill names with the
+   > `sdp-solution-` prefix convention (see `project-scope-skill-naming-design.md`).
 1b. **[2026-07-21 addition, same day follow-up]** COORDINATOR states what it read, by name — the
    tracked source file's actual path (or "no tracked source document for this cycle" if 1a's field
    was absent), `01_concept.md`, and (Phase 3) `02_research_findings.md` — before opening the
@@ -393,8 +403,7 @@ must pass a gate (a REVIEWER session) before the next phase begins.
 > **Superseded — 2026-07-18 — expanded to 7 phases.** The 5-phase diagram below is the
 > pre-2026-07-18 pipeline, kept for historical reference (any project still running under
 > `SDP_Sapient-Driven-Principles_v1.0.0.md` per the Version Change Procedure's "freeze on
-> starting version" rule uses this shape). See `~SDP-Maintenance/~docs/phase-pipeline-expansion-design.md`
-> for full rationale.
+> starting version" rule uses this shape).
 >
 > ```
 > Phase 1: Concept
@@ -444,15 +453,13 @@ Phase 7: Phase Readiness
 > **Correction — 2026-07-20 — phases 1–7 are solution-scoped.** Every phase in the pipeline
 > above runs **once per solution**, never once per project — driven by ~~`sdp-solution-coordinator`~~
 > [2026-07-22: superseded — see Correction below] `sdp-solution-phase-coordinator` (a dedicated
-> companion skill; `sdp-solution-coordinator` itself never reaches phases-1–7 dispatch logic — see
-> `~SDP-Maintenance/~docs/solution-phase-dispatch-gap-design.md`), with
+> companion skill; `sdp-solution-coordinator` itself never reaches phases-1–7 dispatch logic), with
 > deliverables at `sdp-solution-docs/*.md`, tracked via `.sdp-solution-workflow/registry.md` and
 > `.sdp-solution-workflow/state.json`. Project-level identity first appears at Phase 7's
 > decomposition step, which assigns build-phase tasks into each project's own (previously empty)
 > `.sdp-workflow/registry.md`. Everything in the Implementation Loop section below this one
 > continues to operate per-project, completely unchanged — that machinery only ever begins after
-> Phase 7's gate passes. See
-> `~SDP-Maintenance/~docs/solution-coordinator-orchestration-design.md` §2, §6 for full rationale.
+> Phase 7's gate passes.
 
 > ~~**Addition — 2026-07-13 — Phase 5 sizing signal:** Phase 5's job is not limited to writing
 > acceptance criteria for a single Refined Implementation Plan document — it is also where the
@@ -482,10 +489,11 @@ Phase 7: Phase Readiness
 ### Phase 1 — Source-Doc Intake Ownership
 
 > **Addition — 2026-07-18:** `sdp-solution-docs/user-design-docs/` (the drop zone for
-> pre-existing user design docs/notes) and the mandatory `sdp-source-coverage-check` step existed
-> only in Level 2 skill files (`sdp-new-concept-intake`, `sdp-source-coverage-check`) before this
-> addition — never in this section, despite this section being the authoritative parent for phase
-> gates. Phase 1's bootstrap-doc entry now explicitly owns this path:
+> pre-existing user design docs/notes) and the mandatory ~~`sdp-source-coverage-check`~~
+> `sdp-solution-source-coverage-check` step existed only in Level 2 skill files
+> (~~`sdp-new-concept-intake`~~ `sdp-solution-new-concept-intake`, ~~`sdp-source-coverage-check`~~ `sdp-solution-source-coverage-check`)
+> before this addition — never in this section, despite this section being the authoritative
+> parent for phase gates. Phase 1's bootstrap-doc entry now explicitly owns this path:
 >
 > 1. Check `sdp-solution-docs/user-design-docs/processed/` for existing files.
 > 2. **If empty** (no intake has happened yet): proactively ask the user — "Do you have any
@@ -493,17 +501,15 @@ Phase 7: Phase Readiness
 >    into Phase 1 rather than starting from a blank concept doc." This is a deliberate onboarding
 >    moment for new users who wouldn't otherwise know document-driven intake exists.
 >    - If yes: tell them where to place files (`sdp-solution-docs/user-design-docs/`) and invoke
->      `/sdp-new-concept-intake` to process them before drafting `sdp-solution-docs/01_concept.md`.
+>      ~~`/sdp-new-concept-intake`~~ `/sdp-solution-new-concept-intake` to process them before drafting `sdp-solution-docs/01_concept.md`.
 >    - If no: ~~proceed with conversational intake as today — no source doc, no behavior
 >      change.~~ [2026-07-20: superseded — see Correction below]
 > 3. **If files already exist in `processed/`:** intake already happened — skip the prompt, draft
 >    `sdp-solution-docs/01_concept.md` from the tracked source as today.
-> 4. `sdp-source-coverage-check` runs immediately after Phase 1 and Phase 3 (Concept and
+> 4. ~~`sdp-source-coverage-check`~~ `sdp-solution-source-coverage-check` runs immediately after Phase 1 and Phase 3 (Concept and
 >    Expanded Concept, under this version's numbering) are drafted, comparing the tracked source
 >    doc against `sdp-solution-docs/01_concept.md`/`sdp-solution-docs/03_expanded_concept.md` for
 >    coverage — mandatory, not optional.
->
-> See `~SDP-Maintenance/~docs/phase-pipeline-expansion-design.md` §2 for full rationale.
 >
 > **Correction — 2026-07-20:** The struck-through "if no" branch collapsed two materially
 > different situations into one — "I'll describe it live and skip document creation entirely"
@@ -511,14 +517,13 @@ Phase 7: Phase Readiness
 > branches further:
 >    - **No docs, want to develop one:** run `/brainstorming` to develop the concept — direct it
 >      to save the resulting spec to `sdp-solution-docs/user-design-docs/` (not Superpowers' own
->      default `docs/superpowers/specs/` location) — then invoke `/sdp-new-concept-intake`, which
+>      default `docs/superpowers/specs/` location) — then invoke ~~`/sdp-new-concept-intake`~~
+>      `/sdp-solution-new-concept-intake`, which
 >      picks it up via its existing document-driven mode exactly as if it had been hand-dropped.
->      No change to `sdp-new-concept-intake` itself was needed or made.
+>      No change to ~~`sdp-new-concept-intake`~~ `sdp-solution-new-concept-intake` itself was needed or made.
 >    - **No docs, want to seed directly from conversation:** proceed with conversational intake
 >      as before — no source doc, no coverage-check applies to this cycle. Still the right choice
 >      for genuinely trivial concepts that don't warrant full brainstorming rigor.
->
-> See `~SDP-Maintenance/~docs/concept-intake-brainstorm-path-design.md` for full rationale.
 
 ### Phase 2 — Research
 
@@ -560,15 +565,12 @@ afterward, same as any other phase. No new `orchestration_mode` value; does not 
 Invariant 7 (outcome detection via state file only) — child-subagent text is consumed only by
 the parent WORKER, never read by COORDINATOR directly.
 
-See `~SDP-Maintenance/~docs/phase-pipeline-expansion-design.md` §3 for full rationale.
-
 ### Phase 3 — Expanded Concept
 
 > **Addition — 2026-07-21:** Phase 3 previously had no Mechanics entry at all — Phase 2 and
 > Phase 7 both do. The only existing hint that Phase 3 must incorporate Phase 2's findings was
 > Phase 2's own gate criterion ("Actionability: findings are structured so Phase 3 can cite them
-> directly by angle"); nothing told whoever drafted Phase 3 to actually do so. See
-> `~SDP-Maintenance/~docs/phase-1-3-interactive-capture-design.md` for full rationale.
+> directly by angle"); nothing told whoever drafted Phase 3 to actually do so.
 
 **Trigger:** COORDINATOR dispatches a WORKER-role task for Phase 3 immediately after Phase 2's
 gate passes.
@@ -600,8 +602,12 @@ gate passes.
 - **Capture fidelity:** every decision transcribed from the COORDINATOR brainstorming session
   appears in the expanded concept, unmodified in substance.
 - **Source coverage:** when a tracked source doc exists (Phase 1 — Source-Doc Intake Ownership),
-  `sdp-source-coverage-check` has run against this document — mandatory, not optional (see that
-  section above).
+  ~~`sdp-source-coverage-check`~~ `sdp-solution-source-coverage-check` has run against this
+  document — mandatory, not optional (see that section above).
+
+  > **Correction — 2026-08-08:** `sdp-source-coverage-check` renamed to
+  > `sdp-solution-source-coverage-check` as part of aligning solution-scoped skill names with the
+  > `sdp-solution-` prefix convention (see `project-scope-skill-naming-design.md`).
 - **Actionability:** the expanded concept is structured so Phase 4 (Architecture) can build
   directly on it without re-deriving decisions already made here.
 
@@ -612,7 +618,7 @@ gate passes.
 > Contracts section) after a project's Architecture phase closed a hosting-provider gap via the
 > Pros-Cons-Gaps Cycle's "declared out of scope with a written rationale" path with zero user
 > contact, and a separate project stalled mid-build needing external API credentials no phase had
-> surfaced early. See `~SDP-Maintenance/~docs/material-decision-escalation-design.md`.
+> surfaced early.
 
 **Trigger:** COORDINATOR dispatches a WORKER-role task for Phase 4 immediately after Phase 3's
 gate passes.
@@ -768,8 +774,7 @@ solution's own registry — no project is even assigned work yet, in the strict 
 branch, added by the prior phase-pipeline-expansion work) becomes unreachable once no project's
 `current_phase` ever again contains "Phase Readiness" under normal operation — existing code
 going unexercised, not a defect; it remains live only for the transient migration case (see the
-design doc's Section 11). See
-`~SDP-Maintenance/~docs/solution-coordinator-orchestration-design.md` §3 for full rationale.
+design doc's Section 11).
 
 > **Correction — 2026-07-21:** the original design put a `-scope project|solution` parameter on
 > ~~`sdp-gate-review`~~ `sdp-project-gate-review`'s three backend scripts rather than authoring a companion skill — the
@@ -782,9 +787,8 @@ design doc's Section 11). See
 > solution-level work. ~~`sdp-gate-review`~~ `sdp-project-gate-review`'s `-scope` parameter was removed entirely — it is
 > project-scoped only again, exactly as before this whole design — and `sdp-solution-phase-gate-review`
 > was authored as a dedicated companion, even though its content is very close to
-> ~~`sdp-gate-review`~~ `sdp-project-gate-review`'s own. See
-> `~SDP-Maintenance/~docs/solution-phase-dispatch-gap-design.md` for the full rationale, including
-> why the equivalent WORKER/REVIEWER gap (surfaced the same week) was closed the same way with
+> ~~`sdp-gate-review`~~ `sdp-project-gate-review`'s own. The equivalent WORKER/REVIEWER gap
+> (surfaced the same week) was closed the same way with
 > `sdp-solution-phase-worker`/`sdp-solution-phase-reviewer`, rather than adding solution-scope
 > awareness to ~~`sdp-worker`~~ `sdp-project-worker`/~~`sdp-reviewer`~~ `sdp-project-reviewer`.
 
@@ -832,8 +836,6 @@ format this extends):
 > 2. **Target Phase:** [exact .sdp-solution-workflow/registry.md Phase column value] — [description]
 > 3. **Target Phase:** [exact .sdp-solution-workflow/registry.md Phase column value] — [description]
 ```
-
-See `~SDP-Maintenance/~docs/phase-pipeline-expansion-design.md` §4, §5 for full rationale.
 
 Pros-cons-gaps cycles happen within the architecture and overview phases. Each cycle:
 1. Agent identifies pros, cons, and gaps in the current document
@@ -1379,6 +1381,9 @@ WORKER session (new subagent invocation):
       Set status → WORK_COMPLETE as normal. Session ends — COORDINATOR handles escalation.
   11. Mark task checkbox [x] in the phase file
   12. Append Completed blockquote (include build/compile status explicitly)
+  12a. [2026-08-17 addition — see Correction below] If the phase file has a top-level
+      **Status:** header and its value does not reflect the new WORK_COMPLETE state: strike it
+      through and append the corrected value, per Append-Only Discipline.
   13. Update [phase]_state.json: set task status → WORK_COMPLETE, last_session, last_updated
   14. Mirror phase file changes to parent doc per sync rule
   15. Session ends — do not proceed to evaluate own work
@@ -1497,7 +1502,7 @@ REVIEWER session (new subagent invocation):
        match `[PROJECT].speq.md`. A deviation not noted in the Completed blockquote is a finding —
        including any new external dependency introduced without a resolved Material Decision
        Escalation halt on record for it (see Dispatch and Halt Contracts section). [2026-07-23
-       addition — see `~SDP-Maintenance/~docs/material-decision-escalation-design.md`.]
+       addition.]
   7. Append Eval N blockquote (criterion-by-criterion; each sub-step addressed explicitly)
      State outcome: compliant / partially compliant / non-compliant
      If non-compliant: include specific, actionable notes for the next WORKER session
@@ -1511,11 +1516,31 @@ REVIEWER session (new subagent invocation):
        partially compliant verdict), also add flag "PARTIAL_COMPLIANCE_ESCALATE" — COORDINATOR
        must flag this task for design review before dispatching a new WORKER session.
      - If non-compliant (no Verified written): status → REJECTED, eval_cycles + 1
+  9a. [2026-08-17 addition — see Correction below] If the phase file has a top-level
+      **Status:** header and its value does not reflect the new evaluated state: strike it
+      through and append the corrected value (VERIFIED, VERIFIED (partially compliant), or
+      REJECTED as applicable), per Append-Only Discipline.
   10. Mirror phase file changes to parent doc per sync rule
   11. Session ends
 
 Repeat.
 ```
+
+> **Addition — 2026-08-17 — WORKER/REVIEWER Step 12a/9a, phase-document Status header sync:**
+> The standard phase-document template (`SDP-Workspace-Setup.md`) includes a top-level
+> `**Status:**` header, but no step in this Implementation Loop ever kept it synced with the
+> task's actual completion state — only "Mark task checkbox" and "Append Completed blockquote"
+> existed for WORKER, and the equivalent Eval/Verified steps for REVIEWER, neither of which
+> touches this header. The only place it ever got corrected was reactively, as a GATE_REVIEWER
+> Internal Consistency finding that blocks the gate on a stale `**Status:** PENDING.` header
+> contradicting the task's own checkbox and Completed/Eval/Verified blockquotes — confirmed
+> recurring five times across one project's Work Items (WI-RD-2, 7, 8, 10, 11), each costing a
+> full block → fix → re-gate cycle for a defect that was fully predictable in advance. WORKER
+> Step 12a and REVIEWER Step 9a close this at the source: sync the header when the state that
+> would make it correct is already being set, instead of leaving it for GATE_REVIEWER to
+> discover and block on later. See `sdp-project-worker/SKILL.md` Step 6, `sdp-project-reviewer/SKILL.md`
+> Step 6, `sdp-solution-phase-worker/SKILL.md` Step 6, and `sdp-solution-phase-reviewer/SKILL.md`
+> Step 6 for the corresponding Level 2 procedure steps.
 
 **Critical rule:** Work on a task and review of that task must occur in separate subagent
 invocations with no shared conversation history. An agent that performs work on a task is
@@ -1587,8 +1612,7 @@ with a clean attempt counter.
 >
 > **Never-reset regression record — solution-scoped since 2026-07-20:** the *solution's*
 > `.sdp-solution-workflow/state.json` gains a `phase_readiness` block (project-level `state.json`
-> retains the identical field for the transient migration case only — see the
-> `~SDP-Maintenance/~docs/solution-coordinator-orchestration-design.md` §11):
+> retains the identical field for the transient migration case only):
 >
 > ```json
 > "phase_readiness": {
@@ -1951,8 +1975,7 @@ After the final cycle, the document goes to gate review.
 > (Dispatch and Halt Contracts section — an external dependency not already named in `.speq`, or
 > an architectural pattern with no GPG precedent) cannot be resolved via the Deferred or
 > declared-out-of-scope bullets above alone. It must go through that escalation and reach either
-> explicit user approval or an explicitly user-approved deferral before it counts as resolved. See
-> `~SDP-Maintenance/~docs/material-decision-escalation-design.md`.
+> explicit user approval or an explicitly user-approved deferral before it counts as resolved.
 
 ### Gap Resolution Format
 
@@ -2345,8 +2368,7 @@ When a blocking condition is detected:
 > Resolve this condition and run COORDINATOR to resume.` — the wording is unchanged, only the
 > delivery mechanism. This is the "Halt Behavior Contract" text referenced throughout this
 > document and mirrored across ~~`sdp-coordinator`~~ `sdp-project-coordinator`, ~~`sdp-worker`~~ `sdp-project-worker`, ~~`sdp-reviewer`~~ `sdp-project-reviewer`, ~~`sdp-state-loop`~~ `sdp-project-state-loop`,
-> and other skills' Level 2 procedures — all were converted in the same pass (23 skills total;
-> see `~SDP-Maintenance/~docs/sdp-create-banner-adoption-tracker.md` for the full list).
+> and other skills' Level 2 procedures — all were converted in the same pass (23 skills total).
 >
 > **Correction — 2026-07-24:** This 2026-07-17 correction's own text still named `sdp-reviewer` —
 > renamed to `sdp-project-reviewer` as part of the `sdp-project-*` scope-prefix rename (see
@@ -2666,7 +2688,7 @@ REVIEWER reads the same chapters for the task under review during the GPG alignm
 | Ch. 9 — DTO & Contract Library | DTO classes, request/response contracts, shared contract library |
 | Ch. 10 — API Design & Response Envelope | API endpoint design, response shaping, HTTP conventions, versioning |
 | Ch. 11 — Website (Blazor) | Blazor components, pages, layouts, client-side patterns |
-| Ch. 12 — Mobile Readiness | Mobile API concerns, offline support, push notifications, mobile-specific patterns |
+| Ch. 12 — Mobile Readiness | Mobile API concerns, offline support, push notifications, adaptive/responsive UI layout, mobile-specific patterns |
 | Ch. 14 — Configuration & Secrets | App settings, environment-specific config, secrets management, `appsettings.json` |
 | Ch. 17 — Database Seed Data Patterns | Seed data scripts, initial data population, migration seeding |
 
@@ -2692,4 +2714,4 @@ all dispatch files for the life of the project.
 
 ---
 
-*End of bootstrap document. Version 1.1.0 — 2026-07-18.*
+*End of bootstrap document. Version 1.1.1 — 2026-08-13.*

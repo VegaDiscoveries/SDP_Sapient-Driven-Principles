@@ -20,8 +20,8 @@ signal; a three-note "tada" tune (see the `tada` sequence in `SDP-Tones.json`, b
 note at both start and end.
 
 1. Use the Read tool to read `sdp-shared/ai-skills/sdp-initialize-sdp/SKILL.md` from the project
-   root — do this before anything else. If the Read fails, halt and report:
-   "`sdp-shared/ai-skills/sdp-initialize-sdp/SKILL.md` not found — skill cannot execute."
+   root — do this before anything else. If the Read fails, halt and invoke
+   `/sdp-create-banner icon=error row=0 row: Status | sdp-shared/ai-skills/sdp-initialize-sdp/SKILL.md not found — skill cannot execute.`
 2. Execute every numbered step in that SKILL.md in order, completing all sub-steps of a step
    before moving to the next. Do not report this skill complete until every step and sub-step
    is done.

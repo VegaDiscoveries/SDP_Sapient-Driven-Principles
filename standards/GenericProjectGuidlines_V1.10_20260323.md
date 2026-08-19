@@ -165,6 +165,8 @@ A pure API consumer. References only the `Contracts` library. Contains no busine
 - MVVM viewmodels bound to MAUI pages and shell navigation
 - Platform-specific code under `Platforms/{iOS|Android|Windows|MacCatalyst}/`
 - App version number tracked separately from the API version (see Chapter 4)
+- Dynamic, structured screen content sourced per target — mobile always via the API, desktop via
+  an API-synced local cache by default (see Chapter 12's Dynamic Content Delivery)
 
 ---
 
@@ -249,6 +251,7 @@ A consistent folder structure across all projects reduces the time needed to nav
   │   │   ├── Public/                 // pages accessible without authentication
   │   │   └── Secure/                 // pages requiring authentication
   │   └── Support/                    // PageBase.cs, SecurePageBase.cs
+  ├── Content/                        // JSON data files backing structured page content (Ch. 11)
   ├── Data/                           // WebsiteContext, WebsiteUser, WebsiteRole
   ├── Support/
   │   ├── Extensions/                 // StringExtensions.cs, SessionExtensions.cs
@@ -2656,6 +2659,78 @@ public class SecurePageBase : ComponentBase
 - **SHOULD** Use `StringExtensions` and `SessionExtensions` from `Support/Extensions/` rather than duplicating logic inline.
 - **SHOULD** Group pages by access level: `Pages/Public/` and `Pages/Secure/`.
 
+### Responsive Layout
+
+> **Addition — 2026-08-11:** Added after a review of an existing SDP-built site found no
+> requirement anywhere in this document that customer-facing pages render correctly across
+> device sizes.
+
+Every customer-facing page — public marketing/portfolio pages as much as authenticated app
+pages — must render correctly across desktop, tablet, and phone viewports.
+
+- **MUST** Every page includes the standard responsive viewport meta tag
+  (`<meta name="viewport" content="width=device-width, initial-scale=1" />`) in the shared
+  page layout's `<head>` (this stack's Blazor Web App: `App.razor`) — never overridden
+  per-page.
+- **MUST** Layout and navigation use CSS Flexbox/Grid with relative units (`%`, `rem`, `fr`,
+  `vw`/`vh`) and at minimum a mobile breakpoint (~≤480px) and a tablet breakpoint
+  (~481–1024px) in addition to the desktop layout. Fixed pixel-width containers that do not
+  reflow below desktop width are not acceptable for customer-facing pages.
+- **MUST** Primary navigation collapses to a mobile-appropriate pattern (hamburger/off-canvas
+  menu or equivalent) below the tablet breakpoint rather than truncating or overflowing.
+- **SHOULD** Verify each new or changed customer-facing page at three reference widths — phone
+  (~375px), tablet (~768px), desktop (~1440px) — before marking the task complete; for
+  `[VERIFY DURING IMPLEMENTATION]`-flagged UI tasks, note the widths checked in the Completed
+  blockquote.
+- **SHOULD** Prefer CSS-only responsive behavior (media queries, container queries) over
+  JavaScript-driven layout switching, to keep behavior predictable and testable.
+- **MAY** Use a component library's built-in responsive grid (e.g. Bootstrap, MudBlazor) in
+  place of hand-rolled Flexbox/Grid, provided its breakpoints are not overridden in a way that
+  defeats the MUST rules above.
+
+### Dynamic Content Collections
+
+> **Addition — 2026-08-13:** Concrete Website instantiation of Chapter 13's "Data-Driven Content —
+> Preferred Default" rule. Added after a real incident where a version-history page's milestone
+> list had no data source separate from the page markup rendering it.
+
+Any structured, repeating content collection rendered on a page — version-history/changelog
+entries, FAQ items, testimonials, portfolio or pricing entries — is sourced from a typed content
+file under `Content/` (see Chapter 3), not hand-authored in the `.razor` markup.
+
+```csharp
+// Content/VersionHistoryEntry.cs
+public record VersionHistoryEntry(string Version, DateOnly Date, string Description);
+
+// Support/ContentService.cs
+public class ContentService(IWebHostEnvironment env)
+{
+    public async Task<IReadOnlyList<T>> LoadAsync<T>(string contentFileName)
+    {
+        var path = Path.Combine(env.ContentRootPath, "Content", contentFileName);
+        await using var stream = File.OpenRead(path);
+        return await JsonSerializer.DeserializeAsync<List<T>>(stream) ?? [];
+    }
+}
+```
+
+```json
+// Content/version-history.json
+[
+  { "version": "1.1.0", "date": "2026-08-11", "description": "..." }
+]
+```
+
+- **MUST** Structured content collections live under `Content/` at the project root, one JSON file
+  per collection, deserialized into a strongly-typed record via an injected content-loading
+  service.
+- **MUST** Pages consume content through the content-loading service — never by reading the file
+  directly or embedding the values inline.
+- **SHOULD** Name the content file after the collection it backs (`version-history.json`,
+  `faq.json`) so a content update can be located without a codebase search.
+- **MAY** Cache a loaded content file's deserialized result for the process lifetime when the
+  backing page is read frequently and the file only changes on deploy.
+
 ---
 
 ## Chapter 12 — Mobile Readiness
@@ -2693,6 +2768,61 @@ var storedRefreshToken = await SecureStorage.Default.GetAsync("refresh_token");
 - **MUST** MAUI references only `{AppName}.Contracts`. Never `Domain` or `API`.
 - **SHOULD** Handle `401 Unauthorized` globally in the HTTP client by attempting a silent token refresh before showing a login prompt.
 - **SHOULD** Test localization using device locale settings on both iOS Simulator and Android Virtual Device before release.
+
+### Adaptive Layout (MAUI UI)
+
+> **Addition — 2026-08-11:** The rest of this chapter prepares the API/contracts layer for a
+> future MAUI app; it does not address whether the MAUI app's own UI adapts across phone,
+> tablet, and orientation. This subsection closes that gap.
+
+Every MAUI page must render correctly on phone and tablet form factors, in both portrait and
+landscape.
+
+- **MUST** Layouts use adaptive sizing primitives (`Grid`/`FlexLayout` with proportional
+  (`*`/`Auto`) sizing, `OnIdiom`/`OnPlatform` markup extensions, or
+  `VisualStateManager`/`AdaptiveTrigger`) rather than fixed pixel dimensions.
+- **MUST** Verify each new or changed page on at least one phone-class and one tablet-class
+  screen profile, in both portrait and landscape, before marking the task complete; for
+  `[VERIFY DURING IMPLEMENTATION]`-flagged UI tasks, note the profiles checked in the Completed
+  blockquote.
+- **SHOULD** Prefer declarative XAML sizing (Grid ratios, `HorizontalOptions="FillAndExpand"`,
+  etc.) over manual `OnSizeAllocated`/pixel-math layout logic.
+- **SHOULD** Verify orientation-change behavior doesn't clip or truncate content.
+- **MAY** Use a UI toolkit's adaptive-layout component (e.g. .NET MAUI Community Toolkit,
+  Syncfusion, Telerik) in place of hand-rolled adaptive layout, provided it doesn't override
+  the platform's own size-class behavior in a way that defeats the MUST rules above.
+
+### Dynamic Content Delivery
+
+> **Addition — 2026-08-13:** Concrete MAUI instantiation of Chapter 13's "Data-Driven Content —
+> Preferred Default" rule, split by target — mobile and desktop do not share one delivery model
+> for content that changes independently of app releases.
+
+**Mobile (`Platforms/iOS/`, `Platforms/Android/`):** structured, independently-changing content
+(version-history/changelog entries, announcements, and similar) is fetched through a dedicated
+`{AppName}.API` endpoint and DTO (Chapter 9), consumed via the client's existing typed HTTP
+client — never bundled as a local data file in the app package. A bundled file only updates on the
+next store release; every user must install that update before seeing new content. This reinforces
+the "pure API consumer" rule above rather than adding an exception to it.
+
+**Desktop (`Platforms/Windows/`, `Platforms/MacCatalyst/`):** not store-review-gated the same way
+— a desktop client may read and write local files as part of ordinary runtime operation. A local
+content file is acceptable, in two forms: bundled with the app at install, for content that
+changes at the app's own release cadence; or written/refreshed by the app itself at runtime as a
+local cache synced from `{AppName}.API`, which gives desktop live-updatable content without
+needing a full app update. Prefer the runtime-synced-cache form for content whose source of truth
+is shared with other clients (e.g. the same version-history list mobile and Website both show), so
+every client reads from one authoritative source; reserve the bundled-at-install form for content
+that is genuinely desktop-specific.
+
+- **MUST** Mobile targets source independently-changing structured content through the API —
+  never a bundled local file — except content that shares the app's own release cadence
+  (Chapter 13).
+- **SHOULD** Desktop targets source the same centrally-authored content through an API-synced
+  local cache rather than a bundled-at-install file, to keep desktop and mobile reading from one
+  source of truth.
+- **MAY** Desktop targets use a purely bundled local file for content that is genuinely
+  desktop-specific and tied to the app's own release cadence.
 
 ---
 
@@ -2813,6 +2943,41 @@ throw new AuthException("UNDERAGE", "You must be at least 16 years old to regist
 - **SHOULD** Group related messages under a common prefix key rather than creating a new resource file for a single additional message.
 - **SHOULD** Write resource values in full, grammatical sentences with correct punctuation — these may be displayed directly to end users.
 - **MAY** Define a `Common_` prefix group for error strings shared across multiple service classes within the same project.
+
+### Data-Driven Content — Preferred Default
+
+> **Addition — 2026-08-13:** Elevates the "Code vs. data-file distinction" Addition above from a
+> single blockquote into a first-class, named rule other chapters can cross-reference. Prompted by
+> a real incident: a version-history page's content list had no data source separate from the
+> markup rendering it, so adding an entry required editing the page itself. See Chapter 11 and
+> Chapter 12 for this rule's concrete, per-project-type instantiations.
+
+Whenever content values change independently of the logic that renders them, source those values
+from a data file — or, for a distributed client, the API — rather than embedding them in code.
+This applies to every project type and rendering surface GPG governs, not only to the
+string-externalization case above.
+
+- **MUST** Structured, repeating content (a version-history/changelog list, FAQ items,
+  testimonials, portfolio or pricing entries, and similar) is never hand-authored inline in a
+  `.razor`, `.xaml`, `.cs`, or other executable-logic file.
+- **MUST** For a server-hosted surface (`{AppName}.Website`), a bundled data file committed to the
+  project and shipped with the next deploy is the default delivery mechanism — see Chapter 11.
+- **MUST** For a distributed client's mobile targets (`{AppName}.MAUI`, `Platforms/iOS/` and
+  `Platforms/Android/`), content that changes independently of app releases is sourced through the
+  API, never bundled as a local file in the app package — see Chapter 12.
+- **SHOULD** For a distributed client's desktop targets (`{AppName}.MAUI`, `Platforms/Windows/`
+  and `Platforms/MacCatalyst/`), prefer a local content file the app syncs from the API at
+  runtime over a purely bundled-at-install file, for content whose source of truth is shared with
+  other clients — see Chapter 12.
+- **SHOULD** Escalate to a database-backed content table (Chapter 17 seed-data pattern) only on a
+  confirmed requirement for live, non-developer editing — do not build admin-editable content
+  storage speculatively.
+- **MUST** Escalate to a headless CMS or other external content service only through Material
+  Decision Escalation (bootstrap doc, Architecture phase) — never a default choice.
+- **MAY** Keep content that shares its host app's own release cadence and needs no update between
+  releases (fixed onboarding copy, bundled legal text for offline access) in a bundled data file
+  even on a mobile target — the MUST rules above target content whose value is *independent*
+  update cadence, not literally all content.
 
 ---
 

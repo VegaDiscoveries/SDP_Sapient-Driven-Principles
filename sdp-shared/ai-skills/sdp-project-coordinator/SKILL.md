@@ -62,8 +62,11 @@ All paths below are relative to `[resolved_project]` (resolved in Step 1 item 1 
    Reached only when `last_active_projects` is empty or absent. Read the `projects` array from
    `SDP-Solution.json` (already read in Level 3).
    - If `projects` contains exactly 1 entry: use it as `[resolved_project]`.
-   - If `projects` contains 2 or more entries: list the available projects to the user and
-     prompt them to select one. Wait for the user's response before continuing.
+   - If `projects` contains 2 or more entries: invoke `/sdp-create-banner` with a numbered
+     `Projects` row and a `Select` row prompting for a number, e.g.
+     `icon=info row=0 row: Projects | [N] projects registered: 1) [project1], 2) [project2], ... row: | row: Select | Reply with the number (1-N) of the project this session should target.`
+     Wait for the user's response before continuing, and correlate the number they reply with
+     back to the project at that position in the list.
    - If `projects` is empty or absent: halt by invoking
      `/sdp-create-banner icon=error row=0 row: Status | No projects registered in SDP-Solution.json — register at least one project before proceeding.`
 
@@ -134,8 +137,11 @@ a prior resolved Material Decision Escalation record — or an architectural pat
 precedent: stop. If `SDP-Config.json` `materialDecisionEscalation.enabled` is `true` (default), do
 not proceed. Halt per the bootstrap doc's Halt Behavior Contract instead — set `workflow_status:
 "halted"`, `halt_reason` naming the decision, and append a 2-4 option table (per the Gap
-Resolution Format) before ending the session. See the bootstrap doc's Material Decision Escalation
-section (Dispatch and Halt Contracts).
+Resolution Format) as plain markdown. Then invoke `/sdp-create-banner` with a `Decision` row
+summarizing what's undecided, e.g.
+`icon=warning row=0 row: Decision | [decision under consideration] is not yet settled in .speq/concept docs — halted per Material Decision Escalation. See options above.`
+before ending the session. See the bootstrap doc's Material Decision Escalation section (Dispatch
+and Halt Contracts).
 
 ### Step 2: Read Workflow State
 
@@ -155,9 +161,10 @@ section (Dispatch and Halt Contracts).
 ### Step 3: Verify State Consistency
 
 1. For any task that has checkbox `[x]` in its phase file but `status: "PENDING"` in its
-   state file: flag the discrepancy to the user before dispatching. Do not silently correct
-   it — it indicates a session that updated one artifact but not the other. Pause and wait
-   for user instruction before continuing.
+   state file: do not silently correct it — it indicates a session that updated one artifact but
+   not the other. Invoke `/sdp-create-banner` with a `Mismatch` row, e.g.
+   `icon=warning row=0 row: Mismatch | Task [TASK-ID] shows [x] in the phase file but status "PENDING" in the state file — one artifact was updated without the other. Provide instruction before continuing.`
+   Pause and wait for user instruction before continuing.
 
 ### Step 4: Find Next Actionable Task
 
@@ -165,7 +172,9 @@ section (Dispatch and Halt Contracts).
 2. If no REJECTED tasks: find the first PENDING task in the current phase.
 3. For any candidate task: check its phase's Depends On column in `registry.md`. Do not
    dispatch if any listed dependency phase is not `[x]` complete. If blocked by a dependency,
-   report the dependency to the user and terminate.
+   invoke `/sdp-create-banner` with a `Blocked` row, e.g.
+   `icon=warning row=0 row: Blocked | Task [TASK-ID] cannot dispatch — dependency phase [phase] is not yet [x] complete.`
+   and terminate.
 4. If the active task has status `WORK_COMPLETE`: the next dispatch target is REVIEWER, not
    WORKER.
 5. If no REJECTED or PENDING tasks remain and all tasks in the current phase are VERIFIED:
@@ -290,8 +299,10 @@ section (Dispatch and Halt Contracts).
         by unmet dependencies." Notify the user by invoking
         `/sdp-create-banner icon=error row=0 row: Status | No phase in registry.md is eligible to dispatch — remaining incomplete phases [list] are all blocked by unmet dependencies.`
         Do not report "All phases complete" in this case.
-6. If no actionable task exists after all checks above: report to the user and terminate
-   without writing a dispatch file.
+6. If no actionable task exists after all checks above: invoke `/sdp-create-banner` with a
+   `Status` row, e.g.
+   `icon=info row=0 row: Status | No actionable task found after all checks — nothing to dispatch this cycle.`
+   and terminate without writing a dispatch file.
 
 ### Step 5: Write Dispatch File (task dispatch) / Gate Dispatch Variant
 
@@ -421,9 +432,8 @@ or the `"blocked"` branch's Re-gate path):
 ### Step 7: Notify User
 
 1. Read `orchestration_mode` from `[resolved_project]/.sdp-workflow/state.json`.
-2. **If `"human-gated"`:** Print:
-   "Ready to dispatch [ROLE] for [TASK-ID] — `[resolved_project]/sdp-docs/00_prompt.txt`
-   contains the ready-to-paste prompt. Open a new subagent and paste it to begin."
+2. **If `"human-gated"`:** Invoke `/sdp-create-banner` with a `Dispatch` row, e.g.
+   `icon=success row=0 row: Dispatch | Ready to dispatch [ROLE] for [TASK-ID] — [resolved_project]/sdp-docs/00_prompt.txt contains the ready-to-paste prompt. Open a new subagent and paste it to begin.`
    Terminate. Do not wait for or attempt to detect the outcome.
 3. **If `"agent-orchestrated"`:** Spawn a subagent via the Agent tool with the content of
    `[resolved_project]/.sdp-workflow/sessions/session-NNN.md` as the prompt, plus the bootstrap
@@ -437,10 +447,8 @@ or the `"blocked"` branch's Re-gate path):
      GATE_BLOCKED → halt per the blocked-gate halt defined in Step 4 sub-step 5.
 4. **If `"loop-orchestrated"`:** Do not spawn a subagent — the recurring `sdp-project-state-loop`
    performs all execution. The session dispatch file, `state.json`, and `00_prompt.txt` written
-   in Steps 5–6 are the complete handoff. Print:
-   "Dispatch prompt written for [ROLE] / [TASK-ID]. The running `sdp-project-state-loop` will execute
-   it on its next fire (start it with `/sdp-auto` or `/sdp-state-loop-start` if it is not
-   running)."
+   in Steps 5–6 are the complete handoff. Invoke `/sdp-create-banner` with a `Dispatch` row, e.g.
+   `icon=success row=0 row: Dispatch | Dispatch prompt written for [ROLE] / [TASK-ID]. The running sdp-project-state-loop will execute it on its next fire (start it with /sdp-auto or /sdp-state-loop-start if it is not running).`
    Terminate. Do not wait for or attempt to detect the outcome.
 5. **If `orchestration_mode` is absent or any other value:** Treat it as `"human-gated"` —
    print the human-gated message from sub-step 2 and terminate. Do not spawn a subagent.

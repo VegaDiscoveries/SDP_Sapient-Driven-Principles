@@ -59,22 +59,21 @@ Attempt to extract the `projects=` attribute from the sentinel pattern:
 If the sentinel read above did not yield a `projects=` attribute:
 
 - If `SDP-Solution.json` was readable and `last_active_projects[0]` is present: use that
-  value as `[resolved_project]`. Log: "sdp-project-state-loop: no `projects=` in sentinel — resolved
-  from SDP-Solution.json last_active_projects."
+  value as `[resolved_project]`. Invoke
+  `/sdp-create-banner row: Project | No projects= in sentinel — resolved from SDP-Solution.json last_active_projects.`
 - If `SDP-Solution.json` is absent: set `[resolved_project]` to `.` (dot — preserves legacy
-  single-project behavior). Log: "sdp-project-state-loop: SDP-Solution.json not found — using
-  workspace root as project root."
+  single-project behavior). Invoke
+  `/sdp-create-banner row: Project | SDP-Solution.json not found — using workspace root as project root.`
 - If `SDP-Solution.json` is readable but `last_active_projects` is empty or absent: read the
   `projects` array from `SDP-Solution.json`.
-  - If `projects` contains exactly 1 entry: use it as `[resolved_project]`. Log:
-    "sdp-project-state-loop: last_active_projects empty — auto-resolved from single projects entry."
-  - If `projects` contains 2 or more entries: report "⛔ sdp-project-state-loop:
-    `last_active_projects` is empty and multiple projects are registered — cannot
-    auto-resolve. Set `last_active_projects` in `SDP-Solution.json` to the target project
-    and retry." Stop — do not proceed.
+  - If `projects` contains exactly 1 entry: use it as `[resolved_project]`. Invoke
+    `/sdp-create-banner row: Project | last_active_projects empty — auto-resolved from single projects entry.`
+  - If `projects` contains 2 or more entries: invoke
+    `/sdp-create-banner icon=error row=0 row: Project | last_active_projects is empty and multiple projects are registered — cannot auto-resolve. Set last_active_projects in SDP-Solution.json to the target project and retry.`
+    Stop — do not proceed.
   - If `projects` is empty or absent: set `[resolved_project]` to `.` (dot — legacy
-    fallback). Log: "sdp-project-state-loop: no projects registered — using workspace root as
-    project root."
+    fallback). Invoke
+    `/sdp-create-banner row: Project | No projects registered — using workspace root as project root.`
 
 Record `[resolved_project]`. All subsequent file paths in this skill use this value as their
 root prefix (e.g., `[resolved_project]/.sdp-workflow/state.json`).
@@ -97,7 +96,7 @@ Proceed to Step 2.
 4. If `active_work_item` is null: play the notification tone (non-blocking — ignore any failure
    and continue): run `./sdp-shared/scripts/sdp-tone.ps1 -trigger "halt.generic"` via the
    PowerShell tool. Then invoke
-   `/sdp-create-banner icon=warning row=0 row: Status | sdp-project-state-loop: no active work item — no dispatch.`
+   `/sdp-create-banner icon=warning row=0 row: Status | No active work item — no dispatch.`
    Record `action = STOP`, `reason = "no active work item"`. Proceed to Step 6 to record the
    fire, then stop.
 5. Record `active_work_item`.
@@ -205,32 +204,34 @@ Act based on the action recorded in Steps 1–4.
 **API_RECOVERY:**
 1. Play the notification tone (non-blocking — ignore any failure and continue): run
    `./sdp-shared/scripts/sdp-tone.ps1 -trigger "api.error_detected"` via the PowerShell tool.
-2. Announce: "sdp-project-state-loop: API Error detected — spawning subagent to resume via
-   sdp-project-run-prompt."
+2. Invoke
+   `/sdp-create-banner icon=warning row=0 row: Action | API error detected — spawning subagent to resume via sdp-project-run-prompt.`
 3. Spawn a subagent via the Agent tool with the following prompt:
    "You are an SDP workflow recovery subagent. An API error interrupted the previous session.
    Invoke `sdp-project-run-prompt` to resume from `[resolved_project]/sdp-docs/00_prompt.txt`. Do not
    take any other action." (Use the `[resolved_project]` value resolved in Step 1b — substitute
    the actual path, not the placeholder.)
-4. After the subagent returns: report "sdp-project-state-loop: recovery subagent returned." Record
-   `action = API_RECOVERY`, `reason = "API error detected"`. Proceed to Step 6 to record the
+4. After the subagent returns: invoke
+   `/sdp-create-banner icon=info row=0 row: Action | Recovery subagent returned.`
+   Record `action = API_RECOVERY`, `reason = "API error detected"`. Proceed to Step 6 to record the
    fire, then stop.
 
 **GENERATE:**
-1. Announce: "sdp-project-state-loop: [reason from Step 4] — spawning subagent to generate next
-   dispatch via sdp-project-create-prompt (project: [resolved_project])."
+1. Invoke
+   `/sdp-create-banner icon=in-progress row=0 row: Action | [reason from Step 4] — spawning subagent to generate next dispatch via sdp-project-create-prompt (project: [resolved_project]).`
 2. Spawn a subagent via the Agent tool with the following prompt:
    "You are an SDP workflow dispatch subagent. Invoke `sdp-project-create-prompt` to generate the
    next SDP dispatch prompt. The resolved project is `[resolved_project]` — pass
    `-workspaceRoot .\[resolved_project]` to `sdp-create-prompt.ps1` when the skill calls it.
    Do not take any other action."
-3. After the subagent returns: report "sdp-project-state-loop: sdp-project-create-prompt subagent returned."
+3. After the subagent returns: invoke
+   `/sdp-create-banner icon=info row=0 row: Action | sdp-project-create-prompt subagent returned.`
    `action` and `reason` are already recorded from Step 4. Proceed to Step 6 to record the
    fire, then stop.
 
 **GATE_REPAIR:**
-1. Announce: "sdp-project-state-loop: [reason from Step 4] — spawning subagent to repair the gate
-   dispatch via sdp-project-coordinator (project: [resolved_project])."
+1. Invoke
+   `/sdp-create-banner icon=in-progress row=0 row: Action | [reason from Step 4] — spawning subagent to repair the gate dispatch via sdp-project-coordinator (project: [resolved_project]).`
 2. Spawn a subagent via the Agent tool with the following prompt:
    "You are an SDP workflow dispatch subagent. Invoke `sdp-project-coordinator` for
    `[resolved_project]` to complete the pending phase-gate dispatch. Do not take any other
@@ -240,8 +241,9 @@ Act based on the action recorded in Steps 1–4.
    file, re-read its `Role:` and `Work Item:` lines using the same check as Step 4 sub-step c.
    - **Repaired** — the session file now matches `Role: GATE_REVIEWER` /
      `Work Item: [current_phase]`, or `phase_gate.status` is no longer `"pending"`/`"blocked"`
-     because COORDINATOR advanced the phase or a different task took dispatch priority: report
-     "sdp-project-state-loop: gate dispatch repaired by sdp-project-coordinator." Record `action = GATE_REPAIR`,
+     because COORDINATOR advanced the phase or a different task took dispatch priority: invoke
+     `/sdp-create-banner icon=success row=0 row: Action | Gate dispatch repaired by sdp-project-coordinator.`
+     Record `action = GATE_REPAIR`,
      `halted = false`. Proceed to Step 6 to record the fire, then stop — the next scheduled
      fire re-evaluates the sentinel against the corrected state.
    - **Not repaired** — the session file is still missing or still mismatched after
@@ -252,7 +254,7 @@ Act based on the action recorded in Steps 1–4.
      `state.json`. Play the notification tone (non-blocking): run
      `./sdp-shared/scripts/sdp-tone.ps1 -trigger "halt.no_progress"` via the PowerShell tool.
      Invoke:
-     `/sdp-create-banner icon=error row=0 row: Status | sdp-project-state-loop: halted — gate dispatch repair failed. Manual investigation required.`
+     `/sdp-create-banner icon=error row=0 row: Status | Halted — gate dispatch repair failed. Manual investigation required.`
      Record `action = GATE_REPAIR`, `halted = true`, `halt_reason` as above.
      Proceed to Step 6 to record the fire, then stop.
 
@@ -261,8 +263,8 @@ Act based on the action recorded in Steps 1–4.
 1. Read `autoResolveHalt.evalCycleAttemptThreshold` from `SDP-Config.json`; if absent, use 2.
    Record as `haltThreshold`. Read `autoResolveHalt.pushOnEvalBlock`; if absent, use false.
    Record as `pushOnEvalBlock`.
-2. Announce: "sdp-project-state-loop: sentinel valid ([active_work_item] / [status]) — spawning
-   subagent to execute current dispatch via sdp-project-run-prompt."
+2. Invoke
+   `/sdp-create-banner icon=in-progress row=0 row: Action | Sentinel valid ([active_work_item] / [status]) — spawning subagent to execute current dispatch via sdp-project-run-prompt.`
 3. Increment the attempt counter appropriate to the sentinel role:
    - If task `status` (from Step 3) is `WORK_COMPLETE` **AND `sentinel_role` is `REVIEWER`**:
      write `eval_cycle_attempts + 1` to the phase state file entry for `active_work_item`.
@@ -280,12 +282,14 @@ Act based on the action recorded in Steps 1–4.
    dispatch prompt at `[resolved_project]/sdp-docs/00_prompt.txt`. Do not take any other action."
 5. After the subagent returns:
    - **Task dispatch (`sentinel_role` is WORKER, REVIEWER, or COORDINATOR):** Read the phase
-     state file identified in Step 3 to confirm the new task status. Report: "sdp-project-state-loop:
-     dispatch subagent returned — task status is now [status]." Record `status_after = [status]`.
+     state file identified in Step 3 to confirm the new task status. Invoke
+     `/sdp-create-banner icon=info row=0 row: Action | Dispatch subagent returned — task status is now [status].`
+     Record `status_after = [status]`.
      Do not parse the subagent's text output for the outcome.
    - **Gate dispatch (`sentinel_role` is GATE_REVIEWER):** Read `state.json.phase_gate.status`
-     to confirm the gate verdict. Report: "sdp-project-state-loop: GATE_REVIEWER subagent returned —
-     phase_gate.status is now [status]." Record `status_after = [status]`. Do not parse the
+     to confirm the gate verdict. Invoke
+     `/sdp-create-banner icon=info row=0 row: Action | GATE_REVIEWER subagent returned — phase_gate.status is now [status].`
+     Record `status_after = [status]`. Do not parse the
      subagent's text output.
 6. Evaluate halt conditions:
    - **Task halt:** If new task status is still `WORK_COMPLETE` AND

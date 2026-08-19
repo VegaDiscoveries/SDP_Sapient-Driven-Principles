@@ -90,12 +90,15 @@ top-level fields).
    signal this solution predates this design.
 3. **None found:** set `migration_checked: true`, proceed normally (Step 1 onward).
 4. **Found in one or more projects:** halt (Halt Behavior Contract) with `halt_reason` naming
-   every project and phase found, and present the user with the actual content of each affected
-   project's existing phase 1-7 documents side by side. This is a one-time, human-directed
-   reconciliation — not scriptable. The user decides, per phase, whether one project's existing
-   document becomes the solution-level starting point (others' equivalent content struck through
-   in place with a pointer to the new solution-level equivalent — Append-Only Discipline) or a
-   fresh solution-level document is drafted informed by all of them.
+   every project and phase found. Present the actual content of each affected project's existing
+   phase 1-7 documents side by side as plain text first (a banner row can't hold full document
+   bodies), then invoke `/sdp-create-banner` with a `Migration` row summarizing which
+   projects/phases were found, e.g.
+   `icon=warning row=0 row: Migration | Existing phase 1-7 documents found in [N] project(s): [project list] — reconciliation required before proceeding. See document content above.`
+   This is a one-time, human-directed reconciliation — not scriptable. The user decides, per phase,
+   whether one project's existing document becomes the solution-level starting point (others'
+   equivalent content struck through in place with a pointer to the new solution-level equivalent
+   — Append-Only Discipline) or a fresh solution-level document is drafted informed by all of them.
 5. **Re-home** once reconciled: seed `.sdp-solution-workflow/registry.md` with rows for the
    resolved phase(s) onward (already-complete phases marked `[x]` immediately, with a note
    referencing the original project-level document); strike through each affected project's own
@@ -115,8 +118,11 @@ a prior resolved Material Decision Escalation record — or an architectural pat
 precedent: stop. If `SDP-Config.json` `materialDecisionEscalation.enabled` is `true` (default), do
 not proceed. Halt per the bootstrap doc's Halt Behavior Contract instead — set `workflow_status:
 "halted"`, `halt_reason` naming the decision, and append a 2-4 option table (per the Gap
-Resolution Format) before ending the session. See the bootstrap doc's Material Decision Escalation
-section (Dispatch and Halt Contracts).
+Resolution Format) as plain markdown. Then invoke `/sdp-create-banner` with a `Decision` row
+summarizing what's undecided, e.g.
+`icon=warning row=0 row: Decision | [decision under consideration] is not yet settled in .speq/concept docs — halted per Material Decision Escalation. See options above.`
+before ending the session. See the bootstrap doc's Material Decision Escalation section (Dispatch
+and Halt Contracts).
 
 ### Step 1: Run Script — **[TARGETED FIX]**
 
@@ -200,7 +206,7 @@ loop fire.
    Concept"` in item 3 below (i.e. when `phase_gate.status` is `"passed"` and the just-completed
    phase is one of those two): read that phase's own `[phase]_state.json` for a
    `source_document` field. If present and `sdp_source_coverage.completed` is not `true`: run
-   `sdp-source-coverage-check` against it before completing the advancement — do not proceed to
+   `sdp-solution-source-coverage-check` against it before completing the advancement — do not proceed to
    item 3's advancement until it certifies. If the field is absent (conversational intake — no
    tracked source for this cycle): nothing to check, proceed normally. This check applies only to
    the Concept→Research and Expanded Concept→Architecture transitions; other phase transitions
@@ -222,10 +228,10 @@ loop fire.
    **Input material to read first, before opening the brainstorming session:**
    - **Tracked source document, both phases:** read this cycle's Concept phase state file
      (`[phase]_state.json` for the "Concept" row) for a `source_document` field, written by
-     `sdp-new-concept-intake` Step 4 item 5. If present, read the file(s) it points to under
+     `sdp-solution-new-concept-intake` Step 4 item 5. If present, read the file(s) it points to under
      `sdp-solution-docs/user-design-docs/processed/` — if it has an accompanying
      `[doc_name]_Sections/[doc_name]_TOC.md` folder, read the TOC first and process section-by-
-     section (same convention `sdp-source-coverage-check` uses — never load a large parent doc in
+     section (same convention `sdp-solution-source-coverage-check` uses — never load a large parent doc in
      one pass). If the field is absent (conversational intake — no tracked source exists for this
      cycle): skip this bullet, nothing to read.
    - **`"Expanded Concept"` only, additionally:** read `sdp-solution-docs/01_concept.md` and
@@ -233,20 +239,22 @@ loop fire.
 
    Bring whatever was read into the brainstorming session as the material being expanded, merged,
    or drafted from — per the bootstrap doc's Phase 3 Mechanics entry. This is a proactive
-   complement to `sdp-source-coverage-check`, not a replacement for it — that check still runs as
+   complement to `sdp-solution-source-coverage-check`, not a replacement for it — that check still runs as
    the mandatory backstop after drafting; reading the original source up front is meant to reduce
    how much it has to catch, not substitute for the audit.
 
-   **State what was read, by name, before opening the brainstorming conversation** — e.g. "I have
-   the tracked source (`user-design-docs/processed/[filename]`), `01_concept.md`, and
-   `02_research_findings.md` (6 angles) loaded." A summary that only gestures at "the tracked
-   source" without naming the actual file read is not sufficient — the user has no way to tell
-   from that phrasing whether `source_document` was actually resolved and its file actually read,
-   or whether this bullet was silently skipped (e.g. because the field was absent). Tool-call
-   transcript entries showing the Read happened are not a substitute for this — the user should
-   not have to scroll back through raw tool calls to confirm what COORDINATOR already knows it
-   read. If no tracked source exists for this cycle (conversational intake), say that explicitly
-   too — "no tracked source document for this cycle" — rather than omitting the line silently.
+   **State what was read, by name, before opening the brainstorming conversation.** Invoke
+   `/sdp-create-banner` with a `Source` row, e.g.
+   `icon=info row=0 row: Source | Tracked source (user-design-docs/processed/[filename]), 01_concept.md, and 02_research_findings.md (6 angles) loaded.`
+   A row that only gestures at "the tracked source" without naming the actual file read is not
+   sufficient — the user has no way to tell from that phrasing whether `source_document` was
+   actually resolved and its file actually read, or whether this bullet was silently skipped (e.g.
+   because the field was absent). Tool-call transcript entries showing the Read happened are not a
+   substitute for this — the user should not have to scroll back through raw tool calls to confirm
+   what COORDINATOR already knows it read. If no tracked source exists for this cycle
+   (conversational intake), the row must say that explicitly too, e.g.
+   `row: Source | No tracked source document for this cycle — proceeding from 01_concept.md and 02_research_findings.md only.`
+   — rather than omitting the line silently.
 
    Transcribe every decision, constraint, and design choice surfaced into the phase document
    (append-only) before this session closes — do not leave brainstorming output only in chat
@@ -308,9 +316,15 @@ Include in the WORKER session's instructions (added to the session file content)
    `sdp-solution-docs/05_implementation_overview.md` applicable to it (a solution-scoped document
    may cover more than one project), and replace the stub content with the real tech stack,
    naming conventions, file structure, and product-shape decisions already recorded there — do
-   not originate new decisions here, only transcribe already-settled ones. A project re-entering
-   decomposition in a later mid-stream cycle (its `.speq`/Context already populated from a prior
-   cycle) is unaffected — this item applies only the first time a project receives tasks.
+   not originate new decisions here, only transcribe already-settled ones. Also populate the
+   `.speq` **Standing Non-Functional Requirements** section with any cross-cutting requirement
+   recorded in those same documents that applies to a whole class of this project's future tasks
+   (e.g. a responsive-layout requirement for a website project per GPG Ch. 11, or an
+   adaptive-layout requirement for a MAUI mobile project per GPG Ch. 12) — same transcribe-only
+   rule; do not originate a requirement here that wasn't already settled upstream. A project
+   re-entering decomposition in a later mid-stream cycle (its `.speq`/Context already populated
+   from a prior cycle) is unaffected — this item applies only the first time a project receives
+   tasks.
 1. **Assign each decomposed build-phase task to a specific project** — the first moment a
    project's own `.sdp-workflow/registry.md` is populated, with only its assigned implementation
    tasks (never phase 1-6 documents, which never exist at project scope). Item 0 above must
@@ -402,8 +416,9 @@ non-`GREEN` edge's `light_attempts` by 1, once per cycle the edge is found still
 `evalCycleAttemptThreshold`; default 2 if absent). When any edge's `light_attempts` reaches or
 exceeds this threshold: set `workflow_status` to `"halted"` in `.sdp-solution-workflow/state.json`,
 `halt_reason` = `"Dependency edge [consumer task] → [producer task/decision] has been stuck at
-[light] for [light_attempts] cycles with no progress — human review required."` — surfaced via
-the existing Halt Behavior Contract.
+[light] for [light_attempts] cycles with no progress — human review required."` Invoke
+`/sdp-create-banner` with a `Dependency` row carrying this same text, e.g.
+`icon=error row=0 row: Dependency | Edge [consumer task] → [producer task/decision] has been stuck at [light] for [light_attempts] cycles with no progress — human review required.`
 
 ### Step 2d: Post-Phase-7 Dispatch Gating
 
@@ -576,7 +591,10 @@ whenever Step 2a finds `phase_gate.status == "blocked"` for the solution's `curr
 2. **Remediation Proposals present:** halt per the Halt Behavior Contract —
    `workflow_status = "halted"`, `halt_reason = "Phase Readiness gate found a traceability gap —
    read the Remediation Proposals in sdp-solution-docs/07_phase_readiness.md and select one before
-   resuming."` Surface all numbered proposals (each with its `Target Phase:` value) verbatim.
+   resuming."` Surface all numbered proposals (each with its `Target Phase:` value) verbatim as
+   plain markdown first — a banner row can't hold a list — then invoke `/sdp-create-banner` with a
+   `Readiness` row carrying a short version of this, e.g.
+   `icon=error row=0 row: Readiness | Traceability gap found — see sdp-solution-docs/07_phase_readiness.md. Select a remediation proposal above before resuming.`
    Terminate — never pick a proposal automatically.
 3. **On the next invocation, once the user has stated their chosen proposal:**
    a. Read the chosen proposal's `Target Phase:` value — the exact `.sdp-solution-workflow/

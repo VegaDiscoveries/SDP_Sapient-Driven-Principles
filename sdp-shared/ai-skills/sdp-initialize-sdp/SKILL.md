@@ -241,9 +241,9 @@ is internal derivation; the closing banner is the only report of it.
      mirroring `sdp-workspace-setup`'s own post-setup guidance (same two-way choice, same
      drop-zone path — do not reword or diverge from that skill's wording):
      - `Have Docs` | `Drop them in sdp-solution-docs/user-design-docs/ and run
-       /sdp-new-concept-intake.`
+       /sdp-solution-new-concept-intake.`
      - `No Docs` | `Run /brainstorming first — save the resulting doc to
-       sdp-solution-docs/user-design-docs/ — then run /sdp-new-concept-intake to advance it.`
+       sdp-solution-docs/user-design-docs/ — then run /sdp-solution-new-concept-intake to advance it.`
    - **Otherwise** (registry has at least one phase 1–7 row): get
      `.sdp-solution-workflow/state.json`'s `current_phase` field. **Reuse-before-re-read:** if
      `sdp-solution-read-docs`'s own Pathway 2 sub-step 2 already read this exact file during

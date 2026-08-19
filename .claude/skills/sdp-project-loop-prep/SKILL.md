@@ -1,6 +1,6 @@
 ---
 name: sdp-project-loop-prep
-description: Use before starting an unattended sdp-auto / sdp-state-loop-start run, or whenever the user wants every not-yet-complete phase certified ahead of time instead of reactively mid-loop. Walks registry.md in dependency order running sdp-project-doc-review, sdp-source-coverage-check, and sdp-phase-rightsizing-check against every not-yet-[x] phase, then reports readiness.
+description: Use before starting an unattended sdp-auto / sdp-state-loop-start run, or whenever the user wants every not-yet-complete phase certified ahead of time instead of reactively mid-loop. Walks registry.md in dependency order running sdp-project-doc-review, sdp-solution-source-coverage-check, and sdp-phase-rightsizing-check against every not-yet-[x] phase, then reports readiness.
 ---
 
 Do not report this skill complete unless every numbered step and all sub-steps within it have

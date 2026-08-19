@@ -1,4 +1,6 @@
-# Sapient Driven Principles — A Self-Driving Process for Coding — Quick Start
+<img src="sdp-shared/docs/images/SDP_DocsLogo_WithText_0700x0163.png" alt="SDP Logo" width="375">
+
+# — A Self-Driving Process for Coding — Quick Start
 
 Condensed workspace setup reference. For the full framework overview, see [`README.md`](README.md). For the complete step-by-step procedure and file templates, see [`SDP-Workspace-Setup.md`](sdp-shared/docs/SDP-Workspace-Setup.md).
 
@@ -54,26 +56,26 @@ The workspace setup above only applies once — the very first Phase 1–7 cycle
 Phases 1–7 are solution-scoped, not project-scoped: they run once per solution regardless of how
 many projects it has, and project assignment doesn't happen until Phase 7's own decomposition
 step — never at intake time. For every concept after that, at any solution maturity, use
-`/sdp-new-concept-intake` instead of repeating workspace setup. Three options:
+`/sdp-solution-new-concept-intake` instead of repeating workspace setup. Three options:
 
 - **Document-driven** — you already have a concept/design doc ready. Drop it (and, if it has an
   accompanying `[doc_name]_Sections/[doc_name]_TOC.md` folder — the same pattern used for the
   GPG standards doc — the whole Sections folder too) into
-  `sdp-solution-docs/user-design-docs/`. Run `/sdp-new-concept-intake`. It scans the drop zone,
+  `sdp-solution-docs/user-design-docs/`. Run `/sdp-solution-new-concept-intake`. It scans the drop zone,
   groups related files, and seeds seven new rows (Concept, Research, Expanded Concept,
   Architecture, Implementation Overview, Refined Implementation Plan, Phase Readiness) into the
   **solution's own** `.sdp-solution-workflow/registry.md` — no project is chosen or confirmed at
   this point. The source document is tracked and moved to
-  `sdp-solution-docs/user-design-docs/processed/` — `sdp-source-coverage-check` compares it
+  `sdp-solution-docs/user-design-docs/processed/` — `sdp-solution-source-coverage-check` compares it
   against the resulting Phase 1 and Phase 3 content (Concept and Expanded Concept) before Phase 4
   (Architecture) is allowed to begin, so scope isn't silently lost in the initial scan-and-extract
   step.
 - **No doc yet, but want one** — run `/brainstorming` first to develop the concept, directing it
   to save the resulting spec straight into `sdp-solution-docs/user-design-docs/` (not
-  Superpowers' own default spec location) — then run `/sdp-new-concept-intake`, which picks it up
+  Superpowers' own default spec location) — then run `/sdp-solution-new-concept-intake`, which picks it up
   via the document-driven path above with no extra steps.
 - **Conversational** — no document, just describe the concept directly when you run
-  `/sdp-new-concept-intake`. Same seven-row seeding, minus the drop-zone scan and the source
+  `/sdp-solution-new-concept-intake`. Same seven-row seeding, minus the drop-zone scan and the source
   coverage check (nothing to compare against). Still the right choice for concepts too small to
   warrant full brainstorming rigor.
 
@@ -92,7 +94,7 @@ point during that stage.
 **The first time** Phase 7's gate passes for this solution, run `/sdp-solution-loop-prep` once
 before starting `/sdp-auto` — triggered by (and only valid at) that Phase-7-passed transition, it
 sweeps *every* registered project's freshly-decomposed registry, not just one, and hands off to
-`/sdp-auto` itself once done. If a later mid-stream `/sdp-new-concept-intake` cycle re-enters
+`/sdp-auto` itself once done. If a later mid-stream `/sdp-solution-new-concept-intake` cycle re-enters
 phases 1–7 (which cancels any running loop), run `/sdp-solution-loop-prep` again once that
 cycle's own Phase 7 gate re-passes, before restarting the loop.
 
@@ -107,7 +109,7 @@ Both walk every not-yet-complete phase (across all swept projects, for `/sdp-sol
 in dependency order up front and certify three things per phase before the loop ever touches it:
 
 - **Content readiness** (`sdp-project-doc-review`, unmodified)
-- **Source coverage** (`sdp-source-coverage-check`, when a tracked source document exists)
+- **Source coverage** (`sdp-solution-source-coverage-check`, when a tracked source document exists)
 - **Right-sizing** (`sdp-phase-rightsizing-check`) — splits an oversized phase into right-sized
   sub-phases before dispatch, instead of a WORKER discovering mid-session that the phase is too
   big to finish

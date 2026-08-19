@@ -69,3 +69,5 @@ A pure API consumer. References only the `Contracts` library. Contains no busine
 - MVVM viewmodels bound to MAUI pages and shell navigation
 - Platform-specific code under `Platforms/{iOS|Android|Windows|MacCatalyst}/`
 - App version number tracked separately from the API version (see Chapter 4)
+- Dynamic, structured screen content sourced per target — mobile always via the API, desktop via
+  an API-synced local cache by default (see Chapter 12's Dynamic Content Delivery)

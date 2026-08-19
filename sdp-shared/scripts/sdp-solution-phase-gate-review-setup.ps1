@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Deterministic backend for sdp-solution-phase-gate-review Steps 3-5 (Read Dispatch File, Read
     Workflow State, Read Phase Document): derives and reads the solution-level session dispatch
@@ -79,7 +79,11 @@ function Get-GateVerdictBlocks([string]$content) {
     $blocks = @()
     $i = 0
     while ($i -lt $lines.Count) {
-        if ($lines[$i] -match '^>\s*\*\*Gate Verdict\s*[-—]\s*(GATE_PASSED|GATE_BLOCKED)\s*[-—]') {
+        # The \u2014 escape (em dash) is plain ASCII in the source and is resolved by the
+        # .NET regex engine itself - a literal non-ASCII character embedded directly in regex
+        # source would be silently mis-parsed under Windows PowerShell 5.1 when the containing
+        # file has no UTF-8 BOM (read via the system ANSI codepage, not UTF-8).
+        if ($lines[$i] -match '^>\s*\*\*Gate Verdict\s*[-\u2014]\s*(GATE_PASSED|GATE_BLOCKED)\s*[-\u2014]') {
             $verdict = $Matches[1]
             $start = $i
             $j = $i
@@ -198,15 +202,17 @@ try {
 $blocks = Get-GateVerdictBlocks $phaseDocContent
 $priorBlocked = @($blocks | Where-Object { $_.verdict -eq "GATE_BLOCKED" } | ForEach-Object { $_.text })
 
-if ($blocks.Count -gt 0) {
-    $stripIndex = @{}
-    foreach ($b in $blocks) { for ($k = $b.start; $k -le $b.end; $k++) { $stripIndex[$k] = $true } }
-    $lines = $phaseDocContent -split "`r`n|`n"
-    $keptLines = for ($k = 0; $k -lt $lines.Count; $k++) { if (-not $stripIndex.ContainsKey($k)) { $lines[$k] } }
-    $strippedContent = ($keptLines -join "`n")
-} else {
-    $strippedContent = $phaseDocContent
-}
+# Every surviving line is prefixed with its original 1-indexed line number from the real file
+# (same "number, tab, content" convention the Read tool itself uses) so Step 6's independent
+# assessment can cite exact lines without ever opening the raw phase document file - the
+# instruction it is already required to follow. Gaps in the numbering mark where a stripped
+# block used to be; that is expected, not an error. Applied unconditionally (not only when a
+# block was actually stripped) so numbering is available on a first gate cycle too.
+$stripIndex = @{}
+foreach ($b in $blocks) { for ($k = $b.start; $k -le $b.end; $k++) { $stripIndex[$k] = $true } }
+$lines = $phaseDocContent -split "`r`n|`n"
+$keptLines = for ($k = 0; $k -lt $lines.Count; $k++) { if (-not $stripIndex.ContainsKey($k)) { "{0,6}`t{1}" -f ($k + 1), $lines[$k] } }
+$strippedContent = ($keptLines -join "`n")
 
 # ---------------------------------------------------------------------------
 # Output result

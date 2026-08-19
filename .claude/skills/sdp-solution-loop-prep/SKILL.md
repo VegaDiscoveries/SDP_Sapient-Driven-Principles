@@ -1,6 +1,6 @@
 ---
 name: sdp-solution-loop-prep
-description: Use once, immediately after solution-level Phase 7's gate passes. For every project registered in SDP-Solution.json, walks its freshly-decomposed registry.md in dependency order running sdp-project-doc-review, sdp-source-coverage-check, and sdp-phase-rightsizing-check, then reports readiness for the recurring loop.
+description: Use once, immediately after solution-level Phase 7's gate passes. For every project registered in SDP-Solution.json, walks its freshly-decomposed registry.md in dependency order running sdp-project-doc-review, sdp-solution-source-coverage-check, and sdp-phase-rightsizing-check, then reports readiness for the recurring loop.
 ---
 
 Do not report this skill complete unless every numbered step and all sub-steps within it have

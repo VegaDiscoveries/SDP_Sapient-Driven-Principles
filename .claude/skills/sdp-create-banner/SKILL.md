@@ -29,6 +29,12 @@ flattens newlines to spaces — so `icon=`, `row=`, and `row:` may appear in any
 - **`row:`** — one row: `Label | Content`, split on the first `|`, both trimmed. One `row:` per
   row; as many as needed. Supply content full and un-wrapped — the script wraps it itself.
   Row order = the position of each `row:` trigger in the argument string, left to right.
+  - **Blank-separator row:** `row: |` (empty label, empty content — just the `|` is required)
+    renders as a full-width blank line inside the border, with no label/content text. Use it to
+    visually separate a status row from a following row that needs to stand out — e.g. a
+    confirmation question placed after a summary row, so it doesn't read as more passive status.
+    A blank row still occupies a row index like any other — account for it when combining with
+    `row=` (see below).
 - **`icon=`** — a comma-separated list of icon names (see Icon Registry below). At most one
   `icon=` per invocation.
   - Paired with **`row=`** (comma-separated 0-based row indices, same length as `icon=`,
@@ -54,6 +60,14 @@ Positional fallback and order independence together, on one line, exactly as the
 channel delivers it:
 ```
 row: Status|Really bad things going on! row: Info|Not sure how bad it gets. icon=critical,warning
+```
+Blank-separator row setting off a trailing question (icon= row=0 still targets the first row —
+the blank row and the question row that follow it are unaffected):
+```
+icon=success row=0
+row: Conversion | Converted to .md — 14 headings detected, 6 tables preserved.
+row: |
+row: Confirm | Does this conversion look acceptable, or are there fidelity issues to flag?
 ```
 
 ## Icon Registry

@@ -91,18 +91,21 @@ section (Dispatch and Halt Contracts).
     `sdp-solution-docs/02_research_findings.md` before drafting — the expanded concept must
     address every research angle from Phase 2, cited by angle, and build on Phase 1's concept
     rather than restate it. Also check this cycle's Concept phase state file for a
-    `source_document` field (written by `sdp-new-concept-intake` Step 4 item 5); if present, read
+    `source_document` field (written by `sdp-solution-new-concept-intake` Step 4 item 5); if present, read
     the tracked source file(s) it points to under `sdp-solution-docs/user-design-docs/processed/`
     (section-by-section if a `[doc_name]_Sections/[doc_name]_TOC.md` folder exists, same
-    convention as `sdp-source-coverage-check`) — the expanded concept must not lose detail present
+    convention as `sdp-solution-source-coverage-check`) — the expanded concept must not lose detail present
     in the original source that the Phase 1 concept compressed away. If
     `sdp-solution-docs/03_expanded_concept.md` already contains COORDINATOR-captured brainstorming
     material (per the bootstrap doc's "Phase 1 / Phase 3 — Interactive Capture Mechanics"), treat
     that material as the starting point to finish and formalize — do not originate content that
     contradicts or ignores it.
-3. State what the assigned task requires before starting work. Proceed without waiting for user
-   confirmation unless the restatement reveals an interpretation conflict — in that case, pause
-   and state the conflict explicitly.
+3. Invoke `/sdp-create-banner` with a `Task` row restating what the assigned task requires, e.g.
+   `icon=info row=0 row: Task | [restated task summary].`
+   Proceed without waiting for user confirmation unless the restatement reveals an interpretation
+   conflict — in that case, invoke
+   `/sdp-create-banner icon=warning row=0 row: Conflict | [conflict description] row: | row: Confirm | How should this be resolved before work continues?`
+   and pause for the user's response.
 4. If the task has a prior non-compliant Eval blockquote: read it carefully before beginning
    work. The corrective notes from the REVIEWER are the starting point.
    If Superpowers is installed: invoke `/receiving-code-review` before beginning corrective work.
@@ -149,8 +152,9 @@ this solution-level phase document:
    Incomplete (partial content, or a Completed blockquote with a prior non-compliant Eval and no
    corrective work yet) / Complete (Completed blockquote present, task checkbox `[x]`, no open
    REJECTED cycle).
-3. **Act:** Not Started → proceed to Step 5. In Progress/Incomplete → report findings and await
-   user confirmation before continuing. Complete → do not proceed to Step 5; notify
+3. **Act:** Not Started → proceed to Step 5. In Progress/Incomplete → invoke
+   `/sdp-create-banner icon=warning row=0 row: Findings | [what was found] row: | row: Confirm | Continue from this partial state, or handle differently?`
+   and await the user's response before continuing. Complete → do not proceed to Step 5; notify
    `sdp-solution-phase-coordinator` that the task is already done.
 
 ### Step 5: Implement the Task
@@ -190,7 +194,13 @@ this solution-level phase document:
    build-phase task was assigned to a project's own `.sdp-workflow/registry.md`, and
    `.sdp-solution-workflow/dependencies.json` parses with every edge carrying its required
    fields (per Step 3 item 5 / `sdp-solution-phase-coordinator` Step 2b's Confirm-outcome check).
-3. Update `sdp-solution-docs/[NN_phase_name]_state.json` (the phase document's path with `.md`
+3. If `sdp-solution-docs/[NN_phase_name].md` has a top-level `**Status:**` header (the standard
+   document template in `SDP-Workspace-Setup.md` includes one) and its current value does not
+   reflect this task's new `WORK_COMPLETE` state: strike it through in place and append the
+   corrected value immediately after, per Append-Only Discipline — e.g. `**Status:**
+   ~~PENDING.~~ **WORK_COMPLETE** [DATE, this session].` Do not silently overwrite the header.
+   A phase document with no `**Status:**` header needs no action here.
+4. Update `sdp-solution-docs/[NN_phase_name]_state.json` (the phase document's path with `.md`
    replaced by `_state.json`):
    - Set the task's `status` to `"WORK_COMPLETE"`
    - Set `last_session` to the current session identifier
@@ -198,7 +208,7 @@ this solution-level phase document:
    - Do **not** write, add, or modify `eval_cycle_attempts` — owned solely by
      `sdp-solution-state-loop` (mirrors the bootstrap Stuck-Loop Detection table exactly; a
      WORKER write here corrupts REVIEWER-attempt accounting).
-4. Update `.sdp-solution-workflow/state.json`:
+5. Update `.sdp-solution-workflow/state.json`:
    - Set `phase_gate.status` to `"pending"` if this was the phase's first task reaching
      WORK_COMPLETE and no gate has run yet; otherwise leave `phase_gate` untouched (gate
      transitions are `sdp-solution-phase-gate-review`'s job, not WORKER's).
@@ -207,25 +217,28 @@ this solution-level phase document:
    - Do **not** write, add, or modify `eval_cycle_attempts` — owned solely by `sdp-solution-state-loop`
      (mirrors the bootstrap Stuck-Loop Detection table exactly; a WORKER write here corrupts
      REVIEWER-attempt accounting).
-5. Mirror phase document changes to the parent solution documents per the sync rule notice, if
+6. Mirror phase document changes to the parent solution documents per the sync rule notice, if
    this phase document has section files.
-6. Commit all work: run `git status` to identify every untracked and modified file. Stage and
+7. Commit all work: run `git status` to identify every untracked and modified file. Stage and
    commit ALL files not covered by `.gitignore` — do not enumerate a specific file list. This
    includes the phase document, its `_state.json` file, `.sdp-solution-workflow/state.json`, and
    (for Phase 7) every affected project's `.sdp-workflow/registry.md` plus the dependency ledger
    files. Push via `./sdp-shared/scripts/sdp-github.ps1 push` (PowerShell tool) — read the JSON
    envelope: `status: "pushed"` confirms success; an `ok:false` / `status:"error"` envelope means
-   the push failed — surface it and do not mark the task complete. Record the short commit hash
-   in the Completed blockquote.
-7. **CI-green gate (only when `SDP-Config.json` `ci.enabled` is true).** Same contract as
+   the push failed — invoke
+   `/sdp-create-banner icon=error row=0 row: Push | Push failed — [error]. Task not marked complete.`
+   and do not mark the task complete. Record the short commit hash in the Completed blockquote.
+8. **CI-green gate (only when `SDP-Config.json` `ci.enabled` is true).** Same contract as
    `sdp-project-worker` Step 6 item 6 — `green` proceeds; `red` requires four-phase root cause analysis,
-   fix, re-commit, re-push, re-check; `no_ci`/`unreachable` proceeds with a disclosed caveat;
-   `timeout` halts per the Halt Behavior Contract rather than guessing the outcome.
-8. Record completion (non-blocking — ignore any failure and continue): run
+   fix, re-commit, re-push, re-check; `no_ci`/`unreachable` proceeds after invoking
+   `/sdp-create-banner icon=warning row=0 row: CI Gate | Continuous Integration (CI) status is [no_ci/unreachable] following the repo update — proceeding without CI confirmation. Verify manually if this matters for this task.`
+   as the disclosed caveat; `timeout` halts per the Halt Behavior Contract rather than guessing
+   the outcome.
+9. Record completion (non-blocking — ignore any failure and continue): run
    `./sdp-shared/scripts/sdp-workflow-log.ps1 -trigger "worker.complete" -role "WORKER" -workItem
    "[current_phase]" -outcome "WORK_COMPLETE" -reason "[one sentence: what was done, and any
    deviation from spec and why]"` via the PowerShell tool.
-9. Session ends. Do not proceed to evaluate or verify the completed work.
+10. Session ends. Do not proceed to evaluate or verify the completed work.
 
 ## Constraints
 
@@ -248,7 +261,8 @@ this solution-level phase document:
 ## Outputs
 
 - Phase document (`sdp-solution-docs/[NN_phase_name].md`) updated: task checkbox `[x]`, Completed
-  blockquote appended
+  blockquote appended, top-level `**Status:**` header synced to `WORK_COMPLETE` if present and
+  stale
 - Phase state file (`sdp-solution-docs/[NN_phase_name]_state.json`) updated: task `status` →
   `WORK_COMPLETE`, `last_session`, `last_updated`
 - `.sdp-solution-workflow/state.json` updated: `last_session`, `updated`, `phase_gate.status` set

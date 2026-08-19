@@ -41,7 +41,9 @@ All paths below are relative to `[resolved_project]` (resolved in Step 1 item 1 
    (e.g., `sdp-project_VirtualCoinFolio.API/.sdp-workflow/sessions/session-042.md`
    → `[resolved_project]` = `sdp-project_VirtualCoinFolio.API`).
    If the path contains no `sdp-project_*` segment, this is a solution-level file; no single
-   project applies — halt and notify the user.
+   project applies — invoke
+   `/sdp-create-banner icon=error row=0 row: Status | Session file path contains no sdp-project_* segment — this is a solution-level file; no single project applies. Cannot resolve a target project.`
+   and halt.
 
    Once resolved, all file paths in subsequent steps are built under `[resolved_project]/`.
    For single-project workspaces where `last_active_projects` is `["."]`,
@@ -87,22 +89,32 @@ a prior resolved Material Decision Escalation record — or an architectural pat
 precedent: stop. If `SDP-Config.json` `materialDecisionEscalation.enabled` is `true` (default), do
 not proceed. Halt per the bootstrap doc's Halt Behavior Contract instead — set `workflow_status:
 "halted"`, `halt_reason` naming the decision, and append a 2-4 option table (per the Gap
-Resolution Format) before ending the session. See the bootstrap doc's Material Decision Escalation
-section (Dispatch and Halt Contracts).
+Resolution Format) as plain markdown. Then invoke `/sdp-create-banner` with a `Decision` row
+summarizing what's undecided, e.g.
+`icon=warning row=0 row: Decision | [decision under consideration] is not yet settled in .speq/concept docs — halted per Material Decision Escalation. See options above.`
+before ending the session. See the bootstrap doc's Material Decision Escalation section (Dispatch
+and Halt Contracts).
 
 ### Step 3: Load Task Context
 
 1. If the assigned task is in an architecture or design phase: read the relevant GPG section
    file(s) before reading the task. Note applicable GPG patterns before forming an approach.
    Read `[resolved_project]/[AppName].speq.md` to load the tech contract before forming
-   an implementation approach.
+   an implementation approach. Any row in its Standing Non-Functional Requirements section
+   whose "Applies To" matches this task is binding acceptance-criteria input, in addition to
+   the task's own written description — carry it into Step 3.3's restatement below.
 2. Read the full phase file — the `active_phase_file` path from
    `[resolved_project]/.sdp-workflow/state.json` (or the session dispatch file's "Phase file
    path" field if `active_phase_file` is absent) — understand the assigned task in the context
    of the full phase.
-3. State what the assigned task requires before starting work. Proceed without waiting for
-   user confirmation unless the restatement reveals an interpretation conflict — in that case,
-   pause and state the conflict explicitly.
+3. Invoke `/sdp-create-banner` with a `Task` row restating what the assigned task requires,
+   including any applicable Standing Non-Functional Requirements row carried in from Step 3.1
+   alongside the task's own written acceptance criteria, e.g.
+   `icon=info row=0 row: Task | [restated task requirements].`
+   Proceed without waiting for user confirmation unless the restatement reveals an interpretation
+   conflict — in that case, invoke
+   `/sdp-create-banner icon=warning row=0 row: Conflict | [conflict description] row: | row: Confirm | How should this be resolved before work continues?`
+   and pause for the user's response.
 4. If the task has a prior non-compliant Eval blockquote: read it carefully before beginning
    work. The corrective notes from the REVIEWER are the starting point.
    If Superpowers is installed: invoke `/receiving-code-review` before beginning corrective
@@ -169,7 +181,13 @@ section (Dispatch and Halt Contracts).
    ```
    Include explicit build/compile status. If a deploy step is required, append a Deploy
    blockquote per the bootstrap document's deploy annotation pattern.
-3. Update the phase state file (the phase file's path with `.md` replaced by `_state.json`):
+3. If the phase file has a top-level `**Status:**` header (the standard document template in
+   `SDP-Workspace-Setup.md` includes one) and its current value does not reflect this task's new
+   `WORK_COMPLETE` state: strike it through in place and append the corrected value immediately
+   after, per Append-Only Discipline — e.g. `**Status:** ~~PENDING.~~ **WORK_COMPLETE** [DATE,
+   this session].` Do not silently overwrite the header. A phase file with no `**Status:**`
+   header needs no action here.
+4. Update the phase state file (the phase file's path with `.md` replaced by `_state.json`):
    - Set the task's `status` to `"WORK_COMPLETE"`
    - Set `last_session` to the current session identifier
    - Set `last_updated` to today's ISO date
@@ -177,17 +195,18 @@ section (Dispatch and Halt Contracts).
      `sdp-project-state-loop` (see the bootstrap Stuck-Loop Detection table). Writing it from a WORKER
      session corrupts REVIEWER-attempt accounting and can trigger a false-positive halt. Leave
      any existing `eval_cycle_attempts` value exactly as found; if it is absent, do not add it.
-4. Mirror all phase file changes to the parent document per the sync rule notice in the
+5. Mirror all phase file changes to the parent document per the sync rule notice in the
    phase file header.
-5. Commit all work: run `git status` to identify every untracked and modified file. Stage
+6. Commit all work: run `git status` to identify every untracked and modified file. Stage
    and commit ALL project files not covered by `.gitignore` — do not enumerate a specific
    file list. This includes implementation files, test files, fixtures, phase file changes,
    and state file updates from this and any prior uncommitted sessions. ~~Push to the remote
    branch.~~ Push via `./sdp-shared/scripts/sdp-github.ps1 push` (PowerShell tool) — read the
    JSON envelope: `status: "pushed"` means the push succeeded; an `ok:false` / `status:"error"`
-   envelope means the push failed (surface it and do not mark the task complete). Record the
-   short commit hash in the Completed blockquote.
-6. **CI-green gate (only when `SDP-Config.json` `ci.enabled` is true).** After a successful
+   envelope means the push failed — invoke
+   `/sdp-create-banner icon=error row=0 row: Push | Push failed — [error]. Task not marked complete.`
+   and do not mark the task complete. Record the short commit hash in the Completed blockquote.
+7. **CI-green gate (only when `SDP-Config.json` `ci.enabled` is true).** After a successful
    push, run `./sdp-shared/scripts/sdp-github.ps1 ci-status` and branch on the JSON `status`:
    - `green` — proceed to record completion.
    - `red` — do **not** mark the task complete. Read the failed-job detail
@@ -202,11 +221,11 @@ section (Dispatch and Halt Contracts).
      Halt Behavior Contract rather than guessing the outcome.
    When `ci.enabled` is false or absent, `ci-status` returns `no_ci` and this gate is a no-op
    (today's local-green behavior).
-7. Record completion (non-blocking — ignore any failure and continue): run
+8. Record completion (non-blocking — ignore any failure and continue): run
    `./sdp-shared/scripts/sdp-workflow-log.ps1 -trigger "worker.complete" -role "WORKER"
    -workItem "[task ID]" -outcome "WORK_COMPLETE" -reason "[one sentence: what was done, and
    any deviation from spec and why]"` via the PowerShell tool.
-8. Session ends. Do not proceed to evaluate or verify the completed work.
+9. Session ends. Do not proceed to evaluate or verify the completed work.
 
 ## Constraints
 
@@ -223,7 +242,8 @@ section (Dispatch and Halt Contracts).
 
 ## Outputs
 
-- Phase file (path noted in Step 3.2) updated: task checkbox `[x]`, Completed blockquote appended
+- Phase file (path noted in Step 3.2) updated: task checkbox `[x]`, Completed blockquote
+  appended, top-level `**Status:**` header synced to `WORK_COMPLETE` if present and stale
 - Parent document updated: mirrors phase file changes per sync rule
 - Phase state file (phase file path with `.md` replaced by `_state.json`) — task status →
   `WORK_COMPLETE`, `last_session`, `last_updated`

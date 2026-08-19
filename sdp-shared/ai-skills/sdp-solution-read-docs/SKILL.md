@@ -96,9 +96,8 @@ record the missing project name in the Confirm output; continue without halting.
 
 ### Step 1: Pathway 1 — Load Solution Docs
 
-1. Read `SDP-Document-List.json` at the solution root. If absent: report
-   "⚠️ No `SDP-Document-List.json` at solution root — solution docs not loaded." Proceed to
-   Step 2.
+1. Read `SDP-Document-List.json` at the solution root. If absent: invoke
+   `/sdp-create-banner icon=warning row=0 row: Status | No SDP-Document-List.json at solution root — solution docs not loaded. Proceeding to Step 2.`
 2. Parse JSON. Separate entries into two groups:
    - **Load list** — entries where `includeInReadDocs` is explicitly `true`, in array order
    - **Registered only** — all other entries (field absent, `false`, or any other value)
@@ -114,13 +113,12 @@ record the missing project name in the Confirm output; continue without halting.
 **Level 0 — Invocation argument (user or agent):** If a project path was passed as an
 argument on invocation, skip sub-steps 1–2. Read `SDP-Solution.json` to validate the
 argument against the `projects` array. If valid: use it as `[active_project]` and proceed
-to sub-step 3. If invalid: reject with "⛔ Invocation argument '[value]' does not match
-any project registered in `SDP-Solution.json`. Available: [list]. Correct the argument and
-re-run."
+to sub-step 3. If invalid: invoke
+`/sdp-create-banner icon=error row=0 row: Status | Invocation argument '[value]' does not match any project registered in SDP-Solution.json. Available: [list]. Correct the argument and re-run.`
 
-1. Read `SDP-Solution.json` from the solution root using the Read tool. If absent: halt with:
-   "⛔ `SDP-Solution.json` not found at solution root. Run `/sdp-workspace-setup` to create it
-   before proceeding."
+1. Read `SDP-Solution.json` from the solution root using the Read tool. If absent: invoke
+   `/sdp-create-banner icon=error row=0 row: Status | SDP-Solution.json not found at solution root. Run /sdp-workspace-setup to create it before proceeding.`
+   and halt.
 2. Parse `last_active_projects[0]` from `SDP-Solution.json`. Capture the full `projects` array
    for use in Step 3. If `last_active_projects` is empty or absent: read the `projects` array.
    - If `projects` contains exactly 1 entry: use it as `[active_project]` and proceed to
@@ -129,21 +127,22 @@ re-run."
      `current_phase` field.
      - If `current_phase` is not `null` (phases 1–7 still in progress for this solution — no
        project has been assigned real work yet, per the solution-scoped phase pipeline): no
-       active project exists to resolve. Report "ℹ️ No active project yet — solution is in
-       phases 1–7 (current_phase: [value]); project identity begins at Phase 7's decomposition."
+       active project exists to resolve. Invoke
+       `/sdp-create-banner icon=info row=0 row: Status | No active project yet — solution is in phases 1-7 (current_phase: [value]); project identity begins at Phase 7's decomposition.`
        Skip to Step 3 without loading any project docs. Do not prompt.
      - If `current_phase` is `null`, or `.sdp-solution-workflow/state.json` cannot be read or has
        no `current_phase` field (phase status unknown — e.g. a pre-solution-scoped-model
-       workspace): fall back to the original behavior — list the available projects to the user
-       and prompt them to select one. Wait for the user's response, then use the selected value
-       as `[active_project]` and proceed to sub-step 3.
-   - If `projects` is empty or absent: report "⚠️ No projects registered in
-     `SDP-Solution.json` — cannot resolve active project. Register at least one project and
-     re-run." Skip to Step 3.
+       workspace): fall back to the original behavior — invoke
+       `/sdp-create-banner icon=info row=0 row: Projects | [N] projects registered: 1) [project1], 2) [project2], ... row: | row: Select | Reply with the number (1-N) of the active project.`
+       Wait for the user's response, then use the project at that position as
+       `[active_project]` and proceed to sub-step 3.
+   - If `projects` is empty or absent: invoke
+     `/sdp-create-banner icon=warning row=0 row: Status | No projects registered in SDP-Solution.json — cannot resolve active project. Register at least one project and re-run.`
+     Skip to Step 3.
 
-3. Read `[active_project]/SDP-Document-List.json` using the Read tool. If missing: report
-   "⚠️ `[active_project]/SDP-Document-List.json` is missing — cannot load project document
-   list." Skip to Step 3.
+3. Read `[active_project]/SDP-Document-List.json` using the Read tool. If missing: invoke
+   `/sdp-create-banner icon=warning row=0 row: Status | [active_project]/SDP-Document-List.json is missing — cannot load project document list.`
+   Skip to Step 3.
 4. Parse the JSON array. Separate entries into two groups:
    - **Load list** — entries where `includeInReadDocs` is explicitly `true`, in array order
    - **Registered only** — all other entries (field absent, `false`, or any other value)
@@ -167,18 +166,11 @@ re-run."
 
 ### Step 4: Confirm
 
-Report to the user in one sentence that the skill is complete. List:
-- Solution docs loaded by name (Pathway 1), or "not loaded" with reason
-- Active project docs successfully loaded by name (Pathway 2)
-- Any docs that were unreadable or skipped due to context limits (Pathways 1 and 2)
-- Count of registered-only entries not loaded (Pathways 1 and 2)
-- Other project doc index (Pathway 3) — each project name and its available doc names
+Invoke `/sdp-create-banner` with a multi-row summary:
+`icon=success row=0 row: Sol Docs | [names loaded, or "not loaded" with reason] row: Proj Docs | [names loaded] row: Unreadable | [names, or "none"] row: Unloaded | [count] registered-only entries row: Other Proj | [project name (doc count)] for each other registered project`
 
-If Pathway 3 produced any results, append in-context note:
-> "If this task involves coordination across more than one project, load the following project
-> docs before proceeding:
-> - [project-name]: [file path 1], [file path 2], ...
-> - [project-name]: [file path 1], ..."
+If Pathway 3 produced any results, append a `Coordinate` row to the same banner invocation:
+`row: Coordinate | If this task involves coordination across more than one project, load the listed project docs above before proceeding.`
 
 Do not include documentation content in this response unless the user explicitly asks.
 

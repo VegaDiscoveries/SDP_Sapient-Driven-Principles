@@ -1,3 +1,5 @@
+<img src="images/SDP_DocsLogo_WithText_0700x0163.png" alt="SDP Logo" width="375">
+
 # AI-Assisted Development Workflow — Script Authoring Reference
 
 | Field | Value |
@@ -718,7 +720,7 @@ this last step cannot itself be scripted).
 | Trigger-position tokenizing, not line-splitting | `Step 1: Tokenize` | The slash-command channel flattens newlines to spaces, so `icon=`/`row=`/`row:` directives can appear anywhere in one line, in any order — parsing must scan for trigger tokens by position, not assume one directive per line |
 | `Get-TextElements` (grapheme-cluster enumeration) | Top of script | Several registered icon glyphs are surrogate-pair or base+variation-selector emoji; raw `.Length`/`.Substring()` would miscount or split a glyph mid-codepoint. `StringInfo`'s text-element enumerator treats each as the single unit the row-width math assumes |
 | Ordinary string padding, no mask-overlay | `New-BannerRow` | The hand-authored (pre-script) version used a `œ`-character mask-overlay technique specifically to help an LLM avoid manual counting errors: a script has no such failure mode and computes exact padding with `.PadRight`-equivalent arithmetic directly |
-| Icon registry loaded from `script-support/`, a sibling folder to the script itself | Icon Registry load | Runtime data the script consumes internally — the calling skill's L1 shim never reads it, which is the entire point of the L1-only conversion (context-cost elimination, not tool-call elimination; see the skill's own eval history in `~SDP-Maintenance/~sdp-shared/~skill-evals/`) |
+| Icon registry loaded from `script-support/`, a sibling folder to the script itself | Icon Registry load | Runtime data the script consumes internally — the calling skill's L1 shim never reads it, which is the entire point of the L1-only conversion (context-cost elimination, not tool-call elimination) |
 | `banner` returned directly in the JSON envelope, no file write | `Write-Result` | A file-then-Read round trip would cost the identical context tokens plus an extra tool call, for zero benefit — direct-return was the explicit design decision recorded in the skill's own eval |
 
 **Permission entry:**

@@ -1,3 +1,5 @@
+<img src="images/SDP_DocsLogo_WithText_0700x0163.png" alt="SDP Logo" width="375">
+
 # SDP Project Evolution
 
 **Created:** 2026-06-18

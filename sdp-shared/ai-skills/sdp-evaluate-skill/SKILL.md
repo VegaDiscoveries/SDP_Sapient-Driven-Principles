@@ -224,8 +224,8 @@ risk/reward tradeoff is.]
 new steps added, existing steps modified, script coverage extended, or recommendation unchanged.]
 ```
 
-4. Report to user: "Evaluation complete — report written to
-   `[eval_dir][skill-name]-eval.md`."
+4. Invoke `/sdp-create-banner` with an `Eval` row, e.g.
+   `icon=success row=0 row: Eval | Evaluation complete — report written to [eval_dir][skill-name]-eval.md.`
 
 ---
 

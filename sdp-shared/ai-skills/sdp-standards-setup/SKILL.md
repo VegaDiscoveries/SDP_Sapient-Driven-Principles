@@ -31,27 +31,30 @@ Complete every sub-step in order. Do not proceed to Step 2 until all sub-steps p
 user has confirmed how to handle any exception.
 
 **1a. Obtain doc path**
-If the user provided the new standards doc path on invocation, use it. If not, ask:
-"What is the path to your standards doc? (Provide the full path or a path relative to the
-solution root.)" Wait for the user's response before continuing.
+If the user provided the new standards doc path on invocation, use it. If not, invoke
+`/sdp-create-banner icon=info row=0 row: Input | What is the path to your standards doc? (Provide the full path or a path relative to the solution root.)`
+Wait for the user's response before continuing.
 
 **1b. Location enforcement**
 Check whether the provided path is inside the `standards/` folder at the solution root.
 - If yes: continue to sub-step 1c.
-- If no: inform the user — "Standards docs must reside in `standards/` for the skill to
-  update path references correctly. Moving the file there now." Move (copy + delete source)
-  the file into `standards/`. If a file by that name already exists in `standards/`, report
-  the conflict and ask the user how to resolve before moving. Confirm the final path to the
-  user before continuing.
+- If no: invoke
+  `/sdp-create-banner icon=info row=0 row: Location | Standards docs must reside in standards/ for the skill to update path references correctly. Moving [file] there now.`
+  Move (copy + delete source) the file into `standards/`. If a file by that name already
+  exists in `standards/`, invoke
+  `/sdp-create-banner icon=warning row=0 row: Conflict | A file named [name] already exists in standards/. row: | row: Resolve | How should this be resolved — overwrite, rename the incoming file, or cancel?`
+  and wait for the user's response before moving. Then invoke
+  `/sdp-create-banner icon=success row=0 row: Location | Standards doc moved to standards/[filename].`
 
 **1c. Version string**
 Inspect the filename for a version segment matching `V[major].[minor]_[YYYYMMDD]`
 (e.g., `V1.0_20260625`).
 - If a version segment is present: extract it as `[version_key]` and continue to sub-step 1d.
 - If absent: propose the filename `[BaseName]_V1.0_[today].md` where `[today]` is today's
-  date as `YYYYMMDD`. Present the proposal to the user and wait for confirmation or a
-  correction. Rename the file to the confirmed name. Set `[version_key]` to `V1.0_[today]`
-  (or the confirmed version string). Continue to sub-step 1d.
+  date as `YYYYMMDD`. Invoke
+  `/sdp-create-banner icon=info row=0 row: Version | Proposed filename: [BaseName]_V1.0_[today].md row: | row: Confirm | Does this filename look correct, or would you like to provide a different version string?`
+  Wait for confirmation or a correction. Rename the file to the confirmed name. Set
+  `[version_key]` to `V1.0_[today]` (or the confirmed version string). Continue to sub-step 1d.
 
 Derive `[DocName]` from the filename: the base name without the version segment and without
 the `.md` extension. Example: `CompanyStandards_V1.0_20260625.md` → `[DocName]` =
@@ -60,17 +63,22 @@ the `.md` extension. Example: `CompanyStandards_V1.0_20260625.md` → `[DocName]
 **1d. Format check**
 Verify the file extension is `.md`.
 - If yes: continue to sub-step 1e.
-- If no: inform the user — "The standards doc must be a Markdown file. Converting to `.md`
-  now." Convert the file to Markdown (best-effort format preservation). After conversion,
-  present a summary of structural changes made (headings detected, tables preserved, etc.)
-  and ask the user to confirm the conversion is acceptable before continuing. If the user
-  reports fidelity issues, halt and ask them to manually produce an acceptable `.md` file,
-  then re-run the skill.
+- If no: invoke
+  `/sdp-create-banner icon=info row=0 row: Format | [file] is not Markdown — converting to .md now (best-effort format preservation).`
+  Convert the file to Markdown (best-effort format preservation). After conversion, invoke
+  `/sdp-create-banner` with a `Conversion` row summarizing the structural changes made (headings
+  detected, tables preserved, etc.), a blank-separator row, and a `Confirm` row asking whether the
+  conversion is acceptable, e.g.
+  `icon=success row=0 row: Conversion | Converted [file] to Markdown — [N] headings detected, [M] tables preserved[, other notable changes]. row: | row: Confirm | Does this conversion look acceptable, or are there fidelity issues to flag before continuing?`
+  Wait for the user's response before continuing. If the user reports fidelity issues, invoke
+  `/sdp-create-banner icon=error row=0 row: Status | Conversion fidelity issue reported — manually produce an acceptable .md file, then re-run /sdp-standards-setup.`
+  and halt.
 
 **1e. GPG presence check**
 Scan `standards/` for files matching `GenericProjectGuidlines_V*.md`.
-- If one or more matches found: confirm to the user which GPG file will be used as the
-  cross-reference source. Continue to sub-step 1f.
+- If one or more matches found: invoke
+  `/sdp-create-banner icon=info row=0 row: GPG Source | Using [filename] as the cross-reference source for Phase 3.`
+  Continue to sub-step 1f.
 - If no match found: halt. Invoke
   `/sdp-create-banner icon=error row=0 row: Status | The original GPG doc (standards/GenericProjectGuidlines_V*.md) is required for Phase 3 chapter cross-referencing and must be present during this skill's execution. Restore the file to standards/ and re-run /sdp-standards-setup.`
   Do not proceed until the user restores the file and re-invokes the skill.
@@ -79,14 +87,15 @@ Scan `standards/` for files matching `GenericProjectGuidlines_V*.md`.
 Read the new doc. Identify the primary chapter structure:
 - If the doc uses H2 (`##`) for chapters: use H2 headings as chapter boundaries.
 - If the doc uses H1 (`#`) for chapters (and H2 for sub-sections): use H1 headings.
-- If the structure is ambiguous: describe what was found and ask the user to confirm which
-  heading level defines chapters before continuing.
+- If the structure is ambiguous: invoke
+  `/sdp-create-banner icon=warning row=0 row: Headings | Both H1 and H2 headings found — ambiguous chapter structure. row: | row: Confirm | Which heading level defines chapters — H1 or H2?`
+  Wait for the user's response before continuing.
 
 Extract the ordered chapter list. For each chapter, derive a section filename using the rule:
 remove non-alphanumeric characters from the heading, apply TitleCase concatenation, and prefix
 with `[DocName]_`. Example: "Chapter 3: Security & Authentication" → `[DocName]_SecurityAuthentication.md`.
 
-Present a confirmation table to the user:
+Present the chapter table as plain markdown first — a banner row can't hold a rendered table:
 
 ```
 | # | Chapter Heading | Proposed Section File |
@@ -95,7 +104,8 @@ Present a confirmation table to the user:
 ...
 ```
 
-Ask: "Does this chapter breakdown look correct? Confirm or provide corrections before scaffolding begins."
+Then invoke `/sdp-create-banner` with a `Chapters` digest row and a folded `Confirm` question:
+`icon=success row=0 row: Chapters | [N] chapters identified from [H1/H2] headings — see table above. row: | row: Confirm | Does this chapter breakdown look correct, or are there corrections?`
 
 Wait for user confirmation. Apply any corrections to the chapter list before proceeding to Step 2.
 
@@ -108,8 +118,8 @@ After Step 1 user confirmation, proceed without further prompts unless a write f
 **2a. Create sections folder**
 Create `standards/[DocName]_Sections/` if it does not already exist. If it exists and contains
 files, invoke
-`/sdp-create-banner icon=warning row=0 row: Status | Sections folder already exists with content — proceeding will overwrite existing section files.`
-Then separately ask the user: "Confirm?" Wait for confirmation before continuing.
+`/sdp-create-banner icon=warning row=0 row: Status | Sections folder already exists with content — proceeding will overwrite existing section files. row: | row: Confirm | Proceed with overwrite?`
+Wait for confirmation before continuing.
 
 **2b. Inject sync rule notices into parent doc**
 Prepend the following block immediately after the document title line (the first `#` heading)
@@ -182,8 +192,10 @@ When adding, renaming, or deleting a chapter:
 ```
 
 **2e. Report scaffolding results**
-List every file created and every file modified in this phase. Note any chapters that could
-not be cleanly extracted (e.g., chapter with no distinct end boundary) for user review.
+List every file created and every file modified in this phase as plain text first. Note any
+chapters that could not be cleanly extracted (e.g., chapter with no distinct end boundary) for
+user review. Then invoke `/sdp-create-banner` with a `Scaffold` digest row, e.g.
+`icon=success row=0 row: Scaffold | Phase 2 scaffolding complete — [N] files created, [M] files modified. See file list above.`
 
 ---
 
@@ -239,14 +251,13 @@ and assess which SDP workflow stages it applies to. Propose one of:
 - Conditional: if the chapter applies only to specific task types (propose the trigger condition)
 
 **3d. Present draft to user**
-Present the complete draft reading map to the user:
+Present the complete draft reading map to the user as plain markdown first:
 - Section A: the updated tables with mapped chapters substituted
 - Section B: coverage notes for unmapped GPG topics (with stub prose)
 - Section C: proposed entries for new-doc-only chapters
 
-Ask: "Review each section. For Section B gaps, confirm or revise the stub prose. For Section C
-new entries, confirm or correct the proposed SDP stage applicability. Reply with any
-corrections and I will update before writing."
+Then invoke `/sdp-create-banner` with a `Draft` digest row and a folded `Review` question, e.g.
+`icon=success row=0 row: Draft | Reading map draft complete — [N] mapped, [M] coverage notes, [K] new-doc entries. See draft above. row: | row: Review | Confirm each section, or reply with corrections — Section B stub prose, Section C stage applicability.`
 
 Wait for user response. Apply all corrections. Produce the final reading map.
 
@@ -306,7 +317,8 @@ For `SDP-Document-List.json` at the solution root: update the path entry for the
 to the new filename.
 
 If a file cannot be read or written, record it as a failure. Continue processing remaining
-files. Report all failures at the end of sub-step 4c before proceeding.
+files. Do not report failures to the user yet — they are consolidated into the single Phase 4
+completion report in sub-step 4e below.
 
 **4d. Update bootstrap doc (append-only, strikethrough approach)**
 The bootstrap doc (`SDP_Sapient-Driven-Principles_v*.md`) is an append-only historical record.
@@ -353,14 +365,18 @@ After all edits: read back the sections of the bootstrap doc that were changed t
 correct application before proceeding.
 
 **4e. Report Phase 4 changes**
-Output a file-by-file change log:
+Output a file-by-file change log as plain text:
 - File path
 - Number of substitutions made
 - Brief description of what changed (e.g., "gpg_version → standards_version (3 occurrences),
   TOC path updated")
 
-If any files had failures: list them separately with the specific error. Ask the user to
-resolve failures before continuing to Phase 5.
+If any files had failures (including those recorded in sub-step 4c): list them separately with
+the specific error, immediately after the change log. Then invoke `/sdp-create-banner` with a
+single `Phase 4` row covering both outcomes. No failures:
+`icon=success row=0 row: Phase 4 | [N] files updated — see change log above.`
+Any failures:
+`icon=error row=0 row: Phase 4 | [N] files updated, [M] failed — see change log above. row: | row: Resolve | Address the listed failures before continuing to Phase 5.`
 
 ---
 
@@ -380,18 +396,22 @@ For each remaining match, classify it as one of:
 | **Ambiguous** | Not clearly intentional or auto-correctable; requires user decision |
 
 **5c. Apply auto-corrections**
-Apply all auto-correctable fixes immediately. Report each one.
+Apply all auto-correctable fixes immediately, listing each one as plain text. Then invoke
+`/sdp-create-banner` with an `Auto-Fix` digest row, e.g.
+`icon=success row=0 row: Auto-Fix | [N] auto-correctable fix(es) applied — see list above.`
 
 **5d. Surface ambiguous hits**
 For each ambiguous remaining hit: show the user the file path, line number, matched text, and
-3 lines of surrounding context. Ask: "Is this an intentional retention or should it be
-updated?" Apply the user's decision. Do not proceed past this sub-step until every ambiguous
-hit is resolved.
+3 lines of surrounding context as plain text first. Then invoke `/sdp-create-banner` with a
+`Hit` row and a folded `Confirm` question, e.g.
+`icon=question row=0 row: Hit | [file]:[line] — "[matched text]" row: | row: Confirm | Intentional retention, or should this be updated?`
+Apply the user's decision. Do not proceed past this sub-step until every ambiguous hit is
+resolved.
 
 **5e. Confirm clean**
-After all resolutions: re-run the search one final time. Confirm to the user that the only
-remaining hits are in intentional/historical locations. If any unexpected hits remain, repeat
-sub-steps 5b–5d.
+After all resolutions: re-run the search one final time. Invoke
+`/sdp-create-banner icon=success row=0 row: Status | Sanity check clean — all remaining hits are in intentional/historical locations.`
+If any unexpected hits remain, repeat sub-steps 5b–5d.
 
 ---
 

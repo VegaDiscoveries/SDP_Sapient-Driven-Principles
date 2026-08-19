@@ -40,10 +40,10 @@ selects Option 1 automatically for two-option prompts. Outputs single-line JSON.
 
 ### Step 3: Announce
 
-- If `selection_reason` is `"one-match"`: announce to the user: "Identified next step:
-  `/[skill_name]` — invoking now."
-- If `selection_reason` is `"two-option-auto"`: announce to the user: "Two-option prompt
-  detected — automatically selecting Option 1 (recommended): `/[skill_name]`."
+- If `selection_reason` is `"one-match"`: invoke
+  `/sdp-create-banner icon=info row=0 row: Status | Identified next step: /[skill_name] — invoking now.`
+- If `selection_reason` is `"two-option-auto"`: invoke
+  `/sdp-create-banner icon=info row=0 row: Status | Two-option prompt detected — automatically selecting Option 1 (recommended): /[skill_name].`
 
 ### Step 4: Invoke the Skill
 

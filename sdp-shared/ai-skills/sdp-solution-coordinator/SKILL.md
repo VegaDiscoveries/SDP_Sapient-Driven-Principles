@@ -79,12 +79,15 @@ pass, adjacent to the existing top-level fields).
    signal this solution predates this design.
 3. **None found:** set `migration_checked: true`, proceed normally (Step 1 onward).
 4. **Found in one or more projects:** halt (Halt Behavior Contract) with `halt_reason` naming
-   every project and phase found, and present the user with the actual content of each affected
-   project's existing phase 1–7 documents side by side. This is a one-time, human-directed
-   reconciliation — not scriptable. The user decides, per phase, whether one project's existing
-   document becomes the solution-level starting point (others' equivalent content struck through
-   in place with a pointer to the new solution-level equivalent — Append-Only Discipline) or a
-   fresh solution-level document is drafted informed by all of them.
+   every project and phase found. Present the actual content of each affected project's existing
+   phase 1–7 documents side by side as plain text first (a banner row can't hold full document
+   bodies), then invoke `/sdp-create-banner` with a `Migration` row summarizing which
+   projects/phases were found, e.g.
+   `icon=warning row=0 row: Migration | Existing phase 1-7 documents found in [N] project(s): [project list] — reconciliation required before proceeding. See document content above.`
+   This is a one-time, human-directed reconciliation — not scriptable. The user decides, per phase,
+   whether one project's existing document becomes the solution-level starting point (others'
+   equivalent content struck through in place with a pointer to the new solution-level equivalent
+   — Append-Only Discipline) or a fresh solution-level document is drafted informed by all of them.
 5. **Re-home** once reconciled: seed `.sdp-solution-workflow/registry.md` with rows for the
    resolved phase(s) onward (already-complete phases marked `[x]` immediately, with a note
    referencing the original project-level document); strike through each affected project's own
@@ -104,8 +107,11 @@ a prior resolved Material Decision Escalation record — or an architectural pat
 precedent: stop. If `SDP-Config.json` `materialDecisionEscalation.enabled` is `true` (default), do
 not proceed. Halt per the bootstrap doc's Halt Behavior Contract instead — set `workflow_status:
 "halted"`, `halt_reason` naming the decision, and append a 2-4 option table (per the Gap
-Resolution Format) before ending the session. See the bootstrap doc's Material Decision Escalation
-section (Dispatch and Halt Contracts).
+Resolution Format) as plain markdown. Then invoke `/sdp-create-banner` with a `Decision` row
+summarizing what's undecided, e.g.
+`icon=warning row=0 row: Decision | [decision under consideration] is not yet settled in .speq/concept docs — halted per Material Decision Escalation. See options above.`
+before ending the session. See the bootstrap doc's Material Decision Escalation section (Dispatch
+and Halt Contracts).
 
 ### Step 1: Run Script
 
@@ -403,7 +409,10 @@ whenever Step 2a finds `phase_gate.status == "blocked"` for the solution's `curr
 2. **Remediation Proposals present:** halt per the Halt Behavior Contract —
    `workflow_status = "halted"`, `halt_reason = "Phase Readiness gate found a traceability gap —
    read the Remediation Proposals in sdp-solution-docs/07_phase_readiness.md and select one before
-   resuming."` Surface all numbered proposals (each with its `Target Phase:` value) verbatim.
+   resuming."` Surface all numbered proposals (each with its `Target Phase:` value) verbatim as
+   plain markdown first — a banner row can't hold a list — then invoke `/sdp-create-banner` with a
+   `Readiness` row carrying a short version of this, e.g.
+   `icon=error row=0 row: Readiness | Traceability gap found — see sdp-solution-docs/07_phase_readiness.md. Select a remediation proposal above before resuming.`
    Terminate — never pick a proposal automatically.
 3. **On the next invocation, once the user has stated their chosen proposal:**
    a. Read the chosen proposal's `Target Phase:` value — the exact `.sdp-solution-workflow/

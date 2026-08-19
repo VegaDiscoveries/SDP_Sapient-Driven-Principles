@@ -13,11 +13,12 @@ checks whether task-level work has already been done. The two are not interchang
 
 - **Target doc path** — required. Must be provided by the user when invoking the skill
   directly (user-invoked trigger), or established by agent context when the skill is run as
-  part of staging (agent-staged trigger). If not established, ask the user to provide the path
-  before proceeding.
+  part of staging (agent-staged trigger). If not established, invoke
+  `/sdp-create-banner icon=info row=0 row: Input | Target document path not established — provide the path to the document to review.`
 - **Associated state file** — required for Step 4 (Certify). Typically the `[phase]_state.json`
   file associated with the doc, or `.sdp-workflow/state.json` for non-phase docs. If the
-  associated state file is not obvious from context, ask the user.
+  associated state file is not obvious from context, invoke
+  `/sdp-create-banner icon=info row=0 row: State File | Associated state file for this document is not obvious from context — confirm the correct [phase]_state.json (or .sdp-workflow/state.json) to use.`
 - **Session identifier** — used in the certification blockquote and state file entry. Use the
   current session's `session-NNN` identifier from `state.json`, or `"user-invoked"` when the
   skill is triggered directly by the user outside the SDP workflow.
@@ -27,9 +28,11 @@ checks whether task-level work has already been done. The two are not interchang
 ### Step 1: Identify Target Doc
 
 1. Confirm the target doc path is established (from user input or agent context). If not:
-   ask the user to provide it before continuing.
+   invoke the banner described in the Inputs section above and wait for the user's response
+   before continuing.
 2. Read the full target document using the Read tool.
-3. Identify the associated state file. If uncertain, ask the user to confirm.
+3. Identify the associated state file. If uncertain, invoke the banner described in the Inputs
+   section above and wait for the user's confirmation.
 
 ### Step 2: Review — Identify All Items
 
@@ -49,8 +52,9 @@ Read the full document and identify every item in any of the following categorie
 Record every identified item internally before surfacing any. Order items by document position.
 Do not surface any item during this step — complete the full scan first.
 
-If no items are identified: report that to the user, skip Step 3, and proceed directly to
-Step 4 (Certify).
+If no items are identified: invoke
+`/sdp-create-banner icon=success row=0 row: Review | No open decisions, informally resolved items, concerns, or blockers identified — proceeding directly to certification.`
+Skip Step 3 and proceed directly to Step 4 (Certify).
 
 ### Step 3: Surface, Resolve, and Lock In (one item at a time)
 
@@ -71,11 +75,13 @@ Do not surface the next item until the current item is closed. A conversation an
 does not close an item — the resolution must be written into the doc first (see Lock In
 below).
 
-If an item cannot be resolved and cannot be deferred: surface the blocker explicitly and halt.
-Do not proceed to remaining items. Also record the block (non-blocking — ignore any failure and
-continue): run `./sdp-shared/scripts/sdp-workflow-log.ps1 -trigger "doc_review.blocker" -role
-"DOC_REVIEWER" -outcome "HALTED" -reason "[item description] - cannot be resolved or
-deferred"` via the PowerShell tool.
+If an item cannot be resolved and cannot be deferred: surface the blocker explicitly (as part
+of the ordinary Surface step above), then invoke
+`/sdp-create-banner icon=error row=0 row: Status | Item cannot be resolved or deferred — halting doc review. See blocker above.`
+and halt. Do not proceed to remaining items. Also record the block (non-blocking — ignore any
+failure and continue): run `./sdp-shared/scripts/sdp-workflow-log.ps1 -trigger
+"doc_review.blocker" -role "DOC_REVIEWER" -outcome "HALTED" -reason "[item description] -
+cannot be resolved or deferred"` via the PowerShell tool.
 
 **Lock In** — immediately after the user confirms a resolution, write it into the doc before
 surfacing the next item. Confirm the write with the user before applying it. Use the

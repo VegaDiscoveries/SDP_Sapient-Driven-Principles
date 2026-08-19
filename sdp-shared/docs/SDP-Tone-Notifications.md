@@ -1,3 +1,5 @@
+<img src="images/SDP_DocsLogo_WithText_0700x0163.png" alt="SDP Logo" width="375">
+
 # AI-Assisted Development Workflow — Tone & Tune Notifications Reference
 
 | Field | Value |

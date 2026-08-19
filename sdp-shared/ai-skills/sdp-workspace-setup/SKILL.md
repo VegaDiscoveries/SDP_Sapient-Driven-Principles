@@ -7,7 +7,7 @@ existing call sites that previously only pointed at prose:
 
 - `sdp-solution-read-docs`'s halt — "`SDP-Solution.json` not found at solution root" — now
   names this skill instead of a generic "run solution setup."
-- `sdp-new-concept-intake`'s Step 4 "new project" pause, which explicitly defers project
+- `sdp-solution-new-concept-intake`'s Step 4 "new project" pause, which explicitly defers project
   scaffolding to whatever handles `SDP-Workspace-Setup.md`'s Add-Project Steps — this skill is
   that handler.
 
@@ -41,22 +41,27 @@ existing call sites that previously only pointed at prose:
 Follow `SDP-Workspace-Setup.md`'s **Setup Checklist → Solution Setup** section, in order:
 
 1. **Collect setup inputs (Step 0 of that checklist)** — derive a preliminary solution name from
-   the root folder name and propose it for confirmation; ask Q1–Q3 to compose the synopsis; ask
-   Q4 for the project types (propose the full `sdp-project_*` folder list, PascalCase dotted
-   naming); ask Q5 for the development environment (Visual Studio/Rider, VS Code, agent-only, or
-   other); ask Q6 — detect the GPG standards doc version present in `standards/` and explicitly
-   ask the user to confirm it (or name a different one) before any scaffolding begins. Present
-   the complete setup plan as a banner:
-   `/sdp-create-banner icon=info,info,info,info,info row=0,1,2,3,4 row: Solution | [confirmed name] row: Synopsis | [synopsis] row: Projects | [Q4 project list] row: IDE File | [IDE file to create] row: GPG Version | [confirmed Q6 version]`
-   — then, as a separate, real question immediately after the banner, wait for explicit user
-   confirmation. **Do not create any file or folder before this confirmation.**
+   the root folder name and present it via a `/sdp-create-banner` question row for confirmation
+   or correction, e.g.
+   `icon=info row=0 row: Name | Proposed solution name: [derived name] — confirm, or provide a different name.`
+   Ask Q1–Q3 (each its own `/sdp-create-banner` question row, same pattern) to compose the
+   synopsis; ask Q4 (same pattern) for the project types (propose the full `sdp-project_*` folder
+   list, PascalCase dotted naming); ask Q5 (same pattern) for the development environment (Visual
+   Studio/Rider, VS Code, agent-only, or other); ask Q6 (same pattern) — detect the GPG standards
+   doc version present in `standards/` and explicitly confirm it (or name a different one) before
+   any scaffolding begins. Wait for the user's response after each question before asking the
+   next. Once all six are answered, present the complete setup plan as one banner with the
+   confirmation folded in as a trailing row:
+   `/sdp-create-banner icon=info,info,info,info,info row=0,1,2,3,4 row: Solution | [confirmed name] row: Synopsis | [synopsis] row: Projects | [Q4 project list] row: IDE File | [IDE file to create] row: Standards | [confirmed Q6 version] row: | row: Confirm | Proceed with this setup plan?`
+   Wait for explicit user confirmation. **Do not create any file or folder before this
+   confirmation.**
 2. **Verify the SDP framework is already present** — `sdp-shared/`, `standards/`, `.claude/`, the
    bootstrap doc(s), `SDP-Config.json`. (`SDP-Tones.json` is not part of this check — it is
    created during this setup, not copied in; see the "Create `SDP-Tones.json`" checklist step.)
-   If any are missing: halt and tell the
-   user to copy them in per `QuickStart.md`'s "Add to an existing solution" step before this
-   skill can continue — this skill scaffolds workflow state and registration, not the framework
-   files themselves.
+   If any are missing: invoke
+   `/sdp-create-banner icon=error row=0 row: Status | SDP framework files missing: [list]. Copy them in per QuickStart.md's "Add to an existing solution" step before this skill can continue.`
+   and halt — this skill scaffolds workflow state and registration, not the framework files
+   themselves.
 3. **Conduct-rules check** — per that checklist's Step 1.5, exactly as written there (template
    vs. existing `~/.claude/CLAUDE.md` / `.claude/rules/*.md` comparison, full/partial/no-match
    classification).
@@ -86,13 +91,14 @@ Follow `SDP-Workspace-Setup.md`'s **Setup Checklist → Solution Setup** section
      discipline manually.
    - PowerShell available; all `sdp-` skill pairs present at both levels; script permission
      entries present in `permissions.allow`; standards files (GPG or custom) present in
-     `standards/`. Halt and ask the user to resolve anything missing before proceeding to Step 2
-     of this skill.
+     `standards/`. If anything is missing: invoke
+     `/sdp-create-banner icon=error row=0 row: Status | Solution infrastructure check found issues: [list]. Resolve before proceeding to Step 2 of this skill.`
+     and halt.
 
 ### Step 2: Add-Project Steps (always — once per confirmed project)
 
 For each project confirmed in Q4 (first-run mode) or the single new project being added
-(already-configured solution, invoked directly or via `sdp-new-concept-intake`'s hand-off):
+(already-configured solution, invoked directly or via `sdp-solution-new-concept-intake`'s hand-off):
 follow `SDP-Workspace-Setup.md`'s **Setup Checklist → Add-Project Steps** section verbatim, in
 order — project name/description confirmation; `sdp-project_[AppName.xxx]/` folder scaffold
 (`.sdp-workflow/`, `sdp-docs/` — stub `00_user_notes.txt` and empty `00_prompt.txt` only, no
@@ -117,9 +123,9 @@ just created empty by this same invocation (Step 2 always scaffolds it empty —
 scaffolded project always has zero phase rows, so COORDINATOR has nothing to dispatch and would
 immediately halt on first invocation):
 
-`/sdp-create-banner icon=success,success,success,success row=0,1,2,3 row: Structure | [created solution/project structure] row: IDE File | [confirmed IDE file, if any] row: Next Step — Have Docs | Drop them in sdp-solution-docs/user-design-docs/ and run /sdp-new-concept-intake for the active project ([name]). row: Next Step — No Docs Yet | Run /brainstorming first — save the resulting doc to sdp-solution-docs/user-design-docs/ (not Superpowers' own default spec location) — then run /sdp-new-concept-intake to advance it.`
+`/sdp-create-banner icon=success,success,success,success row=0,1,2,3 row: Structure | [created solution/project structure] row: IDE File | [confirmed IDE file, if any] row: Next Step — Have Docs | Drop them in sdp-solution-docs/user-design-docs/ and run /sdp-solution-new-concept-intake for the active project ([name]). row: Next Step — No Docs Yet | Run /brainstorming first — save the resulting doc to sdp-solution-docs/user-design-docs/ (not Superpowers' own default spec location) — then run /sdp-solution-new-concept-intake to advance it.`
 
-If this invocation was triggered by `sdp-new-concept-intake`'s "new project" pause, also change
+If this invocation was triggered by `sdp-solution-new-concept-intake`'s "new project" pause, also change
 `icon=success,success,success,success row=0,1,2,3` to
 `icon=success,success,success,success,success row=0,1,2,3,4`
 and add `row: Intake | The paused concept-intake set can now proceed since the target project
@@ -127,7 +133,7 @@ exists and is registered.` to the same invocation — do not prefix this added r
 `row=` fragment; the row index list was already extended to include it in the `icon=`/`row=`
 directive above, and at most one `row=` directive is permitted per invocation. Do not draft
 Phase 1 content and do not spawn a COORDINATOR, WORKER, or
-REVIEWER subagent from within this skill — this mirrors the discipline `sdp-new-concept-intake`
+REVIEWER subagent from within this skill — this mirrors the discipline `sdp-solution-new-concept-intake`
 already applies to itself.
 
 ## Constraints
@@ -136,7 +142,7 @@ already applies to itself.
 - Step 1 runs at most once per solution — Step 0's mode check is the only gate; never re-run
   solution-root setup once `SDP-Solution.json` is configured.
 - Does not draft Phase 1/3 content and does not spawn COORDINATOR/WORKER/REVIEWER — mirrors
-  `sdp-new-concept-intake`'s Step 6 discipline.
+  `sdp-solution-new-concept-intake`'s Step 6 discipline.
 - `SDP-Workspace-Setup.md` is read explicitly every invocation (Step 0.1) — never assume its
   content from memory across sessions, since it is not auto-loaded and may have been amended.
 - Framework files (`sdp-shared/`, `standards/`, `.claude/`, bootstrap doc) are a precondition

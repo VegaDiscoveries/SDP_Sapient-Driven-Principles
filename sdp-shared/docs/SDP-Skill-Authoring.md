@@ -1,4 +1,6 @@
-﻿# AI-Assisted Development Workflow — Skill Authoring Reference
+﻿<img src="images/SDP_DocsLogo_WithText_0700x0163.png" alt="SDP Logo" width="375">
+
+# AI-Assisted Development Workflow — Skill Authoring Reference
 
 | Field | Value |
 |-------|-------|
@@ -74,8 +76,7 @@ questions: a banner can only ever be the visual framing immediately before a sep
 
 This convention was established by a framework-wide adoption pass (2026-07-17) that surveyed all
 ~31 skills against these criteria and converted 23 of them — see `SDP-Changelog.md` for the
-summary and `~SDP-Maintenance/~docs/sdp-create-banner-adoption-tracker.md` for the full per-skill
-record, including which skills were deliberately excluded and why. Apply the same criteria when
+summary, including which skills were deliberately excluded and why. Apply the same criteria when
 authoring a new skill's chat-facing messages, rather than defaulting to raw emoji-prefixed text.
 
 ---

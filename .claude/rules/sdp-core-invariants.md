@@ -2,7 +2,7 @@
 
 These seven invariants govern every SDP session (COORDINATOR, WORKER, REVIEWER, and any
 orchestrating/loop session) regardless of how long the session runs or how many times it
-compacts. They are extracts of `SDP_Sapient-Driven-Principles_v1.1.0.md` — that document is
+compacts. They are extracts of `SDP_Sapient-Driven-Principles_v1.1.1.md` — that document is
 authoritative; this file exists so these specific rules survive session compaction, which the
 bootstrap doc's own content does not. When the bootstrap doc's language for one of these
 changes, mirror the edit here — same discipline as GPG chapter sections mirroring

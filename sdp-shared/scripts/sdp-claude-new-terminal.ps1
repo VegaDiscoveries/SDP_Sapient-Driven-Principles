@@ -19,6 +19,15 @@
     as a single compact JSON line to stdout INSTEAD of launching a process or writing the
     registry file. Intended for deterministic testing without spawning a real window.
 
+.PARAMETER callerSessionId
+    Optional. The calling session's own session_id (typically obtained via
+    sdp-claude-session-get-sessionid). Written onto the new instance's row as
+    launcherSessionId, in the same single write that already creates the row - no separate
+    update-write, no second touch on SDP-Terminal-Sessions.json. Empty string (default) leaves
+    launcherSessionId null on the new row. The row's own sessionId field always starts null,
+    regardless of this parameter - it is self-written later by the spawned session itself (see
+    sdp-claude-session-init), not by this script.
+
 .NOTES
     Reads:
       SDP-Config.json                  (newTerminals[] - array of {id, name, initialPrompt,
@@ -88,6 +97,7 @@
 param(
     [string]$terminal = "",
     [string]$promptOverride = "",
+    [string]$callerSessionId = "",
     [switch]$whatIf
 )
 
@@ -355,18 +365,20 @@ foreach ($entry in $instancesList) {
 $instancesList = $reconciledList
 
 $newEntry = [pscustomobject]@{
-    id            = $instanceId
-    terminalId    = $selectedTerminalId
-    terminalName  = $selectedTerminalName
-    pid           = $recordedPid
-    pidConfirmed  = $pidConfirmed
-    launcher      = $launcherName
-    initialPrompt = $resolvedPrompt
-    workspaceRoot = $resolvedDirectory
-    launchedAt    = (Get-Date).ToString("o")
-    status        = "running"
-    notRunningAt  = $null
-    completedAt   = $null
+    id                = $instanceId
+    terminalId        = $selectedTerminalId
+    terminalName      = $selectedTerminalName
+    pid               = $recordedPid
+    pidConfirmed      = $pidConfirmed
+    launcher          = $launcherName
+    initialPrompt     = $resolvedPrompt
+    workspaceRoot     = $resolvedDirectory
+    launchedAt        = (Get-Date).ToString("o")
+    status            = "running"
+    notRunningAt      = $null
+    completedAt       = $null
+    launcherSessionId = if ($callerSessionId) { $callerSessionId } else { $null }
+    sessionId         = $null
 }
 $instancesList.Add($newEntry)
 $registry | Add-Member -NotePropertyName "instances" -NotePropertyValue $instancesList.ToArray() -Force

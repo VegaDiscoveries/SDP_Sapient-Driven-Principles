@@ -47,8 +47,8 @@ session has taken work in a direction that departs from normal SDP workflow disp
 - **Override detected** — user has redirected work outside normal workflow (e.g.
   ad-hoc edits, design work, skill authoring, setup tasks, or any user instruction
   that is not a workflow dispatch). In this case:
-  - Report to the user what context signal was detected and why the prompt file is
-    not being generated.
+  - Invoke
+    `/sdp-create-banner icon=warning row=0 row: Override | [context signal detected] — prompt file not being generated.`
   - Exit the skill immediately. Do NOT invoke the script. Do NOT write
     `[resolved_project]/sdp-docs/00_prompt.txt`.
 
@@ -191,11 +191,11 @@ This is rare — default to leaving the script's single-option output untouched.
 
 ### Step 5: Confirm
 
-Report to the user in one sentence that `[resolved_project]/sdp-docs/00_prompt.txt` is
-ready, stating who wrote it (script single-option form, or an LLM two-option overwrite)
-and the next role and action identified (e.g. "WORKER — task WI-007" or "COORDINATOR —
-no active work item, first run"). Do not reproduce the prompt content in the confirmation
-message.
+Invoke `/sdp-create-banner` with a `Prompt` row: `[resolved_project]/sdp-docs/00_prompt.txt`
+is ready, stating who wrote it (script single-option form, or an LLM two-option overwrite)
+and the next role and action identified, e.g.
+`icon=success row=0 row: Prompt | [resolved_project]/sdp-docs/00_prompt.txt ready — written by [script/LLM]. Next: [ROLE] — [action].`
+Do not reproduce the prompt content in the confirmation message.
 
 ## Constraints
 

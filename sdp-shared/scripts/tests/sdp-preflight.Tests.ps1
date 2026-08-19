@@ -665,5 +665,42 @@ Describe "sdp-preflight.ps1" {
                 $run.Result.checks[0].detail | Should -Match "directory missing"
             } finally { Remove-TestWorkspace $ws }
         }
+
+        It "json-field-present passes on any non-null value (including false), fails when the pointer is absent" {
+            $ws = New-TestWorkspace
+            try {
+                New-File $ws "SDP-Config.json" (@{ materialDecisionEscalation = @{ enabled = $true } } | ConvertTo-Json -Depth 6)
+                Write-Manifest $ws @(
+                    @{ type = "json-field-present"; file = "SDP-Config.json"; pointer = "materialDecisionEscalation.enabled"; tier = "setup" }
+                )
+                $run = Invoke-Script @("-workspaceRoot", $ws)
+                $run.Result.ok | Should -Be $true
+                $run.Result.checks[0].detail | Should -BeNullOrEmpty
+
+                # Explicitly disabled (false) is still present — must still pass, since this is a
+                # presence check, not a json-value equality check.
+                New-File $ws "SDP-Config.json" (@{ materialDecisionEscalation = @{ enabled = $false } } | ConvertTo-Json -Depth 6)
+                $run = Invoke-Script @("-workspaceRoot", $ws)
+                $run.Result.ok | Should -Be $true
+
+                # Field missing entirely -> fail.
+                New-File $ws "SDP-Config.json" (@{ schema_version = "1.0" } | ConvertTo-Json -Depth 6)
+                $run = Invoke-Script @("-workspaceRoot", $ws)
+                $run.Result.ok | Should -Be $false
+                $run.Result.checks[0].detail | Should -Match "pointer not found"
+            } finally { Remove-TestWorkspace $ws }
+        }
+
+        It "json-field-present fails cleanly when the target file is missing" {
+            $ws = New-TestWorkspace
+            try {
+                Write-Manifest $ws @(
+                    @{ type = "json-field-present"; file = "SDP-Config.json"; pointer = "materialDecisionEscalation.enabled"; tier = "setup" }
+                )
+                $run = Invoke-Script @("-workspaceRoot", $ws)
+                $run.Result.ok | Should -Be $false
+                $run.Result.checks[0].detail | Should -Match "file missing"
+            } finally { Remove-TestWorkspace $ws }
+        }
     }
 }

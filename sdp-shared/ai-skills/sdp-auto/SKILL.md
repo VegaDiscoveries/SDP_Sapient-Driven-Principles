@@ -75,10 +75,9 @@ exist at the root at all. This step determines which case applies before Steps 1
      Halt. Do not proceed to Step 1, Step 5, or invoke `/sdp-state-loop-start`.
    - **`null`** (phases 1-7 complete): this is the regime `/sdp-state-loop-start` is built for —
      it performs its own project-count-aware resolution and loop-target selection, which Steps
-     1-4 below do not. Invoke `/sdp-state-loop-start` via the Skill tool. Report: "sdp-auto:
-     project(s) live in their own subfolder(s) and phases 1-7 are already complete — delegating
-     to /sdp-state-loop-start for correct loop startup." Terminate once it returns — do not
-     proceed to Step 1 or Step 5 of this skill.
+     1-4 below do not. Invoke `/sdp-state-loop-start` via the Skill tool. Invoke
+     `/sdp-create-banner icon=success row=0 row: Status | Project(s) live in their own subfolder(s) and phases 1-7 are already complete — delegating to /sdp-state-loop-start for correct loop startup.`
+     Terminate once it returns — do not proceed to Step 1 or Step 5 of this skill.
 
 ### Step 1: Verify Workflow Is Active
 
@@ -150,7 +149,8 @@ exist at the root at all. This step determines which case applies before Steps 1
    "You are an SDP workflow dispatch subagent. Invoke `sdp-project-run-prompt` to execute the current
    dispatch prompt at `sdp-docs/00_prompt.txt`. Do not take any other action."
 2. After the subagent returns: read the phase state file identified in Step 2 to confirm the
-   new task status. Report: "sdp-auto: dispatch subagent returned — task status is now [status]."
+   new task status. Invoke
+   `/sdp-create-banner icon=info row=0 row: Status | Dispatch subagent returned — task status is now [status].`
    Do not parse the subagent's text output for the outcome.
 
 ### Step 5: Start the State Loop

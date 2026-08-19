@@ -12,7 +12,7 @@ otherwise exist: it certifies every not-yet-complete phase — not just the acti
 three checks (content readiness, source coverage, right-sizing) up front.
 
 `sdp-project-loop-prep` orchestrates three other skills. It does not duplicate their logic and does not
-modify them: `sdp-project-doc-review` runs completely unmodified; `sdp-source-coverage-check` and
+modify them: `sdp-project-doc-review` runs completely unmodified; `sdp-solution-source-coverage-check` and
 `sdp-phase-rightsizing-check` are the two new checks this whole effort introduced, each already
 built to run standalone or as part of this sweep.
 
@@ -58,9 +58,9 @@ built to run standalone or as part of this sweep.
      -outcome "HALTED" -reason "No projects registered in SDP-Solution.json"` via the
      PowerShell tool.
    - If exactly one project is registered: use it without asking.
-   - If multiple are registered: ask the user — "Prep just [last_active_projects[0] or the
-     first registered project], or every registered project ([list])?" Do not assume either
-     answer. Use the user's answer to set the in-scope project list.
+   - If multiple are registered: invoke
+     `/sdp-create-banner icon=info row=0 row: Scope | Prep just [last_active_projects[0] or the first registered project], or every registered project ([list])?`
+     Do not assume either answer. Use the user's answer to set the in-scope project list.
 
 ### Step 2: Preflight Per Project
 
@@ -106,7 +106,7 @@ For each row in the dependency-ordered list, in order:
    the user's resolution of an open item — that is expected and correct, not a failure of this
    sweep. If already `true`: skip.
 3. **Source coverage** — if `sdp_source_coverage.completed` is not `true` in the phase state
-   file: run `sdp-source-coverage-check` against this phase. The check itself determines and
+   file: run `sdp-solution-source-coverage-check` against this phase. The check itself determines and
    reports whether a tracked source document even applies (it self-reports "not applicable" and
    writes no entry when none exists — do not pre-filter which rows get this check). If already
    `true`: skip.
@@ -181,7 +181,7 @@ directly — see Constraints.
 - Zero or more new `registry.md` rows, phase documents, and phase state files (from
   `sdp-phase-rightsizing-check` splits triggered during the sweep)
 - Zero or more Coverage Check records appended to phase documents (from
-  `sdp-source-coverage-check`)
+  `sdp-solution-source-coverage-check`)
 - Zero or more Decisions Locked / Doc Review certifications (from `sdp-project-doc-review`, unmodified)
 - `loop_prep` readiness block written to each in-scope project's `state.json`
 - Full summary report to the user, ending with the manual next-step instruction to run

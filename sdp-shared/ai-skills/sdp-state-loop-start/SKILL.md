@@ -37,9 +37,9 @@ This skill is user-initiated only. It is never called by `sdp-project-state-loop
 
 **Level 0 — Invocation argument (user or agent):** If a project path was passed as an
 argument on invocation, skip sub-steps 1–2. Read `SDP-Solution.json` to validate the
-argument against the `projects` array. If valid: announce "sdp-state-loop-start: project
-resolved from invocation argument — [value]. Proceeding." and use it as `[resolved_project]`
-for all subsequent steps. If invalid: halt by invoking
+argument against the `projects` array. If valid: invoke
+`/sdp-create-banner icon=info row=0 row: Project | Resolved from invocation argument — [value]. Proceeding.`
+and use it as `[resolved_project]` for all subsequent steps. If invalid: halt by invoking
 `/sdp-create-banner icon=error row=0 row: Status | Invocation argument '[value]' does not
 match any project registered in SDP-Solution.json. Available: [list]. Correct the argument
 and retry.`
@@ -59,10 +59,9 @@ and non-empty before starting the loop.
    - If the field is absent or the array is empty: read the `projects` array from
      `SDP-Solution.json`.
      - If `projects` contains exactly 1 entry: use it as the active project. Announce by
-       invoking `/sdp-create-banner icon=warning row=0 row: Status | sdp-state-loop-start:
-       last_active_projects is empty — auto-resolved to single registered project: [project].
-       Proceeding.` Use this value as `[resolved_project]` for all subsequent steps in this
-       skill.
+       invoking `/sdp-create-banner icon=warning row=0 row: Status | last_active_projects is
+       empty — auto-resolved to single registered project: [project]. Proceeding.` Use this
+       value as `[resolved_project]` for all subsequent steps in this skill.
      - If `projects` contains 2 or more entries: list the available projects and halt by
        invoking `/sdp-create-banner icon=error row=0 row: Status | Cannot start loop —
        last_active_projects is empty and multiple projects are registered: [list]. Set
@@ -79,8 +78,9 @@ and non-empty before starting the loop.
        failure and continue): run `./sdp-shared/scripts/sdp-workflow-log.ps1 -trigger
        "loop_start.precondition_fail" -role "STATE_LOOP_START" -outcome "HALTED" -reason
        "No projects registered in SDP-Solution.json"` via the PowerShell tool.
-3. If `last_active_projects` is non-empty: announce the active project(s) and proceed to Step 2.
-   "sdp-state-loop-start: active project(s) confirmed — [last_active_projects values]. Proceeding."
+3. If `last_active_projects` is non-empty: invoke
+   `/sdp-create-banner icon=info row=0 row: Project | Active project(s) confirmed — [last_active_projects values]. Proceeding.`
+   and proceed to Step 2.
 
 ### Step 2: Start the State Loop
 
@@ -124,8 +124,8 @@ sets `active_work_item` in `state.json` to match it, so the loop's first fire se
 that matches current state and takes the EXECUTE path instead of spending a fire regenerating a
 stale prompt. This priming does not perform the work itself; the loop's first fire does.
 
-1. Announce: "sdp-state-loop-start: priming dispatch prompt — spawning a COORDINATOR subagent so
-   `sdp-docs/00_prompt.txt` and `active_work_item` are accurate before the loop's first fire."
+1. Invoke
+   `/sdp-create-banner icon=in-progress row=0 row: Status | Priming dispatch prompt — spawning a COORDINATOR subagent so sdp-docs/00_prompt.txt and active_work_item are accurate before the loop's first fire.`
 2. Spawn a subagent via the Agent tool with the following prompt:
    "You are an SDP COORDINATOR priming subagent. Invoke `sdp-project-coordinator` to determine the next
    dispatch, write `.sdp-workflow/sessions/session-NNN.md`, update `.sdp-workflow/state.json`
@@ -139,16 +139,14 @@ stale prompt. This priming does not perform the work itself; the loop's first fi
    - Read the first line of `sdp-docs/00_prompt.txt`. If it matches the sentinel
      `[sdp-prompt work_item="..." expected_status="..."]`, report by invoking
      `/sdp-create-banner icon=success,success row=0,1
-     row: Loop | sdp-state-loop-start: loop started — [target] will monitor and dispatch
-     every [interval] minutes.
-     row: Dispatch Primed | sdp-state-loop-start: COORDINATOR primed the prompt for [work_item]
-     (expected_status [expected_status]) — the loop's first fire will execute it.`
+     row: Loop | Loop started — [target] will monitor and dispatch every [interval] minutes.
+     row: Primed | COORDINATOR primed the prompt for [work_item] (expected_status
+     [expected_status]) — the loop's first fire will execute it.`
    - If no valid sentinel was written, first report the loop-started fact by invoking
-     `/sdp-create-banner icon=success row=0 row: Loop | sdp-state-loop-start: loop started —
-     [target] will monitor and dispatch every [interval] minutes.` Then read
-     `.sdp-workflow/state.json`. If `workflow_status` is
-     `"halted"` or `active_work_item` is null, report the blocking condition from state.json and
-     note that the loop will STOP on its first fire until the condition is resolved.
+     `/sdp-create-banner icon=success row=0 row: Loop | Loop started — [target] will monitor
+     and dispatch every [interval] minutes.` Then read `.sdp-workflow/state.json`. If
+     `workflow_status` is `"halted"` or `active_work_item` is null, invoke
+     `/sdp-create-banner icon=warning row=0 row: Status | [blocking condition from state.json] — the loop will STOP on its first fire until this condition is resolved.`
 
 ## Constraints
 

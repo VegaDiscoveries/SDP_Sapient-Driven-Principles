@@ -150,13 +150,8 @@ through to the three-level order below. Proceed to Step 2.
 
 ### Step 4: Confirm
 
-Report to the user in one sentence that the skill is complete. List:
-- Project resolved to: `[project]` and the resolution method used (argument / sentinel /
-  path extraction / SDP-Solution.json)
-- Solution docs loaded by name (Pathway 1), or "not loaded" with reason
-- Project docs successfully loaded by name (Pathway 2)
-- Any docs that were unreadable or skipped due to context limits
-- Count of registered-only entries not loaded (both pathways)
+Invoke `/sdp-create-banner` with a multi-row summary, e.g.
+`icon=success row=0 row: Project | [project] (resolved via [method]) row: Sol Docs | [names loaded, or "not loaded" with reason] row: Proj Docs | [names loaded] row: Unreadable | [names, or "none"] row: Unloaded | [count] registered-only entries`
 
 Do not include documentation content in this response unless the user explicitly asks.
 

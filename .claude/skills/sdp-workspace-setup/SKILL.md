@@ -1,6 +1,6 @@
 ---
 name: sdp-workspace-setup
-description: Run when SDP-Solution.json is absent or unpopulated (first-run workspace setup) or when adding a new project to an existing solution — executes SDP-Workspace-Setup.md's Setup Checklist (solution-root setup and/or per-project Add-Project Steps) deterministically instead of freehand. This is the concrete action named by the sdp-solution-read-docs "SDP-Solution.json not found" halt and by sdp-new-concept-intake's "new project" pause.
+description: Run when SDP-Solution.json is absent or unpopulated (first-run workspace setup) or when adding a new project to an existing solution — executes SDP-Workspace-Setup.md's Setup Checklist (solution-root setup and/or per-project Add-Project Steps) deterministically instead of freehand. This is the concrete action named by the sdp-solution-read-docs "SDP-Solution.json not found" halt and by sdp-solution-new-concept-intake's "new project" pause.
 ---
 
 Do not report this skill complete unless every numbered step and all sub-steps within it have

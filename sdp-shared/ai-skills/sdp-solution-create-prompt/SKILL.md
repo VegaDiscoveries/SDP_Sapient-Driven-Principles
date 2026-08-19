@@ -256,9 +256,11 @@ project-scoped only and has no way to be pointed at solution-level work.
 
 ### Step 5: Confirm
 
-Report to the user in one sentence that `sdp-solution-docs/00_solution_prompt.txt` has been
-written. Shared-task mode: state the solution task ID, role, and involved projects. Phases-1-7
-mode: state `current_phase` and role.
+Invoke `/sdp-create-banner` with a `Prompt` row confirming that
+`sdp-solution-docs/00_solution_prompt.txt` has been written. Shared-task mode:
+`icon=success row=0 row: Prompt | sdp-solution-docs/00_solution_prompt.txt written — task [ID], role [role], projects: [list].`
+Phases-1-7 mode:
+`icon=success row=0 row: Prompt | sdp-solution-docs/00_solution_prompt.txt written — current_phase [phase], role [role].`
 
 ## Constraints
 

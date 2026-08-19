@@ -65,8 +65,8 @@ If the `role=` value is not one of the six values above: halt — invoke
 
 ### Step 4: Invoke the Skill
 
-1. Announce to the user: "Identified next solution step: `role=[role-value]` —
-   invoking `/[skill-name]` now."
+1. Invoke
+   `/sdp-create-banner icon=info row=0 row: Status | Identified next solution step: role=[role-value] — invoking /[skill-name] now.`
 2. Use the Skill tool to invoke the identified skill. Pass the bare skill name without the
    leading `/` (e.g., `sdp-solution-coordinator`, not `/sdp-solution-coordinator`).
 3. The invoked skill takes over from this point. `sdp-solution-run-prompt` has no further

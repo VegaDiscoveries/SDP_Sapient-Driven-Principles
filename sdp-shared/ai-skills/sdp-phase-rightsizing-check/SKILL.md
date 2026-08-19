@@ -58,9 +58,9 @@ with no natural stopping point within that one task?
 
 ### Step 3: Surface Findings
 
-If the phase is appropriately sized and no task is individually oversized: report "Right-sizing
-check: [phase] is appropriately scoped — no split needed." Write an `sdp_rightsizing` entry to
-the phase state file:
+If the phase is appropriately sized and no task is individually oversized: invoke
+`/sdp-create-banner icon=success row=0 row: Sizing | Phase [phase] is appropriately scoped — no split needed.`
+Write an `sdp_rightsizing` entry to the phase state file:
 
 ```json
 "sdp_rightsizing": {
@@ -74,14 +74,18 @@ the phase state file:
 
 Stop — do not proceed further.
 
-If phase-level oversize is found: present the specific finding to the user — the task-by-task
-breakdown, why it's oversized, and a recommended split plan (proposed sub-phase count, a
-name and one-line scope for each, which existing tasks move to which sub-phase). Do not proceed
-to Step 4 without the user's explicit confirmation of the plan or a corrected version of it.
-A recommendation is not confirmation.
+If phase-level oversize is found: present the specific finding as plain text first — the
+task-by-task breakdown, why it's oversized, and a recommended split plan (proposed sub-phase
+count, a name and one-line scope for each, which existing tasks move to which sub-phase). Then
+invoke
+`/sdp-create-banner icon=warning row=0 row: Sizing | Phase [phase] is oversized — see task breakdown and split plan above. row: | row: Confirm | Approve this split plan, or provide a corrected version?`
+Do not proceed to Step 4 without the user's explicit confirmation of the plan or a corrected
+version of it. A recommendation is not confirmation.
 
 If task-level oversize is found (independent of the phase-level question): present the specific
-task and a recommended split into sub-tasks. Do not proceed to Step 6 without confirmation.
+task and a recommended split into sub-tasks as plain text first. Then invoke
+`/sdp-create-banner icon=warning row=0 row: Task Split | Task [task] is oversized — see recommended sub-task split above. row: | row: Confirm | Approve this split, or provide a corrected version?`
+Do not proceed to Step 6 without confirmation.
 
 ### Step 4: Execute the Approved Split (Phase-Level)
 
@@ -121,7 +125,9 @@ On user confirmation of the plan (as presented, or as corrected):
    phases `sdp-project-loop-prep` will separately re-encounter in its walk, and each needs its own
    `sdp_doc_review` and `sdp_source_coverage` pass; recording `sdp_rightsizing` here only marks
    that *this* check has already run for each of them, not that the other two checks have.
-6. Report the full set of changes made — new rows, new files, corrected cells — to the user.
+6. Report the full set of changes made — new rows, new files, corrected cells — as plain text
+   first. Then invoke
+   `/sdp-create-banner icon=success row=0 row: Sizing | Split executed — see the full list of changes above.`
 
 ### Step 5: Re-Verification Note
 
@@ -129,10 +135,10 @@ A newly created sub-phase document is new content that has not been through `sdp
 
 - If this skill is running as part of `sdp-project-loop-prep`'s sweep: no special action needed here —
   the sweep's row-by-row walk will reach the newly appended rows in their turn and run
-  `sdp-project-doc-review` (and `sdp-source-coverage-check`, if the original phase traced to a tracked
+  `sdp-project-doc-review` (and `sdp-solution-source-coverage-check`, if the original phase traced to a tracked
   source doc) against them before the sweep considers the solution prepped.
-- If this skill is invoked standalone (not from `sdp-project-loop-prep`): state explicitly to the user
-  that the new sub-phase documents still need `sdp-project-doc-review` before any of them can dispatch.
+- If this skill is invoked standalone (not from `sdp-project-loop-prep`): invoke
+  `/sdp-create-banner icon=warning row=0 row: Sizing | New sub-phase documents still need sdp-project-doc-review before any of them can dispatch.`
 
 ### Step 6: Task-Level Split (No Registry Change)
 
@@ -142,7 +148,7 @@ criteria drawn from the original task's scope. No `registry.md` involvement; no 
 
 Write an `sdp_rightsizing` entry to the phase state file (`"outcome": "task_split_executed"`,
 listing the new `TASK-ID`s in place of `"new_phases"`) — the phase itself has not gained new
-rows and does not need re-review by `sdp-project-doc-review`/`sdp-source-coverage-check` on this account
+rows and does not need re-review by `sdp-project-doc-review`/`sdp-solution-source-coverage-check` on this account
 alone, but a future `sdp-project-doc-review` pass should still see the updated task list.
 
 ## Constraints

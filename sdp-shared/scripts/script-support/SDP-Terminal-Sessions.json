@@ -2,20 +2,6 @@
     "schema_version":  "1.0",
     "instances":  [
                       {
-                          "id":  "9b8684b7-e6bb-46e9-a04f-0dbbffe308c9",
-                          "terminalId":  1,
-                          "terminalName":  "stateLoop",
-                          "pid":  16328,
-                          "pidConfirmed":  true,
-                          "launcher":  "wt",
-                          "initialPrompt":  "/sdp-state-loop-start",
-                          "workspaceRoot":  "C:\\Development\\VegaDiscoveries\\SapientDrivenPrinciples-AI_Workflow_Bootstrap\\SapientDrivenPrinciples-AI_Workflow_Bootstrap_Project",
-                          "launchedAt":  "2026-07-06T22:41:33.9166642-07:00",
-                          "completedAt":  null,
-                          "status":  "not_running",
-                          "notRunningAt":  "2026-07-17T11:45:28.8207010-07:00"
-                      },
-                      {
                           "id":  "9caea4c4-b382-49f4-a6ca-c6045ee30d68",
                           "terminalId":  0,
                           "terminalName":  "go",
@@ -25,9 +11,25 @@
                           "initialPrompt":  "go",
                           "workspaceRoot":  "C:\\Development\\VegaDiscoveries\\SapientDrivenPrinciples-AI_Workflow_Bootstrap\\SapientDrivenPrinciples-AI_Workflow_Bootstrap_Project",
                           "launchedAt":  "2026-07-17T11:45:28.8247937-07:00",
+                          "completedAt":  null,
+                          "status":  "not_running",
+                          "notRunningAt":  "2026-08-11T17:41:42.4909231-07:00"
+                      },
+                      {
+                          "id":  "b3cf52ac-4a37-4e77-8f65-bfd38473b6f4",
+                          "terminalId":  2,
+                          "terminalName":  "session-respawn",
+                          "pid":  19788,
+                          "pidConfirmed":  true,
+                          "launcher":  "wt",
+                          "initialPrompt":  "/sdp-claude-session-init -launcherSessionId 338de8b2-365f-4e31-a428-9a813b746207 -thenRun \"/sdp-state-loop-start\"",
+                          "workspaceRoot":  "C:\\Development\\VegaDiscoveries\\SapientDrivenPrinciples-AI_Workflow_Bootstrap\\SapientDrivenPrinciples-AI_Workflow_Bootstrap_Project",
+                          "launchedAt":  "2026-08-11T17:41:42.4939350-07:00",
                           "status":  "running",
                           "notRunningAt":  null,
-                          "completedAt":  null
+                          "completedAt":  null,
+                          "launcherSessionId":  "338de8b2-365f-4e31-a428-9a813b746207",
+                          "sessionId":  "d1ce5393-3670-4a71-a9a6-b374aaa7a162"
                       }
                   ]
 }

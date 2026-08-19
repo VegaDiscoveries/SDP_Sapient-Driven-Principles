@@ -35,7 +35,9 @@ similar). If the request does not name a day at all, use today's date
 
 Parse the single JSON line from stdout.
 
-1. If `status` is `"error"`: report the `error` field to the user and stop.
+1. If `status` is `"error"`: invoke
+   `/sdp-create-banner icon=error row=0 row: Status | [error field from script].`
+   and stop.
 2. If `status` is `"success"`: proceed to Step 3 with the full JSON object in hand. Treat every
    field in it as already-correct, final content — do not re-read or re-verify the output file
    yourself; the script's own envelope (`sourcesFound`, `sourceCounts`, `totalCombinedEntries`) is
@@ -43,11 +45,12 @@ Parse the single JSON line from stdout.
 
 ### Step 3: Confirm
 
-Report to the user, drawn directly from the script's JSON output: the date combined, which of
-the three sources were found (`sourcesFound`) and which (if any) were absent, per-source entry
-counts (`sourceCounts`), the total combined entry count, and the output path. If any source had a
-non-zero `unparseableLineCount`, mention it — that source's file had malformed lines skipped
-during the merge.
+Invoke `/sdp-create-banner` with a `Combine` row, drawn directly from the script's JSON output:
+the date combined, which of the three sources were found (`sourcesFound`) and which (if any)
+were absent, per-source entry counts (`sourceCounts`), the total combined entry count, and the
+output path. If any source had a non-zero `unparseableLineCount`, mention it — that source's
+file had malformed lines skipped during the merge. E.g.
+`icon=success row=0 row: Combine | [date] combined — [sources found/absent]. [per-source counts], [total] total. Written to [output path].`
 
 ## Constraints
 

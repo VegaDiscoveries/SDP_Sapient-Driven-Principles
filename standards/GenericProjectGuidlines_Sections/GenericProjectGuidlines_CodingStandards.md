@@ -123,3 +123,38 @@ throw new AuthException("UNDERAGE", "You must be at least 16 years old to regist
 - **SHOULD** Group related messages under a common prefix key rather than creating a new resource file for a single additional message.
 - **SHOULD** Write resource values in full, grammatical sentences with correct punctuation — these may be displayed directly to end users.
 - **MAY** Define a `Common_` prefix group for error strings shared across multiple service classes within the same project.
+
+## Data-Driven Content — Preferred Default
+
+> **Addition — 2026-08-13:** Elevates the "Code vs. data-file distinction" Addition above from a
+> single blockquote into a first-class, named rule other chapters can cross-reference. Prompted by
+> a real incident: a version-history page's content list had no data source separate from the
+> markup rendering it, so adding an entry required editing the page itself. See Chapter 11 and
+> Chapter 12 for this rule's concrete, per-project-type instantiations.
+
+Whenever content values change independently of the logic that renders them, source those values
+from a data file — or, for a distributed client, the API — rather than embedding them in code.
+This applies to every project type and rendering surface GPG governs, not only to the
+string-externalization case above.
+
+- **MUST** Structured, repeating content (a version-history/changelog list, FAQ items,
+  testimonials, portfolio or pricing entries, and similar) is never hand-authored inline in a
+  `.razor`, `.xaml`, `.cs`, or other executable-logic file.
+- **MUST** For a server-hosted surface (`{AppName}.Website`), a bundled data file committed to the
+  project and shipped with the next deploy is the default delivery mechanism — see Chapter 11.
+- **MUST** For a distributed client's mobile targets (`{AppName}.MAUI`, `Platforms/iOS/` and
+  `Platforms/Android/`), content that changes independently of app releases is sourced through the
+  API, never bundled as a local file in the app package — see Chapter 12.
+- **SHOULD** For a distributed client's desktop targets (`{AppName}.MAUI`, `Platforms/Windows/`
+  and `Platforms/MacCatalyst/`), prefer a local content file the app syncs from the API at
+  runtime over a purely bundled-at-install file, for content whose source of truth is shared with
+  other clients — see Chapter 12.
+- **SHOULD** Escalate to a database-backed content table (Chapter 17 seed-data pattern) only on a
+  confirmed requirement for live, non-developer editing — do not build admin-editable content
+  storage speculatively.
+- **MUST** Escalate to a headless CMS or other external content service only through Material
+  Decision Escalation (bootstrap doc, Architecture phase) — never a default choice.
+- **MAY** Keep content that shares its host app's own release cadence and needs no update between
+  releases (fixed onboarding copy, bundled legal text for offline access) in a bundled data file
+  even on a mobile target — the MUST rules above target content whose value is *independent*
+  update cadence, not literally all content.

@@ -96,12 +96,15 @@ section (Dispatch and Halt Contracts).
 ### Step 3: Load Task Context
 
 1. Read `[resolved_project]/[AppName].speq.md` to load the tech contract before forming a
-   verification approach.
+   verification approach. Any row in its Standing Non-Functional Requirements section whose
+   "Applies To" matches this task is binding acceptance-criteria input, in addition to the
+   task's own written description — include it in sub-step 2's independent understanding.
 2. Read the task description in the phase file — the `active_phase_file` path from
    `[resolved_project]/.sdp-workflow/state.json` (or the session dispatch file's "Phase file
    path" field if `active_phase_file` is absent). Form an independent understanding of the
-   acceptance criteria — record what each criterion requires — before reading the Completed
-   blockquote. Do not read the Completed blockquote until this sub-step is complete.
+   acceptance criteria — record what each criterion requires, including any applicable Standing
+   Non-Functional Requirements row from sub-step 1 — before reading the Completed blockquote.
+   Do not read the Completed blockquote until this sub-step is complete.
 3. Read the Completed blockquote. Note what the WORKER claimed to do and any deviations from
    spec noted by the WORKER.
 
@@ -222,9 +225,16 @@ section (Dispatch and Halt Contracts).
    verdict and, if non-compliant, the primary correction needed]"` via the PowerShell tool. This
    is the narrative counterpart to the mechanical tool-call trail — the reasoning behind
    compliant/partially-compliant/non-compliant is not recoverable from tool calls alone.
-3. Mirror all phase file changes to the parent document per the sync rule notice in the
+3. If the phase file has a top-level `**Status:**` header (the standard document template in
+   `SDP-Workspace-Setup.md` includes one) and its current value does not reflect this task's new
+   evaluated state: strike it through in place and append the corrected value immediately after,
+   per Append-Only Discipline — `VERIFIED`, `VERIFIED (partially compliant)`, or `REJECTED` as
+   applicable, e.g. `**Status:** ~~WORK_COMPLETE.~~ **VERIFIED (partially compliant)** [DATE,
+   this session].` Do not silently overwrite the header. A phase file with no `**Status:**`
+   header needs no action here.
+4. Mirror all phase file changes to the parent document per the sync rule notice in the
    phase file header.
-4. Session ends.
+5. Session ends.
 
 ## Constraints
 
@@ -243,7 +253,8 @@ section (Dispatch and Halt Contracts).
 ## Outputs
 
 - Phase file (path from Step 3.2) updated: Eval N blockquote appended; Verified N appended if
-  compliant or partially compliant
+  compliant or partially compliant; top-level `**Status:**` header synced to the evaluated
+  outcome if present and stale
 - Parent document updated: mirrors phase file changes per sync rule
 - Phase state file (phase file path with `.md` replaced by `_state.json`) — task status →
   `VERIFIED` or `REJECTED`; `eval_cycles` incremented; `PARTIAL_COMPLIANCE` or

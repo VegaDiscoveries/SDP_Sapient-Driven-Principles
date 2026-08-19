@@ -54,8 +54,9 @@ inferred pairings — so there is exactly one **(judgment)** spot: the Summary p
      ```
      Get-ChildItem -Path '.sdp-solution-workflow/logging/hook-logs' -Filter 'hook-log-*.jsonl' -File | Sort-Object Name -Descending | Select-Object -ExpandProperty Name
      ```
-     If this returns nothing: report "⛔ sdp-report-log-hook-metrics: no hook-log files found
-     under `.sdp-solution-workflow/logging/hook-logs/`." and stop — do not proceed to Step 2.
+     If this returns nothing: invoke
+     `/sdp-create-banner icon=error row=0 row: Status | No hook-log files found under .sdp-solution-workflow/logging/hook-logs/.`
+     and stop — do not proceed to Step 2.
    - If the user's request names a specific day (an explicit date, a filename, or
      "today"/"latest"/"most recent"/"current"): resolve it against the listing above. "Today" /
      "latest" / "most recent" / no day specified anywhere in a request that's otherwise
@@ -68,7 +69,8 @@ inferred pairings — so there is exactly one **(judgment)** spot: the Summary p
      date (e.g. "2026-07-17") decoded from the filename — not the raw filename as the label.
      Wait for the user's selection before proceeding. If fewer than 4 files exist, present
      however many there are (AskUserQuestion requires at least 2 options — if only one file
-     exists, skip the question and use it directly, telling the user which day was used).
+     exists, skip the question, use it directly, and invoke
+     `/sdp-create-banner icon=info row=0 row: Report | Using [filename] (only file available) as the report source.`).
    - The resolved file's full path becomes `[jsonl_path]` for Step 2's `-JsonlPath` argument.
 2. Determine, from the user's request or dispatch context: which date filter (if any) applies
    *within* the resolved file, whether `-IncludeSeconds` was requested, and the output report
@@ -88,8 +90,9 @@ Run via the PowerShell tool, always passing the file resolved in Step 1:
 
 Parse the single JSON line from stdout.
 
-1. If `status` is `"error"`: report the `error` field to the user and stop. Do not attempt to
-   assemble a partial report.
+1. If `status` is `"error"`: invoke
+   `/sdp-create-banner icon=error row=0 row: Status | [error field from script].`
+   and stop. Do not attempt to assemble a partial report.
 2. If `status` is `"success"`: proceed to Step 3 with the full JSON object in hand. Treat every
    field in it as already-correct, final content — do not recompute, re-derive, or "sanity check"
    any number in it by re-reading the jsonl yourself. If a figure looks surprising, that is a
@@ -104,6 +107,14 @@ field it presents traces to the hook-log file itself. Proceed directly to Step 4
 
 Write the output file (path from Step 1) with this section order and sourcing. Every item below
 is a literal substitution unless marked **(judgment)**.
+
+Before the numbered sections, the file's very first line is always the SDP logo embed, followed
+by one blank line, then the numbered content starts. Fixed template — reproduce verbatim, path is
+relative from `sdp-solution-docs/log-reports/hook-metrics/` back to the solution root:
+
+```html
+<img src="../../../sdp-shared/docs/images/SDP_DocsLogo_WithText_0700x0163.png" alt="SDP Logo" width="375">
+```
 
 1. `# SDP Hook-Metrics Report — {{period.titleDate}}` — if `period.titleDate` contains the ASCII
    placeholder `->` (emitted for multi-day periods), replace it with the unicode arrow `→` before
@@ -176,7 +187,9 @@ before — opening a partially-written file is misleading.
 
 ### Step 6: Confirm
 
-Report to the user: report path written, period covered, and total event count.
+Invoke `/sdp-create-banner` with a `Report` row: report path written, period covered, and total
+event count, e.g.
+`icon=success row=0 row: Report | [report_path] written — period: [period]. [N] events.`
 
 ## Constraints
 

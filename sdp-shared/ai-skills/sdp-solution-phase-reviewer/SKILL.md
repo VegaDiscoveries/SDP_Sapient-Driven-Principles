@@ -98,13 +98,17 @@ section (Dispatch and Halt Contracts).
    that are not covered by `.gitignore`, stage and commit ALL of them — do not enumerate a
    specific file list — and push via `./sdp-shared/scripts/sdp-github.ps1 push` (PowerShell tool;
    read the JSON envelope — `status: "pushed"` confirms success, an `ok:false` / `status:"error"`
-   envelope means the push failed and must be surfaced). Note in the Eval blockquote whether a
-   catch-up commit was required. Skip this sub-step if the working tree is already clean.
+   envelope means the push failed: invoke
+   `/sdp-create-banner icon=error row=0 row: Push | Push failed — [error].`). Note in the Eval
+   blockquote whether a catch-up commit was required. Skip this sub-step if the working tree is
+   already clean.
 
    **CI-green gate (only when `SDP-Config.json` `ci.enabled` is true).** Same contract as
    `sdp-project-reviewer` Step 4 item 1 — `green` continues verification; `red` records a non-compliant
-   finding and the task goes to `REJECTED` in Step 6; `no_ci`/`unreachable` continues with a
-   disclosed caveat; `timeout` halts per the Halt Behavior Contract.
+   finding and the task goes to `REJECTED` in Step 6; `no_ci`/`unreachable` continues after
+   invoking
+   `/sdp-create-banner icon=warning row=0 row: CI Gate | Continuous Integration (CI) status is [no_ci/unreachable] following the catch-up push — continuing verification without CI confirmation. Verify manually if this matters.`
+   as the disclosed caveat; `timeout` halts per the Halt Behavior Contract.
 
 2. **Group the work before spawning agents.** Cluster the acceptance criteria (or, for
    Pros-Cons-Gaps sessions, the review dimensions — sections, GPG chapters) into logical groups
@@ -202,9 +206,16 @@ section (Dispatch and Halt Contracts).
 2. Record the eval outcome (non-blocking): run `./sdp-shared/scripts/sdp-workflow-log.ps1
    -trigger "reviewer.eval" -role "REVIEWER" -workItem "[current_phase]" -outcome
    "[VERIFIED | REJECTED]" -reason "[one sentence]"` via the PowerShell tool.
-3. Mirror phase document changes to the parent solution documents per the sync rule notice, if
+3. If `sdp-solution-docs/[NN_phase_name].md` has a top-level `**Status:**` header (the standard
+   document template in `SDP-Workspace-Setup.md` includes one) and its current value does not
+   reflect this task's new evaluated state: strike it through in place and append the corrected
+   value immediately after, per Append-Only Discipline — `VERIFIED`, `VERIFIED (partially
+   compliant)`, or `REJECTED` as applicable, e.g. `**Status:** ~~WORK_COMPLETE.~~ **VERIFIED**
+   [DATE, this session].` Do not silently overwrite the header. A phase document with no
+   `**Status:**` header needs no action here.
+4. Mirror phase document changes to the parent solution documents per the sync rule notice, if
    this phase document has section files.
-4. Session ends.
+5. Session ends.
 
 ## Constraints
 
@@ -227,7 +238,8 @@ section (Dispatch and Halt Contracts).
 
 - Phase document (`sdp-solution-docs/[NN_phase_name].md`) updated: Eval N blockquote appended
   (or, for Architecture/Implementation Overview, a Pros-Cons-Gaps — Cycle N evaluation); Verified
-  N appended if compliant or partially compliant
+  N appended if compliant or partially compliant; top-level `**Status:**` header synced to the
+  evaluated outcome if present and stale
 - Phase state file (`sdp-solution-docs/[NN_phase_name]_state.json`) updated: task status →
   `VERIFIED` or `REJECTED`; `eval_cycles` incremented; `PARTIAL_COMPLIANCE`/
   `PARTIAL_COMPLIANCE_ESCALATE` flags if applicable; for Architecture/Implementation Overview,

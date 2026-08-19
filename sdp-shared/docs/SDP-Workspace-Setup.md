@@ -1,3 +1,5 @@
+<img src="images/SDP_DocsLogo_WithText_0700x0163.png" alt="SDP Logo" width="375">
+
 # AI-Assisted Development Workflow — Workspace Setup Reference
 
 | Field | Value |
@@ -163,9 +165,9 @@ folders alongside the actual code project folders.
 │   ├── 05_implementation_overview.md        ← Phase 5
 │   ├── 06_refined_plan.md                   ← Phase 6
 │   ├── 07_phase_readiness.md                ← Phase 7 — build-phase decomposition + dependency declaration
-│   ├── user-design-docs/                    ← drop zone for source design docs — read by sdp-new-concept-intake
+│   ├── user-design-docs/                    ← drop zone for source design docs — read by sdp-solution-new-concept-intake
 │   │   ├── README.md
-│   │   └── processed/                       ← relocated here after intake; tracked reference for sdp-source-coverage-check
+│   │   └── processed/                       ← relocated here after intake; tracked reference for sdp-solution-source-coverage-check
 │   │       └── README.md
 │   └── log-reports/                         ← generated report output (sdp-report-log-* skills); not agent-read
 │       ├── loop-metrics/
@@ -452,8 +454,6 @@ coexist: a solution can be mid-Phase-4 architecture work and simultaneously have
 shared cross-project task in flight. No `dependency_ledger` pointer field is added — the ledger
 lives in its own two fixed-path files (`.sdp-solution-workflow/dependencies.md`/
 `dependencies.json`); `state.json` doesn't need to point at them.
-
-See `~SDP-Maintenance/~docs/solution-coordinator-orchestration-design.md` §2 for full rationale.
 
 ---
 
@@ -1102,8 +1102,8 @@ Setup is two-level: first establish the solution root (steps 1–4), then add ea
       - `sdp-solution-docs/` — create with `00_solution_prompt.txt` stub (leave empty; written
         by `sdp-solution-coordinator`), `00_user_notes.txt` stub (freeform user notes), and
         `user-design-docs/` + `user-design-docs/processed/` (drop zone for source design docs —
-        read by `sdp-new-concept-intake`; each folder gets a README explaining its purpose, see
-        `sdp-shared/ai-skills/sdp-new-concept-intake/SKILL.md`)
+        read by `sdp-solution-new-concept-intake`; each folder gets a README explaining its purpose, see
+        `sdp-shared/ai-skills/sdp-solution-new-concept-intake/SKILL.md`)
       - `sol-shared/` — empty placeholder for future solution-specific non-SDP content. Add
         `.gitkeep` if the repository requires tracked empty directories.
 - [ ] **Step 2.5 — Create `README.md` at the solution root** — use the `README.md` template
@@ -1141,9 +1141,12 @@ Setup is two-level: first establish the solution root (steps 1–4), then add ea
         their script/config files (`file-exists`), the standalone
         solution-root scripts (`file-exists`), `sdp-shared/scripts/script-support/SDP-Tones.json`,
         the Session Start hook registration (`hook-registered`), the `permissions.allow` entry
-        for each script (`json-array-contains`), and the Standards Sections folder's existence
-        (`dir-exists`). Tier each entry `integrity` (drift guards) or `setup` (scaffold
-        completeness). Not registered in `SDP-Document-List.json` — it is data, not context.
+        for each script (`json-array-contains`), the Standards Sections folder's existence
+        (`dir-exists`), and the `materialDecisionEscalation.enabled` field's presence in
+        `SDP-Config.json` (`json-field-present` — presence only, not a specific true/false value,
+        since the field is user-editable policy). Tier each entry `integrity` (drift guards) or
+        `setup` (scaffold completeness). Not registered in `SDP-Document-List.json` — it is data,
+        not context.
       - **Run the solution-level preflight check** — invoke (PowerShell tool):
         ```
         .\sdp-shared\scripts\sdp-preflight.ps1 -workspaceRoot .
@@ -1159,7 +1162,9 @@ Setup is two-level: first establish the solution root (steps 1–4), then add ea
         pairs), the three Level-1-only fully-scriptable skills (`sdp-tone`,
         `sdp-claude-new-terminal`, `sdp-create-banner` and their script/config files), every
         standalone solution-root script's existence, the `permissions.allow` entry for each
-        script, and the Standards Sections folder's existence. Read the single-line JSON
+        script, the Standards Sections folder's existence, and the
+        `materialDecisionEscalation.enabled` field's presence in `SDP-Config.json`. Read the
+        single-line JSON
         envelope it emits: if `ok` is `false`, resolve the listed `failures` (or the `error`
         field on an operational error such as a missing/unparseable manifest) before
         proceeding. The canonical check inventory lives in `SDP-Solution-Setup.json` as data —
@@ -1429,6 +1434,27 @@ Decisions that are closed. Agents must not re-open or re-propose alternatives.
 
 | Item | Reason | Target phase |
 |------|--------|-------------|
+| | | |
+
+---
+
+## Standing Non-Functional Requirements
+
+> **Addition — 2026-08-11:** New section — added after a review found no way for a standing,
+> cross-cutting requirement (e.g. adaptive UI layout across device sizes) to reach every
+> relevant WORKER task automatically. Populated at Phase 7 decomposition
+> (`sdp-solution-phase-coordinator` Step 2b item 0) alongside the rest of this template; read
+> as binding acceptance-criteria input by `sdp-project-worker` Step 3.1 and
+> `sdp-project-reviewer` Step 3.1.
+
+Cross-cutting requirements that apply to every task of a given kind, not just one task's own
+written description — e.g. "every customer-facing web page must be responsive across desktop/
+tablet/phone" (GPG Ch. 11), or "every MAUI page must adapt across phone/tablet and orientation"
+(GPG Ch. 12). A matching row is binding acceptance-criteria input in addition to a task's own
+written description; it is not optional context.
+
+| Requirement | Applies To | Rationale / GPG Reference |
+|-------------|-----------|---------------------------|
 | | | |
 ```
 

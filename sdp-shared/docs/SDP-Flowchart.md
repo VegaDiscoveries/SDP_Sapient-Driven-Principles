@@ -1,3 +1,5 @@
+<img src="images/SDP_DocsLogo_WithText_0700x0163.png" alt="SDP Logo" width="375">
+
 # SDP Flowchart — A New Project, Start to Finish
 
 | Field | Value |
@@ -59,7 +61,7 @@ registry: doc review + source coverage + right-sizing, before any dispatch)
 /sdp-auto  — starts sdp-project-state-loop; from here dispatch is fully unattended
    │
    ▼
-Repeat: /sdp-new-concept-intake seeds a fresh Phases 1-7 mini-cycle
+Repeat: /sdp-solution-new-concept-intake seeds a fresh Phases 1-7 mini-cycle
 whenever new scope shows up, at any point in the project's life
 ```
 
@@ -144,11 +146,11 @@ Work items exist in project registries → Implementation Loop begins (Section 5
 | Situation | Path |
 |-----------|------|
 | `sdp-solution-docs/user-design-docs/processed/` already has files | Intake already happened — draft `01_concept.md` from the tracked source directly |
-| Nothing there yet, user has existing docs/notes | Drop them in `sdp-solution-docs/user-design-docs/`, run `/sdp-new-concept-intake` before drafting |
-| Nothing there yet, no docs but wants one developed | Run `/brainstorming`, save the result into `sdp-solution-docs/user-design-docs/`, then `/sdp-new-concept-intake` |
-| Nothing there yet, wants to seed directly from conversation | Proceed conversationally — no source doc, no `sdp-source-coverage-check` for this cycle |
+| Nothing there yet, user has existing docs/notes | Drop them in `sdp-solution-docs/user-design-docs/`, run `/sdp-solution-new-concept-intake` before drafting |
+| Nothing there yet, no docs but wants one developed | Run `/brainstorming`, save the result into `sdp-solution-docs/user-design-docs/`, then `/sdp-solution-new-concept-intake` |
+| Nothing there yet, wants to seed directly from conversation | Proceed conversationally — no source doc, no `sdp-solution-source-coverage-check` for this cycle |
 
-When a tracked source doc exists, `sdp-source-coverage-check` runs immediately after Phase 1 and
+When a tracked source doc exists, `sdp-solution-source-coverage-check` runs immediately after Phase 1 and
 Phase 3 are drafted, comparing the source against `01_concept.md` / `03_expanded_concept.md` for
 coverage — mandatory, not optional.
 
@@ -192,7 +194,7 @@ with their own work queue."
    it walks **every** registered project's freshly-decomposed registry, in dependency order,
    running:
    - `sdp-project-doc-review` — content readiness
-   - `sdp-source-coverage-check` — when a tracked source doc exists
+   - `sdp-solution-source-coverage-check` — when a tracked source doc exists
    - `sdp-phase-rightsizing-check` — splits anything still oversized before dispatch ever sees it
 4. Only after that sweep reports clean does dispatch begin. `/sdp-project-loop-prep` is the same sweep
    scoped to a single project, for a targeted re-check outside this one-time transition.
@@ -271,7 +273,7 @@ with `/sdp-cancel-auto`; resume with `/sdp-auto` after resolving whatever caused
 A project rarely ends after one pass through Sections 3–6. Two things recur for as long as the
 solution is active:
 
-**New scope appears mid-project.** Run `/sdp-new-concept-intake` at any solution maturity —
+**New scope appears mid-project.** Run `/sdp-solution-new-concept-intake` at any solution maturity —
 document-driven (drop files in `sdp-solution-docs/user-design-docs/`) or conversational (describe
 it directly). Either way it seeds a fresh seven-row Phases 1–7 mini-cycle into the solution's own
 registry and hands off to `/sdp-solution-phase-coordinator` — never to `/sdp-solution-coordinator`
@@ -299,7 +301,7 @@ the condition itself. Common causes:
 |-----------------|-----|---------------------|
 | Bring SDP into a new or existing solution | `/sdp-workspace-setup` | `SDP-Solution.json`, solution + first project scaffold |
 | Drive the Phases 1–7 concept cycle | `/sdp-solution-phase-coordinator` | `sdp-solution-docs/0N_*.md`, `.sdp-solution-workflow/registry.md` |
-| Register a new concept mid-solution | `/sdp-new-concept-intake` | Seven new registry rows + phase stubs |
+| Register a new concept mid-solution | `/sdp-solution-new-concept-intake` | Seven new registry rows + phase stubs |
 | Certify every project's registry before an unattended run | `/sdp-solution-loop-prep` (first time) / `/sdp-project-loop-prep` (targeted) | Doc review + source coverage + right-sizing pass |
 | Drive one project's implementation loop | `/sdp-project-coordinator` | `session-NNN.md`, `sdp-docs/00_prompt.txt`, `[phase]_state.json` |
 | Drive a task spanning 2+ projects | `/sdp-solution-coordinator` | Child tasks fanned out per project, cycle-synced |

@@ -87,6 +87,7 @@ A consistent folder structure across all projects reduces the time needed to nav
   │   │   ├── Public/                 // pages accessible without authentication
   │   │   └── Secure/                 // pages requiring authentication
   │   └── Support/                    // PageBase.cs, SecurePageBase.cs
+  ├── Content/                        // JSON data files backing structured page content (Ch. 11)
   ├── Data/                           // WebsiteContext, WebsiteUser, WebsiteRole
   ├── Support/
   │   ├── Extensions/                 // StringExtensions.cs, SessionExtensions.cs

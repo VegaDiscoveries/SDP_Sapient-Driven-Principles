@@ -39,6 +39,13 @@
                                                           "filename:<pattern>" where {} is
                                                           replaced by the value and the named
                                                           file must exist
+      json-field-present { file, pointer }                passes when the JSON value at pointer
+                                                          resolves to anything non-null (including
+                                                          false) - presence only, no value
+                                                          comparison. Use this over json-value when
+                                                          the field is user-editable policy (e.g. a
+                                                          feature toggle) and any set value, not
+                                                          just one specific one, should pass
       json-last-include  { file, path }                   passes when, in the JSON array file,
                                                           path is the LAST entry with
                                                           includeInReadDocs:true
@@ -55,6 +62,10 @@
                                                           at least one file
       command-available  { command }                      passes when an executable named
                                                           `command` resolves on PATH (Get-Command)
+      json-threshold-order { file, pointers, floor? }      passes when the numeric values at each
+                                                          pointer (in array order) are strictly
+                                                          ascending, and (if `floor` is present)
+                                                          the first pointer's value exceeds it
 
     Tier staleness gate - policy and facts are stored separately by owner:
       SDP-Config.json     preflight.setupValidationIntervalHours / .integrityValidationIntervalHours
@@ -225,6 +236,19 @@ function Test-JsonValue($check) {
     return @{ ok = $false; detail = "value mismatch at $($check.pointer): got '$value', expected '$match'" }
 }
 
+function Test-JsonFieldPresent($check) {
+    $p = Resolve-WsPath $check.file
+    if (-not (Test-Path -LiteralPath $p -PathType Leaf)) {
+        return @{ ok = $false; detail = "json file missing: $($check.file)" }
+    }
+    $json = Get-Content -LiteralPath $p -Raw -Encoding UTF8 | ConvertFrom-Json
+    $value = Get-JsonPointerValue $json $check.pointer
+    if ($null -eq $value) {
+        return @{ ok = $false; detail = "pointer not found: $($check.pointer) in $($check.file)" }
+    }
+    return @{ ok = $true; detail = $null }
+}
+
 function Test-JsonLastInclude($check) {
     $p = Resolve-WsPath $check.file
     if (-not (Test-Path -LiteralPath $p -PathType Leaf)) {
@@ -304,6 +328,42 @@ function Test-GlobExists($check) {
     return @{ ok = $false; detail = "no file matches glob: $($check.pattern)" }
 }
 
+function Test-JsonThresholdOrder($check) {
+    # Validates a chain of numeric JSON pointers is in strictly ascending order, with an optional
+    # lower floor for the first pointer. Added for sessionSubagentBudget sanity (respawnAtCount <
+    # hardStopCount < maxSubagentsPerSession, respawnAtCount above a sane floor) - see the
+    # subagent-budget-respawn-design.md Pros-Cons-Gaps resolution (Gap 5, merged with Gap 2).
+    $p = Resolve-WsPath $check.file
+    if (-not (Test-Path -LiteralPath $p -PathType Leaf)) {
+        return @{ ok = $false; detail = "json file missing: $($check.file)" }
+    }
+    $json = Get-Content -LiteralPath $p -Raw -Encoding UTF8 | ConvertFrom-Json
+    $values = @()
+    foreach ($ptr in @($check.pointers)) {
+        $v = Get-JsonPointerValue $json $ptr
+        if ($null -eq $v) {
+            return @{ ok = $false; detail = "pointer not found: $ptr in $($check.file)" }
+        }
+        $numeric = 0.0
+        if (-not [double]::TryParse("$v", [ref]$numeric)) {
+            return @{ ok = $false; detail = "pointer value not numeric: $ptr = '$v' in $($check.file)" }
+        }
+        $values += $numeric
+    }
+    if (($null -ne $check.floor) -and ($values.Count -gt 0)) {
+        $floor = [double]$check.floor
+        if ($values[0] -le $floor) {
+            return @{ ok = $false; detail = "$($check.pointers[0]) ($($values[0])) must be greater than floor ($floor)" }
+        }
+    }
+    for ($i = 1; $i -lt $values.Count; $i++) {
+        if ($values[$i] -le $values[$i - 1]) {
+            return @{ ok = $false; detail = "$($check.pointers[$i]) ($($values[$i])) must be greater than $($check.pointers[$i - 1]) ($($values[$i - 1]))" }
+        }
+    }
+    return @{ ok = $true; detail = $null }
+}
+
 function Test-CommandAvailable($check) {
     # PATH-only check - deliberately does not care whether the resolved executable is a shell
     # builtin, script, or binary. Environment tooling (git, python) is not workspace-relative,
@@ -326,11 +386,13 @@ function Get-CheckName($check) {
         "dir-exists"        { return "dir-exists:$($check.path)" }
         "skill-pair"        { return "skill-pair:$($check.name)" }
         "json-value"        { return "json-value:$($check.pointer)" }
+        "json-field-present" { return "json-field-present:$($check.pointer)" }
         "json-last-include" { return "json-last-include:$($check.path)" }
         "hook-registered"     { return "hook-registered:$($check.event)" }
         "json-array-contains" { return "json-array-contains:$($check.pointer)" }
         "glob-exists"          { return "glob-exists:$($check.pattern)" }
         "command-available"    { return "command-available:$($check.command)" }
+        "json-threshold-order" { return "json-threshold-order:$($check.file):$(($check.pointers) -join ',')" }
         default             { return "unknown:$($check.type)" }
     }
 }
@@ -348,11 +410,13 @@ function Test-Check($check) {
             "dir-exists"        { Test-DirExists $check }
             "skill-pair"        { Test-SkillPair $check }
             "json-value"        { Test-JsonValue $check }
+            "json-field-present" { Test-JsonFieldPresent $check }
             "json-last-include" { Test-JsonLastInclude $check }
             "hook-registered"     { Test-HookRegistered $check }
             "json-array-contains" { Test-JsonArrayContains $check }
             "glob-exists"          { Test-GlobExists $check }
             "command-available"    { Test-CommandAvailable $check }
+            "json-threshold-order" { Test-JsonThresholdOrder $check }
             default             { @{ ok = $false; detail = "unknown check type: $($check.type)" } }
         }
         return [ordered]@{ name = $name; ok = [bool]$r.ok; detail = $r.detail }

@@ -57,12 +57,12 @@ Assign exactly one classification:
 **In Progress / Incomplete:**
 1. Invoke `/sdp-create-banner icon=warning,warning,warning row=0,1,2 row: Artifacts | [what
    artifacts were found] row: Incomplete | [what appears incomplete] row: Last state | [file
-   dates, git history if available]` to report to the user what artifacts were found; what
-   appears incomplete; last observed state (file dates, git history if available)
-2. Ask: "Should I continue from where this was left off, discard and restart, or inspect
-   first?"
-3. Proceed only after the user confirms
-4. Document the resumption or restart choice in the Completed blockquote
+   dates, git history if available] row: | row: Choice | Continue from where this was left off,
+   discard and restart, or inspect first?` to report to the user what artifacts were found; what
+   appears incomplete; last observed state (file dates, git history if available); and ask how
+   to proceed
+2. Proceed only after the user confirms
+3. Document the resumption or restart choice in the Completed blockquote
 
 **Complete:**
 1. Do not re-implement the task

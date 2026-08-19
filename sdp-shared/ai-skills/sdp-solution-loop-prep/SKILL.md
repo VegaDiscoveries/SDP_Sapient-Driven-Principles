@@ -20,8 +20,9 @@ separate, earlier concern — it runs before solution-level phases 1–7 are dra
 
 Read `.sdp-solution-workflow/state.json`. Confirm `current_phase` was "Phase Readiness" and
 `phase_gate.status` is now `"passed"` (i.e. this is genuinely the Phase-7-passed transition, not
-an arbitrary invocation). If not: report "sdp-solution-loop-prep: Phase 7 has not just passed for
-this solution — nothing to prep yet" and stop.
+an arbitrary invocation). If not: invoke
+`/sdp-create-banner icon=info row=0 row: Status | Phase 7 has not just passed for this solution — nothing to prep yet.`
+and stop.
 
 ### Step 2: Preflight Per Project
 
@@ -38,7 +39,7 @@ Identical to `sdp-project-loop-prep` Step 3, applied to each project's freshly-d
 ### Step 4: Per-Row Sweep (Per Project)
 
 Identical three-part check to `sdp-project-loop-prep` Step 4 (content readiness via `sdp-project-doc-review`,
-source coverage via `sdp-source-coverage-check`, right-sizing via `sdp-phase-rightsizing-check`),
+source coverage via `sdp-solution-source-coverage-check`, right-sizing via `sdp-phase-rightsizing-check`),
 run against each project's decomposed rows.
 
 ### Step 5: Write the Readiness Marker (Per Project)
@@ -48,11 +49,12 @@ Identical to `sdp-project-loop-prep` Step 5 — write a `loop_prep` block to eac
 
 ### Step 6: Report and Hand Off
 
-Report a full summary across every project: rows checked, splits performed, coverage gaps found
-and how resolved, any project halted during Step 2 or Step 3. End by inviting the user to run
-`/sdp-auto` or `/sdp-state-loop-start` — the one-time project-count check inside those skills
-(Task 14) picks `/sdp-project-state-loop` or `/sdp-solution-state-loop` automatically. Do not invoke
-either skill directly.
+Report a full summary across every project as plain text: rows checked, splits performed,
+coverage gaps found and how resolved, any project halted during Step 2 or Step 3. Then invoke
+`/sdp-create-banner icon=success row=0 row: Prep | Solution-wide prep complete for [N] project(s) — run /sdp-auto or /sdp-state-loop-start to begin the unattended loop.`
+— the one-time project-count check inside those skills (Task 14) picks
+`/sdp-project-state-loop` or `/sdp-solution-state-loop` automatically. Do not invoke either skill
+directly.
 
 ## Constraints
 
