@@ -555,6 +555,39 @@ generating a new one (item 4 below).
    `last_active_projects`, `sdp-project-coordinator` must never write this field — it has no
    visibility into sibling projects, no visibility into whether it is itself a shared-task child
    this cycle, and no mandate to write anything outside `[resolved_project]/`.
+7. **Detect genuine all-complete and trigger auto-report generation — edge-triggered, not
+   level-triggered.** After item 6 has written this cycle's `status` for every registered
+   project: check whether every entry in `SDP-Solution.json.projects[]` that has a `status` field
+   (excluding `in_shared_task` entries — covered by the shared-task path's own reporting) reads
+   `work_complete`. An entry with no `status` field yet does not block this check, same exception
+   as `sdp-initialize-sdp`'s own "post-Phase-7, all work complete" banner variant uses.
+
+   Read `.sdp-solution-workflow/state.json.all_projects_complete_reported` (boolean; absent
+   treated as `false`).
+
+   - **Not all complete this cycle:** if the flag is currently `true`, set it to `false` — new
+     work has appeared since the last report, so the next time all-complete is reached it must be
+     detected as new again. If the flag is already `false`/absent, leave it unchanged. Either way,
+     skip the rest of this item, proceed to Step 2e.
+   - **All complete this cycle, flag already `true`:** already reported, nothing has changed since
+     — skip the rest of this item silently (no loop-cancel attempt, no report generation),
+     proceed to Step 2e.
+   - **All complete this cycle, flag `false`/absent:** a genuinely new transition into
+     all-complete. **Do not use any per-project timestamp field for this determination** (e.g.
+     `.sdp-workflow/state.json.updated`) — confirmed by direct inspection that
+     `sdp-project-coordinator/SKILL.md` never writes that field, so it cannot be trusted as a
+     "last changed" signal. The boolean flag transition is the sole, reliable guard.
+
+     **Compute the period and invoke the report skill.** `period_end` = today. `period_start` =
+     the day after the most recent `.sdp-solution-workflow/state.json.auto_actions` entry with
+     `action == "auto_report_generated"`'s `period_end`, if one exists; otherwise the earliest
+     date found across `.sdp-solution-workflow/logging/{loop-logs,hook-logs,workflow-logs}/`
+     (whichever folder has the earliest-dated file). Invoke `sdp-report-logs-auto-generate` (via
+     the Skill tool) with `--period-start=[period_start] --period-end=[period_end]`. That skill
+     owns report generation and the `auto_actions` completion record — it does not set
+     `all_projects_complete_reported` itself (it has no reason to know this flag exists; it is
+     this item's own guard, not a shared contract). After the skill returns, set
+     `all_projects_complete_reported` to `true` in `.sdp-solution-workflow/state.json`.
 
 ### Step 2e: Solution-Level Phase 7 Backward-Regression
 

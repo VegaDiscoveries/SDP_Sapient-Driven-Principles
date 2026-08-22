@@ -155,6 +155,7 @@ $solutionRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 | `sdp-report-log-workflow-metrics.ps1` | Not passed | Solution root (self-resolved) |
 | `sdp-report-logs-combine.ps1` | Not passed | Solution root (self-resolved) |
 | `sdp-report-log-combined-metrics.ps1` | Not passed | Solution root (self-resolved) |
+| `sdp-report-logs-merge-range.ps1` | Not passed | Solution root (self-resolved) |
 | `sdp-hook-log.ps1` | Not passed | Solution root (self-resolved) |
 | `sdp-workflow-log.ps1` | Not passed | Solution root (self-resolved) |
 | `sdp-preflight.ps1` | Required — `.\[resolved_project]` | Active project folder |
@@ -635,6 +636,32 @@ an append-only log.
 **Permission entry:**
 ```json
 "PowerShell(./sdp-shared/scripts/sdp-report-logs-combine.ps1 *)"
+```
+
+---
+
+## Worked Example: `sdp-report-logs-merge-range.ps1`
+
+**Type:** Agent-consumed
+
+Sibling utility to `sdp-report-logs-combine.ps1`, solving the orthogonal problem: that script
+merges one calendar day's three *source types* into one file; this script merges one source
+type's files *across a date range* into one file. Used by `sdp-report-logs-auto-generate` to feed
+each of the 4 report scripts a genuinely multi-day period, since none of those scripts' own
+`-StartDate`/`-EndDate` filters can span more than the single `-JsonlPath` file they're given.
+
+**Annotated patterns:**
+
+| Pattern | Location | Why |
+|---------|----------|-----|
+| Plain concatenation, no re-parsing or re-sorting | Main loop | Each source day-file is already internally chronological and non-overlapping with its neighbors (same guarantee `sdp-report-logs-combine.ps1`'s own `Sort-Object` already established for combined-log day-files) — concatenating in ascending date order preserves overall chronological order without needing to parse every line's JSON |
+| `-SourceType` maps to folder + prefix, caller never names a folder directly | `$sourceMap` | Same declarative-lookup pattern as `sdp-preflight.ps1`'s manifest-driven check types — adding a fifth source family later is a data-only edit to `$sourceMap`, not new branching logic |
+| Missing day in range is not an error; zero files found across the whole range is | Main loop + `$filesFound.Count -eq 0` guard | Mirrors `sdp-report-logs-combine.ps1`'s own "a missing source is a normal, expected state" rule, applied across days instead of across source types |
+| Output folder is a new sibling (`range-merges/`), never the source day-folders | `$OutputPath` default | A merged file living alongside `loop-metrics-yyyyMMdd.jsonl` would match that folder's own `loop-metrics-*.jsonl` glob and pollute the manual picker in `sdp-report-log-loop-metrics`'s Step 1 — keeping it in a distinct folder means the four report skills' existing day-file listing logic never has to filter it back out |
+
+**Permission entry:**
+```json
+"PowerShell(./sdp-shared/scripts/sdp-report-logs-merge-range.ps1 *)"
 ```
 
 ---

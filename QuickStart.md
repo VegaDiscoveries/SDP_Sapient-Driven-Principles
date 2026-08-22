@@ -6,6 +6,42 @@ Condensed workspace setup reference. For the full framework overview, see [`READ
 
 ---
 
+## Install Claude Code (Windows)
+
+If Claude Code isn't installed yet, open a Windows PowerShell terminal and run:
+
+```powershell
+irm https://claude.ai/install.ps1 | iex
+```
+
+This is a native install — no Administrator rights required — and it auto-updates in the
+background. [Git for Windows](https://git-scm.com/downloads/win) is optional but recommended: it
+gives Claude Code Git Bash for its Bash tool. Without it, Claude Code falls back to the
+PowerShell tool.
+
+Alternative for CMD instead of PowerShell:
+
+```batch
+curl -fsSL https://claude.ai/install.cmd -o install.cmd && install.cmd && del install.cmd
+```
+
+Or via WinGet:
+
+```powershell
+winget install Anthropic.ClaudeCode
+```
+
+Verify the install, then launch Claude Code from a terminal opened at the solution root:
+
+```powershell
+claude --version
+claude
+```
+
+Source: [Claude Code docs — Advanced setup](https://code.claude.com/docs/en/setup), verified 2026-08-19.
+
+---
+
 ## Workspace Setup
 
 > **Open Claude Code at the solution root** — the folder containing `SDP-Solution.json` and `.claude/skills/`. Opening at a project subfolder means no skills are visible and every `/sdp-*` invocation silently fails.

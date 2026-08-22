@@ -133,7 +133,8 @@ SapientDrivenPrinciples-AI_Workflow_Bootstrap_Project/
 │   │   ├── loop-logs/           # Workflow-level fire/tone events (sdp-project-state-loop + sdp-tone.ps1)
 │   │   ├── hook-logs/           # Fine-grained PreToolUse/PostToolUse tool-call trace (sdp-hook-log.ps1)
 │   │   ├── workflow-logs/       # Semantic dispatch/eval/gate-verdict narrative log (sdp-workflow-log.ps1)
-│   │   └── combined-logs/       # Normalized per-day merge of the above three (sdp-report-logs-combine)
+│   │   ├── combined-logs/       # Normalized per-day merge of the above three (sdp-report-logs-combine)
+│   │   └── range-merges/        # Multi-day concatenation of one source type (sdp-report-logs-merge-range.ps1), feeds sdp-report-logs-auto-generate
 │   └── sessions/                # Session records (append-only)
 ├── docs/                        # Legacy scratch notes (design specs now live in sdp-shared/docs/)
 ├── research/                    # Legacy scratch notes (research docs now live in sdp-shared/docs/)
@@ -298,6 +299,7 @@ that should have been blocked.
 | `sdp-report-log-workflow-metrics` | Generate a workflow-log report (trigger/role/outcome breakdowns, Concerning Events) from a selected `workflow-log-*.jsonl` file |
 | `sdp-report-logs-combine` | Data-prep step (not a report) — merge one day's `loop-metrics`/`hook-log`/`workflow-log` jsonl into a single normalized `combined-log-yyyyMMdd.jsonl` |
 | `sdp-report-log-combined-metrics` | Generate a combined-metrics report from a selected `combined-log-*.jsonl` file — depends on `sdp-report-logs-combine`'s output already existing for the target day |
+| `sdp-report-logs-auto-generate` | Caller-invoked only (not manual) — generates all 4 reports over the period since the last auto-report when `sdp-solution-phase-coordinator` detects every project is `work_complete`; also cancels any active state loop and records the completion |
 
 ### PowerShell Scripts
 
@@ -318,6 +320,7 @@ that should have been blocked.
 | `sdp-report-log-hook-metrics.ps1` | Reads a selected `hook-logs/hook-log-*.jsonl` file and produces the tool-usage/session/level/work-item breakdown report |
 | `sdp-report-log-loop-metrics.ps1` | Reads a selected `loop-logs/loop-metrics-*.jsonl` file and produces the time-accounting/halt/task-outcome report |
 | `sdp-report-log-workflow-metrics.ps1` | Reads a selected `workflow-logs/workflow-log-*.jsonl` file and produces the trigger/role/outcome breakdown and chronological event report |
+| `sdp-report-logs-merge-range.ps1` | Concatenates one source log type's per-day files across a date range into a single `range-merges/` jsonl file — feeds the 4 report scripts a genuine multi-day period; used by `sdp-report-logs-auto-generate` |
 | `sdp-claude-new-terminal.ps1` | Spawns a new Claude Code terminal window from a named launch profile; tracks the instance in `SDP-Terminal-Sessions.json` |
 | `sdp-preflight.ps1` | Manifest-driven workspace validation; emits JSON envelope with pass/fail per check |
 | `sdp-run-prompt.ps1` | Resolves the active project, reads `sdp-docs/00_prompt.txt`, and emits the next skill to invoke as JSON |

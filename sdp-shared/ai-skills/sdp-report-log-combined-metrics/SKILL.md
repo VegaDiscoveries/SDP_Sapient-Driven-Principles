@@ -40,6 +40,15 @@ must have already run for the day being reported on. This skill does not invoke 
 
 ### Step 1: Resolve invocation parameters
 
+**Level 0 — Auto-invocation override (used by `sdp-report-logs-auto-generate`):** if this
+invocation explicitly supplies `--range-file=[path]`, `--start-date=[yyyy-MM-dd]`, and
+`--end-date=[yyyy-MM-dd]` (a pre-built multi-day merge produced by `sdp-report-logs-merge-range.ps1`
+over per-day `combined-log-*.jsonl` files the caller already ensured exist for every day in the
+range via `sdp-report-logs-combine`), use `[path]` directly as `[jsonl_path]` and the given dates
+as this run's `-StartDate`/`-EndDate` — skip sub-step 1 below (the single-day file listing and
+picker) entirely. Sub-step 2 still runs normally (output path, `-IncludeSeconds`); the supplied
+dates are the already-resolved date filter, not something to determine from the request.
+
 1. **Resolve which day's file to read.**
    - List available files via the PowerShell tool:
      ```

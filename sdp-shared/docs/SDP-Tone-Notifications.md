@@ -156,6 +156,7 @@ entry is silent.
 | `milestone.task_verified` | REVIEWER sets a work item VERIFIED | `sdp-project-reviewer` Step 6.1 (after status write) | ✅ |
 | `milestone.phase_complete` | Phase gate PASSED, COORDINATOR advances `current_phase` | `sdp-project-coordinator` Step 4.5b (after phase_gate reset) | ✅ |
 | `milestone.all_complete` | Final phase passes / project complete | `sdp-project-coordinator` Step 4.5d (before all-complete report) | ✅ |
+| `milestone.all_projects_complete` | Every registered project reaches `work_complete` (solution-wide, post-Phase-7) — distinct from `milestone.all_complete`, which is a single shared-task completion | `sdp-solution-phase-coordinator` Step 2d item 7, via `sdp-report-logs-auto-generate` Step 8 | ✅ |
 | `milestone.doc_certified` | `sdp-project-doc-review` certifies a staged doc as gate-ready | `sdp-project-doc-review` Step 4.5 (after state file write) | ✅ |
 
 ### Gate family

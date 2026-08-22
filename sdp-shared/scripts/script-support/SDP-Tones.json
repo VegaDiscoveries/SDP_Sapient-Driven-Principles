@@ -69,6 +69,7 @@
     { "trigger": "halt.generic", "sequence": "siren", "profile": "burst" },
     { "trigger": "milestone.phase_complete", "sequence": "phase-fanfare", "profile": "once" },
     { "trigger": "milestone.all_complete", "sequence": "victory", "profile": "once" },
+    { "trigger": "milestone.all_projects_complete", "sequence": "victory", "profile": "once", "enabled": true },
     { "trigger": "milestone.task_verified", "sequence": "phase-fanfare", "profile": "once", "enabled": true },
     { "trigger": "gate.blocked", "sequence": "klaxon", "profile": "burst", "enabled": true },
     { "trigger": "milestone.doc_certified", "sequence": "phase-fanfare", "profile": "once" },

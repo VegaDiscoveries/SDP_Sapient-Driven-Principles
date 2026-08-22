@@ -117,8 +117,10 @@ folders alongside the actual code project folders.
 │   │   │   └── hook-log-yyyyMMdd.jsonl      ← append-only PreToolUse/PostToolUse hook log (sdp-hook-log.ps1), gated per-tool by sdp-hook-log-tools.json; local date deliberately, not UTC, so report authors never translate; retention sweep runs on first write of each new day
 │   │   ├── workflow-logs/                   ← one file per LOCAL calendar day; gitignored
 │   │   │   └── workflow-log-yyyyMMdd.jsonl  ← append-only semantic workflow-event log (sdp-workflow-log.ps1) — the narrative/reasoning half, called directly by sdp-project-coordinator/sdp-project-worker/sdp-project-reviewer and internally by sdp-gate-review-finalize.ps1; correlates with hook-logs/ by work_item, not session_id; same retention-sweep convention
-│   │   └── combined-logs/                   ← one file per calendar day; gitignored; not passively accumulated like its three siblings above — created/overwritten only when sdp-report-logs-combine is explicitly invoked for that day
-│   │       └── combined-log-yyyyMMdd.jsonl  ← normalized merge of that day's loop-metrics/hook-log/workflow-log entries into one common envelope shape (sdp-report-logs-combine.ps1); read by sdp-report-log-combined-metrics
+│   │   ├── combined-logs/                   ← one file per calendar day; gitignored; not passively accumulated like its three siblings above — created/overwritten only when sdp-report-logs-combine is explicitly invoked for that day
+│   │   │   └── combined-log-yyyyMMdd.jsonl  ← normalized merge of that day's loop-metrics/hook-log/workflow-log entries into one common envelope shape (sdp-report-logs-combine.ps1); read by sdp-report-log-combined-metrics
+│   │   └── range-merges/                    ← multi-day merges; gitignored; regenerable, not passively accumulated — created/overwritten only when sdp-report-logs-merge-range.ps1 is invoked for a given source type + date range (used by sdp-report-logs-auto-generate)
+│   │       └── [prefix]-yyyyMMdd_to_yyyyMMdd.jsonl ← plain date-ordered concatenation of the matching per-day files (sdp-report-logs-merge-range.ps1); fed to the 4 report skills' Level 0 auto-invocation override
 │   └── sessions/
 │       └── session-NNN.md
 │
@@ -145,6 +147,7 @@ folders alongside the actual code project folders.
 │   │   ├── sdp-report-log-workflow-metrics.ps1
 │   │   ├── sdp-report-logs-combine.ps1
 │   │   ├── sdp-report-log-combined-metrics.ps1
+│   │   ├── sdp-report-logs-merge-range.ps1  ← multi-day concatenation for one source type; used by sdp-report-logs-auto-generate
 │   │   ├── sdp-create-banner.ps1
 │   │   ├── sdp-hook-log.ps1                 ← PreToolUse/PostToolUse hook target; not invoked by any skill
 │   │   ├── sdp-workflow-log.ps1             ← semantic workflow-event log; invoked by sdp-project-coordinator/sdp-project-worker/sdp-project-reviewer directly and by sdp-gate-review-finalize.ps1 internally
@@ -396,7 +399,7 @@ EndGlobal
   "adopted_patterns": [],
   "orchestration_mode": "human-gated",
   "workflow_status": "active",
-  "current_phase": "concept",
+  "current_phase": null,
   "phase_gate": { "status": "pending", "gate_eval_cycles": 0 },
   "active_work_item": null,
   "blocked": false,
@@ -411,6 +414,17 @@ EndGlobal
   "updated": "[ISO_DATE]"
 }
 ```
+
+> **Correction — 2026-08-19:** `current_phase` above previously defaulted to the literal
+> `"concept"` — stale language from before the solution-scoped model (see the bootstrap doc's
+> 2026-07-20 correction). A project has no Phase 1 of its own; `current_phase` only becomes
+> meaningful for a project once Phase 7 decomposition assigns it real tasks, and stays `null`
+> before that. The prior default falsely implied a Phase 1 concept doc existed for a
+> freshly-scaffolded project. Confirmed live: a workspace-setup session correctly deviated from
+> this template and disclosed the deviation rather than propagate the stale default — this
+> correction fixes the template at the source so future setups don't need to repeat that
+> disclosure. Distinct from `.sdp-solution-workflow/state.json`'s own `current_phase` default
+> below, which correctly stays `"concept"` — the solution genuinely does begin at Phase 1.
 
 The `preflight` block holds the per-tier last-run timestamps written by `sdp-preflight.ps1`
 (the only fields that script writes to `state.json`). They are machine-owned facts paired with
