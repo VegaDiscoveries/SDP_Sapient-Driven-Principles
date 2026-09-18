@@ -451,12 +451,19 @@ function Get-StateInfo {
     # Returns @{ exists; parseable; facts = @{ setup; integrity } }. A present-but-unparseable
     # state.json is an OPERATIONAL error (the caller decides to exit 1); an absent state.json is
     # the fresh-workspace case - facts are simply null and every tier is due.
+    # State path mirrors the manifest scope already resolved into $manifestFilename (script
+    # scope, set before this function is ever called) - a solution-root invocation
+    # (SDP-Solution-Setup.json) reads .sdp-solution-workflow/state.json, never the project path.
+    # Confirmed bug, fixed 2026-09-10: this previously hardcoded .sdp-workflow/state.json
+    # unconditionally, so a solution-level run silently no-op'd its preflight-facts write instead
+    # of persisting to the solution's own state file.
     $info = [ordered]@{
         exists     = $false
         parseable  = $true
         facts      = [ordered]@{ setup = $null; integrity = $null }
     }
-    $path = Resolve-WsPath ".sdp-workflow/state.json"
+    $stateRelPath = if ($manifestFilename -eq "SDP-Solution-Setup.json") { ".sdp-solution-workflow/state.json" } else { ".sdp-workflow/state.json" }
+    $path = Resolve-WsPath $stateRelPath
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $info }
     $info.exists = $true
     try {
@@ -490,7 +497,10 @@ function Write-TierTimestamp([string]$tier) {
     # successful write, $false if the write itself failed (operational error). A missing
     # state.json is a no-op success - there is nowhere to record facts on a fresh workspace and
     # creating a partial state.json would be wrong.
-    $path = Resolve-WsPath ".sdp-workflow/state.json"
+    # Same solution/project state-path branch as Get-StateInfo above - see that function's
+    # comment for the bug this fixes.
+    $stateRelPath = if ($manifestFilename -eq "SDP-Solution-Setup.json") { ".sdp-solution-workflow/state.json" } else { ".sdp-workflow/state.json" }
+    $path = Resolve-WsPath $stateRelPath
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $true }
     try {
         $state = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json

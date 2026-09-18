@@ -1,8 +1,8 @@
 ﻿# Chapter 7 — Database Architecture
 
-> *Section file for `GenericProjectGuidlines_V1.10_20260323.md`*
+> *Section file for `GenericProjectGuidlines_V1.11_20260904.md`*
 >
-> **⚠️ Sync rule — agent instruction:** This is a section file. Any change made here **must be mirrored in the corresponding chapter** of `GenericProjectGuidlines_V1.10_20260323.md`. Any change made in the parent document's corresponding chapter must be mirrored back here. Both files must remain identical in content for their shared sections.
+> **⚠️ Sync rule — agent instruction:** This is a section file. Any change made here **must be mirrored in the corresponding chapter** of `GenericProjectGuidlines_V1.11_20260904.md`. Any change made in the parent document's corresponding chapter must be mirrored back here. Both files must remain identical in content for their shared sections.
 >
 > **TOC Maintenance:** If this section is renamed or deleted, update both the parent document's Contents list AND the `GenericProjectGuidlines_TOC.md` file. See the TOC file for detailed maintenance instructions.
 >
@@ -31,6 +31,15 @@ Every table in the database follows the same foundational column set. Consistenc
 | `DeletedUser` | NVARCHAR(150) | `string? DeletedUser` | NULL | Username that performed the soft-delete. |
 
 > **ℹ️ ID and GUID columns are not part of `CommonColumns`.** Each entity class declares its own `(TableName)ID` (INT IDENTITY PK) and `(TableName)GUID` (UNIQUEIDENTIFIER DEFAULT newid()) properties individually. The base class provides only the shared audit, lifecycle, and metadata columns. SQL column names and C# property names are identical throughout — no `[Column]` mapping attributes are required.
+
+> **Addition — 2026-09-04 — `newsequentialid()` exception for high-volume insert-only tables:** The
+> GUID default above is `NEWID()` for every table except a high-volume, insert-only log table (e.g.
+> `DataAccessTracking` — see Chapter 8's Data Access Tracking section), which uses
+> `newsequentialid()` instead. `NEWID()` produces fully random GUIDs, which fragment a clustered
+> index under heavy sequential insert load; `newsequentialid()` produces GUIDs that increase
+> monotonically per call on the same machine, avoiding that fragmentation. This is a documented,
+> narrow exception — not a general license to swap defaults — and applies only where insert volume
+> and table shape (append-only, never updated in place) match this profile.
 
 ## CommonColumns Base Class
 
@@ -135,23 +144,46 @@ All database object names use PascalCase. Underscores serve only as classificati
 | Stored procedure – update | `spu_` | `spu_Coin_UpdatePrice` |
 | Stored procedure – delete / soft-delete | `spd_` | `spd_Coin_SoftDelete` |
 | Stored procedure – mixed operations | Combined prefix | `spiu_Coin_UpsertHolding`, `spud_Coin_UpdateOrDelete` |
+| Stored procedure – data access tracking | `dat_` | `dat_DataAccessTracking_Record`, `dat_DataAccessTracking_ArchiveData` |
+
+> **Addition — 2026-09-04 — `dat_` scope:** `dat_` procedures are a cross-cutting concern called
+> *from inside* other stored procedures (see Chapter 8's Data Access Tracking section), not
+> single-entity CRUD — that is why they sit outside the `sps_`/`spi_`/`spu_`/`spd_`/`spiu_`/`spud_`
+> scheme rather than being folded into it.
 
 > **ℹ️ Read path:** `sps_` → `v_` → table (or `sps_` → `fn_s_` → `v_` → table). The stored procedure always reads through a view; never directly from a table. Every view must return all `CommonColumns` for its primary table.
 >
 > **Write path:** `spi_` / `spu_` / `spd_` → table (or via `fn_i_` / `fn_u_`). Writes always target the table; views are never write targets.
 
+> **Addition — 2026-09-04 — Active/Deleted filtering lives in the `sps_` procedure, never the view:** The `v_` view stays a complete, unfiltered projection (see "every view must return all `CommonColumns`" above) — it is never where row-level Active/Deleted filtering happens. See the new MUST rule under **Database Rules** below. A predicate hidden in a view is a second, undocumented place a future developer or agent has to know to look; keeping the SP as the sole filtering point keeps that logic discoverable in one place.
+
 ## Database Rules
 
 - **MUST** Every table includes all 13 common columns. No exceptions without written justification.
+- **MUST** Every new column added to an existing table or view goes at the true end — after every existing column, never inserted mid-schema — regardless of where it would read most naturally. Anything relying on column position (BCP exports, position-based mapping, some legacy ORM configurations) breaks silently if a column's ordinal shifts underneath it; appending at the end is the only change that can never break such a consumer.
 - **MUST** Use the GUID — not the integer ID — in all public-facing URLs, API responses, and mobile client references.
 - **MUST** Records are never physically deleted. Use the `IsDeleted` / `DeletedDate` / `DeletedUser` columns.
 - **MUST** `CreatedDate` and the GUID are set by database defaults, never by application code.
 - **MUST** Maintain exactly two *runtime* `DbContext` classes: `AppDbContext` for the application domain and `AppIdentityDbContext` for the identity database. These must point to **separate physical databases** — they are never the same database. A third `DbContext` class for migrations is not required; instead, pass a `--connection` override to `dotnet ef database update` pointing to the elevated migration login. For Vega Discoveries projects the Identity database may be shared across multiple solutions; each solution always maintains its own independent application domain database. **The `Email` column (normalised to lowercase, unique-constrained) is the logical cross-database key linking the identity database to the app database.** Cross-database foreign key constraints are not used; joins across databases are performed on `Email` in services that require them.
 - **MUST** Use at least three SQL logins for each solution: (1) a **migrations login** (`db_owner` on both databases) used only during deployments and never by the running application; (2) a **runtime app login** with no direct table permissions — `EXECUTE` is granted only on individual stored procedures as they are created, channelled through an application database role — see **SQL Login and Database Role Pattern** below; (3) a **runtime identity login** with `db_datareader`, `db_datawriter`, and `EXECUTE` on the identity database. Apply this permission model from the first day of development, not only when deploying to production.
 - **MUST** The running application must never hold or read migration login credentials. Migration connection strings (`ConnectionStrings:MigrationsDb`, `ConnectionStrings:MigrationsIdentityDb`) are stored in User Secrets locally and in CI/CD secrets at deploy time. They must not appear in any runtime configuration path — `appsettings.json`, `appsettings.*.json`, or environment variables injected to a running process.
-- **SHOULD** Apply a global EF Core query filter on `IsDeleted`: `modelBuilder.Entity<T>().HasQueryFilter(e => !e.IsDeleted.GetValueOrDefault())`
-- **SHOULD** Use `DATETIME2` (not `DATETIME`) for all date columns. Store all timestamps in UTC.
-- **SHOULD** Use SQL authentication (username + password) rather than Windows authentication for cross-environment portability.
+
+> **Addition — 2026-09-04 — SP-level Active/Deleted filtering (real-world gap found on another Vega
+> Discoveries solution):** An agent built the SP-only read path correctly, but filtered
+> `IsActive`/`IsDeleted` in the *API layer* after the SP had already returned every row — meaning
+> excluded rows still traveled over the wire before being discarded: a needless bandwidth cost, and
+> a real disclosure risk if intercepted or if that after-the-fact filtering step is ever skipped
+> downstream. The fix moves filtering into the SP itself, where no caller — this API, a different
+> service, a report SP, an ETL job — can bypass it. A related incident on the same project is why
+> filtering does **not** move into the `v_` view instead: raw SQL/LINQ against `DbSet<T>` survived
+> several manual audit passes undetected and only surfaced once production's stricter DB permissions
+> rejected it for lack of grants — a predicate hidden in a view is the same kind of thing, quietly
+> correct until someone reads the wrong layer.
+
+- **MUST** Every `sps_` (read) stored procedure accepts `@IsActive BIT = 1` and `@IsDeleted BIT = 0` parameters and applies them itself — `WHERE IsActive = @IsActive AND IsDeleted = @IsDeleted`, or equivalent — before returning any row. Applies without exception, including composition procedures that read through another `sps_` procedure or a `fn_s_` function. The `v_` view remains an unfiltered full projection; see the **Read path** note above — filtering never lives in the view.
+- **MUST** Active/Deleted filtering is enforced by the stored procedure itself; it is never something the calling application's ORM configuration (e.g., an EF Core query filter) is trusted to apply.
+- **MUST** Use `DATETIME2` (not `DATETIME`) for all date columns. Store all timestamps in UTC.
+- **MUST** Use SQL authentication (username + password) rather than Windows authentication for cross-environment portability.
 
 ---
 
@@ -196,15 +228,10 @@ The login now holds no direct object permissions. All access is controlled throu
 
 **Step 3 — Grant EXECUTE to the role at SP creation time:**
 ```sql
--- In the migration or SSDT script that creates the SP:
 GRANT EXECUTE ON [dbo].[sps_User_GetByEmail] TO [Role_VegaAppVegaDrop];
 GRANT EXECUTE ON [dbo].[spi_UserProfile_Create] TO [Role_VegaAppVegaDrop];
 ```
 
-> **Updated 2026-05-23 — `.Database` project changed from SSDT to DbUp:** The comment above (`-- In the migration or SSDT script...`) is superseded. Use `-- In the DbUp migration script that creates the SP:` instead.
-
-~~This step belongs in the same deployment artifact (migration `Up()` or SSDT `.sql` file)
-that creates the SP — not in a separate permissions script applied later.~~
 This step belongs in the same DbUp migration script that creates the SP — not in a separate permissions script applied later.
 
 ### Rules
@@ -214,7 +241,7 @@ This step belongs in the same DbUp migration script that creates the SP — not 
 - **MUST** Role names follow the `Role-[processName]` or `Role_[loginName]` convention. No other naming is permitted.
 - **MUST** EXECUTE permissions are added to the role in the same deployment artifact that creates the SP — never deferred to a separate permissions pass.
 - **MUST** This pattern applies only to non-EF Core SP access. EF Core's built-in Identity table operations are out of scope.
-- **SHOULD** Where a process role (`Role-[processName]`) is used, document which logins are members and why the shared role is appropriate rather than per-login roles.
+- **MUST** Where a process role (`Role-[processName]`) is used, document which logins are members and why the shared role is appropriate rather than per-login roles.
 
 ---
 
@@ -245,7 +272,7 @@ Beyond the standard identity schema, the `RegisteredSolutions` table includes op
 **Implementation:**
 - Defaults: NULL values use the VDC_Emailer platform default (`fn_EmailProperties()`)
 - Configuration: Set by ops during solution onboarding via admin panel
-- Override: Per-template overrides via `RegisteredSolutionEmailTemplate` table for fine-grained control
+- Override: Per-template overrides via `RegisteredSolutionEmailTemplate` table for fine-grained control (e.g., support@solution for support emails, billing@solution for billing emails)
 
 **Rules:**
 
@@ -254,7 +281,6 @@ Beyond the standard identity schema, the `RegisteredSolutions` table includes op
 - **MUST** Each solution-to-template override is stored in `RegisteredSolutionEmailTemplate` (FK to both `RegisteredSolutions` and `EmailTemplate`)
 - **SHOULD** Each solution configures its own sender address at onboarding for branding consistency
 - **SHOULD** Display names follow the pattern: `{SolutionName} Notifications` or similar
-- **SHOULD** Ops can override sender per-email-type using `RegisteredSolutionEmailTemplate` table (e.g., support@solution for support emails, billing@solution for billing emails)
 
 ### Timezone Configuration
 
@@ -298,8 +324,7 @@ public class AppTokenValidator
 
 - **MUST** Use IANA timezone database identifiers (e.g., `"America/Chicago"`, `"Europe/London"`, `"Asia/Tokyo"`), never abbreviations (`"CST"`, `"GMT"`)
 - **MUST NOT** rely solely on `UtcOffsetMinutes` as the authoritative source — daylight saving time changes are not reflected; use `TimeZoneIdentifier` for reliable conversions
-- **SHOULD** Populate `TimeZoneIdentifier` for solutions with geographically distributed app instances
-- **SHOULD** Leave NULL if solution is centrally located or timezone awareness is not required
+- **SHOULD** Populate `TimeZoneIdentifier` when instances are geographically distributed; leave NULL otherwise (solution is centrally located or timezone awareness is not required)
 
 ---
 
@@ -382,7 +407,7 @@ Execution sequence (within the same request):
 - **MUST** The preview endpoint must be called before the email change form is shown; the returned application names are used to populate the confirmation message.
 - **MUST** The confirmation UI must name every affected application — a generic count alone is not sufficient.
 - **MUST** No email change is executed without explicit user confirmation.
-- **MUST** A Reset PIN re-authentication step is required for this account-level operation.
+- **MUST** A Reset PIN re-authentication step is required for this account-level operation; where the user has security questions configured, answering them correctly is accepted as an alternative to the Reset PIN.
 - **MUST** All database updates (identity + all app DBs) are treated as a distributed saga: any failure triggers compensating rollback across all already-updated stores.
 
 ## App DB Role Tables
@@ -395,19 +420,31 @@ Roles and role assignments are stored in the application database, not the ident
 Role
 ├── RoleID               INT IDENTITY(1,1) PK
 ├── RoleGUID             UNIQUEIDENTIFIER NOT NULL   DEFAULT newid()
+├── RoleCategory         NVARCHAR(50) NULL — capability tag (e.g. `DeveloperAccess`, `AdminAccess`);
+│                        NULL for roles that grant no elevated capability. The category, not the
+│                        `Name`, is what capability-gated rules (Dev Toolbar, Admin Panel, etc.) test.
 ├── + CommonColumns      — Name (NVARCHAR 255) holds the role label; SortOrder controls display hierarchy
 UNIQUE constraint on Name
 ```
 
 Generic roles seeded at table creation (present in every solution):
 
-| Name | SortOrder | Purpose |
-|------|-----------|--------|
-| `User` | 10 | Standard authenticated user — baseline role present in every solution |
-| `Admin` | 20 | Full solution administration — activates Admin Panel in the UI for user management, audit, and system configuration. |
-| `Dev` | 30 | Internal developer and debug access. Users with this role see the Dev Toolbar in the UI: raw error details, request/response inspector, JWT inspector, feature flag overrides, session info, log stream, performance alerts, state snapshot, and network latency overlay. |
+| Name | RoleCategory | SortOrder | Purpose |
+|------|--------------|-----------|--------|
+| `User` | NULL | 10 | Standard authenticated user — baseline role present in every solution |
+| `Admin` | `AdminAccess` | 20 | Full solution administration — activates Admin Panel in the UI for user management, audit, and system configuration. |
+| `Dev` | `DeveloperAccess` | 30 | Internal developer and debug access. Users with this role see the Dev Toolbar in the UI: raw error details, request/response inspector, JWT inspector, feature flag overrides, session info, log stream, performance alerts, state snapshot, and network latency overlay. |
 
-These three roles are seeded by the shared framework migration. App-specific roles are defined in the project documentation and seeded in addition to these at application startup. The `IsActive` flag (from `CommonColumns`) disables a role without removing existing assignments.
+These three roles are seeded by the shared framework migration. App-specific roles are defined in the project documentation and seeded in addition to these at application startup. The `IsActive` flag (from `CommonColumns`) disables a role without removing existing assignments. A project may rename `Dev` to whatever title fits its org (`Developer`, `DevOps`, `Programmer`, etc.) — the `Name` is cosmetic; what grants developer-tier capability is `RoleCategory = 'DeveloperAccess'`, not any specific `Name` string.
+
+> **Addition — 2026-09-06 — `RoleCategory` generalizes capability checks beyond a fixed role
+> name:** An earlier draft of this rule gated developer-tier access on the literal role name
+> (`Dev`), then attempted to widen that to an enumerated list (`Dev`, `Developer`, `DevOps`, ...)
+> once real deployments were found to name this role differently. An enumerated name list is never
+> complete and reintroduces the same brittleness it was meant to fix. `RoleCategory` decouples the
+> capability a role grants from what the role happens to be called — a project names the role
+> anything it wants and tags it with the category; every capability-gated rule tests the category,
+> never the name.
 
 ### UserRole Table
 
@@ -426,10 +463,11 @@ UNIQUE constraint on (UserID, RoleID)
 - **MUST** Every new `User` row is assigned the project-defined default role in `UserRole` immediately after the `User` insert, within the same registration transaction. The specific default role is defined in the project documentation.
 - **MUST** The project documentation must explicitly list all app-specific roles to be seeded at application startup, their `SortOrder` values, and which role is the registration default.
 - **MUST** Role names in the app DB `Role` table are the single source of truth. The `RoleDefs` constants class (in `{AppName}.Domain` or `{AppName}.Contracts`) must mirror these values exactly — no magic strings anywhere in application code.
-- **MUST** At JWT generation, the server queries the app DB `UserRole` table to retrieve all active roles for the user and stamps them as `role` claims. The identity DB does not hold or manage solution roles.
+- **MUST** At JWT generation, the server queries the app DB `UserRole` table to retrieve all active roles for the user, stamps them as `role` claims, and additionally stamps each held role's non-null `RoleCategory` as a `roleCategory` claim. The identity DB does not hold or manage solution roles.
+- **MUST** Any rule gated on a capability rather than a specific role identity (e.g. Dev Toolbar access) tests the `roleCategory` claim, never the literal `role`/`Name` string — this is what lets a project rename `Dev` to `Developer`, `DevOps`, `Programmer`, or any other title without breaking the rule.
 - **MUST** For sensitive or destructive operations, re-validate the user's roles against the app DB at request time — do not rely solely on the JWT `role` claims, which reflect roles at the time the token was issued.
-- **SHOULD** A user may hold multiple roles simultaneously (e.g., `User` + `Admin`). Authorization policies should evaluate the full role set.
-- **SHOULD** Role assignment and revocation are audit-logged via `CreatedUser` / `LastUpdatedUser` / `IsDeleted` on the `UserRole` row. Removing a role sets `IsDeleted = true` — rows are never physically deleted.
+- **MUST** A user may hold multiple roles simultaneously (e.g., `User` + `Admin`). Authorization policies evaluate the full role set.
+- **MUST** Role assignment and revocation are audit-logged via `CreatedUser` / `LastUpdatedUser` / `IsDeleted` on the `UserRole` row. Removing a role sets `IsDeleted = true` — rows are never physically deleted.
 
 ## Authentication-Critical Index Strategy
 
@@ -459,8 +497,8 @@ Authentication tables are on the hot request path — every login, token refresh
 - **MUST** All indexes in the table above are created in the initial database migration for any project using VegaIdentity. None are optional.
 - **MUST** Filtered indexes (WHERE clause) are used where the query always filters on a predictable condition (e.g., `IsConsumed = 0`, `IsActive = 1`). Never index the full table when a filtered index is sufficient.
 - **MUST** Composite indexes are ordered with the highest-selectivity column first (e.g., `UserId` before `IsRevoked`).
-- **SHOULD** Index creation is included in the migration script and verified in a post-migration check, not deferred to a DBA.
-- **SHOULD** New auth tables introduced in later phases follow the same pattern: identify every query on the hot path, ensure each has a supporting index, and document the rationale in the schema notes.
+- **MUST** Index creation is included in the migration script and verified in a post-migration check, not deferred to a DBA.
+- **MUST** New auth tables introduced in later phases follow the same pattern: identify every query on the hot path, ensure each has a supporting index, and document the rationale in the schema notes.
 
 ## Custom Token-Table Patterns
 
@@ -506,7 +544,7 @@ Use a custom table when any of the following apply:
 - **MUST** Custom token tables store only hashed or encrypted values — never plaintext tokens.
 - **MUST** All data access on custom token tables goes through stored procedures (SP-only rule). `UserManager<T>` is not used for custom tables.
 - **MUST** The decision (framework table vs. custom table) is documented in the schema notes for each token type.
-- **SHOULD** Custom token tables include an explicit expiry column (`ExpiryDateUtc`) and a nightly cleanup job targeting that column.
+- **MUST** Custom token tables include an explicit expiry column (`ExpiryDateUtc`) and a nightly cleanup job targeting that column.
 
 ## Phone Number Data Management
 
@@ -707,8 +745,8 @@ See **## Cleanup and Retention Patterns** for cleanup job design.
 - **MUST** All phone data access goes through stored procedures (SP-only rule); direct table queries are not permitted
 - **MUST** Soft-delete phones via `IsDeleted` flag; never physically delete
 - **SHOULD** Allow users to disable SMS to a specific phone (`IsSmsEnabled = 0`) without losing the phone record
-- **SHOULD** Auto-mark the first verified phone as preferred; clear preferred status if a user deletes their preferred phone
-- **SHOULD** Track metrics: % of users with registered phones, % of phones verified, preferred SMS vs. email MFA adoption
+- **MUST** Auto-mark the first verified phone as preferred; clear preferred status if a user deletes their preferred phone
+- **MUST** For any Admin Dashboard in a solution where MFA is enabled, track metrics: % of users with registered phones, % of phones verified, and % of preferred MFA channel adoption (SMS vs. email vs. TOTP vs. other)
 
 ## Cleanup and Retention Patterns
 
@@ -730,6 +768,19 @@ Use **soft delete** when the record has audit value (e.g., a consumed email veri
 Use **hard delete** when the record is purely operational with no audit value after expiry (e.g., an expired unconsumed `ConsumedAccessToken` entry from a token that was never replayed).
 
 Document the choice for each table in the schema notes.
+
+> **Addition — 2026-09-04 — Move-to-archive (write-scale retention):** Neither soft-delete nor
+> hard-delete fits a high-volume, insert-only log table whose write latency matters on the request
+> path — e.g. `DataAccessTracking` (Chapter 8's Data Access Tracking section), where every tracked
+> write pays the log-insert cost inline. Soft-delete leaves rows (and their index weight) in the
+> live table forever; hard-delete destroys audit history the pattern exists to preserve. The third
+> option: periodically move older rows out of the live table into a structurally identical archive
+> table (`DataAccessTrackingArchive`), keeping the live table small — and therefore fast to write to
+> — while the archive preserves every row indefinitely for audit/compliance queries. A read path
+> that needs the full history unions both tables (see `v_DataAccessTracking`) rather than choosing
+> one. Use this pattern specifically when table growth threatens *write* latency on the live table,
+> not merely when a retention policy is needed — soft-delete remains the default when audit value
+> alone is the driver.
 
 ### Cleanup Job Design
 
@@ -754,7 +805,7 @@ Document the choice for each table in the schema notes.
 - **MUST** Cleanup jobs target indexed columns — never full table scans.
 - **MUST** Cleanup jobs are monitored. A failing or missing cleanup job must trigger an alert.
 - **SHOULD** Batch delete size is configurable (default 1,000 rows). Adjust based on table growth rate and maintenance window constraints.
-- **SHOULD** Soft-deleted records are excluded from all application queries via `WHERE IsDeleted = 0` in stored procedures. Hard-deleted records do not need this filter.
+- **MUST** Soft-deleted records are excluded from all non-admin application queries via `WHERE IsDeleted = 0` in stored procedures. Soft-deleted records only appear in admin queries where specifically declared. Hard-deleted records do not need this filter.
 
 ## Composite Index Rationale
 
@@ -791,16 +842,3 @@ A filtered index is smaller, faster to maintain, and often produces better query
 - **MUST** Every composite index includes a comment in the migration script explaining the column order and the query it supports.
 - **MUST** Composite indexes are verified against the actual query patterns in stored procedures after implementation — not assumed to be correct from the design.
 - **SHOULD** Prefer a filtered index over a full-table composite index when the qualifying condition is a fixed boolean and the qualifying row fraction is small (< 20%).
-
----
-
-## CHANGELOG
-
-| Version | Date | Change | Source |
-|---------|------|--------|--------|
-| 1.11 | 2026-05-19 | Added `## Authentication-Critical Index Strategy` — standard auth index set, filtered indexes, composite indexes for VegaIdentity-class projects | Migrated from VegaIdentity RF, Critical Gap 6 |
-| 1.11 | 2026-05-19 | Added `## Custom Token-Table Patterns` — decision tree for framework vs. custom tables, examples by category | Migrated from VegaIdentity RF, Blocking Decision OQ-8 |
-| 1.11 | 2026-05-19 | Added `## Cleanup and Retention Patterns` — nightly job design, soft vs. hard delete guidance, standard cleanup schedule | Migrated from VegaIdentity RF, Critical Gap 1 + Architecture |
-| 1.11 | 2026-05-19 | Added `## Composite Index Rationale` — column order principle, auth-table examples, filtered index preference guidance | Migrated from VegaIdentity RF, Critical Gap 6 |
-| 1.13 | 2026-05-23 | Added `## SQL Login and Database Role Pattern` — role naming conventions (`Role-[processName]` / `Role_[loginName]`), login-to-role-to-SP EXECUTE chain, setup sequence, and rules; scope limited to non-EF Core activity. Updated three-login MUST rule to reference this section. | User direction |
-| 1.12 | 2026-05-21 | Added `## Phone Number Data Management` — schema, verification lifecycle, MFA integration, endpoint patterns, index strategy | Migrated from VegaIdentity Review Findings, Section 2.85 (SMS Integration) |

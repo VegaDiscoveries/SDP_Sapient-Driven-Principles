@@ -7,9 +7,9 @@ subsequent dispatch, and invokes `sdp-project-run-prompt` for the immediate next
 
 This immediate-dispatch behavior (Steps 1-4) is single-project, dot-collapse-path logic only —
 Step 0b checks this first and, for any solution-scoped project (including a single one living in
-its own `sdp-project_[Name]/` subfolder) or any multi-project solution, either halts with
-direction to `/sdp-solution-phase-coordinator` (phases 1-7 still active) or delegates the entire
-loop-startup to `/sdp-state-loop-start` (phases 1-7 complete) instead of running Steps 1-5 itself.
+its own `sdp-project_[Name]/` subfolder) or any multi-project solution, delegates the entire
+loop-startup instead of running Steps 1-5 itself: to `/sdp-solution-phase-auto` (phases 1-7 still
+active) or to `/sdp-state-loop-start` (phases 1-7 complete).
 
 This skill is user-initiated only. It is never called by `sdp-project-state-loop` or any other SDP
 skill — calling it from within an automated path would cause loop proliferation.
@@ -67,12 +67,12 @@ exist at the root at all. This step determines which case applies before Steps 1
      read. Skip Steps 1-4 entirely. Proceed to sub-step 4.
 4. **Phase-7 completion check.** Read `.sdp-solution-workflow/state.json`'s `current_phase`
    field.
-   - **Not `null`** (phases 1-7 still active for this solution): do not start any loop and do
-     not attempt any dispatch — per the bootstrap doc's Loop Entry Point invariant, phases 1-7
-     are always human-gated, direct session-by-session dispatch; no cron job may exist while
-     this path is active. Invoke:
-     `/sdp-create-banner icon=warning row=0 row: Status | sdp-auto: this solution's project(s) live in their own subfolder(s) and phases 1-7 are still active (current_phase: [value]) — phases 1-7 must be driven by direct, human-gated /sdp-solution-phase-coordinator sessions, not by /sdp-auto or any recurring loop. Run /sdp-solution-phase-coordinator to continue.`
-     Halt. Do not proceed to Step 1, Step 5, or invoke `/sdp-state-loop-start`.
+   - **Not `null`** (phases 1-7 still active for this solution): this is the regime
+     `/sdp-solution-phase-auto` is built for — it drives phases 1-7 dispatch, directly or via its
+     own recurring `sdp-solution-phase-state-loop`, which Steps 1-4 below do not. Invoke:
+     `/sdp-create-banner icon=info row=0 row: Status | sdp-auto: this solution's project(s) live in their own subfolder(s) and phases 1-7 are still active (current_phase: [value]) — delegating to /sdp-solution-phase-auto for correct loop startup.`
+     Invoke `/sdp-solution-phase-auto` via the Skill tool. Terminate once it returns — do not
+     proceed to Step 1 or Step 5 of this skill.
    - **`null`** (phases 1-7 complete): this is the regime `/sdp-state-loop-start` is built for —
      it performs its own project-count-aware resolution and loop-target selection, which Steps
      1-4 below do not. Invoke `/sdp-state-loop-start` via the Skill tool. Invoke
@@ -167,9 +167,12 @@ exist at the root at all. This step determines which case applies before Steps 1
      `icon=warning row=0 row: Status | sdp-auto: SDP-Config.json not found or missing loopInterval.interval_minutes — defaulting to 5-minute loop interval.`
    - If the file can be read: use the value of `loopInterval.interval_minutes` as the interval.
 2a. **Phase-7-gate precondition.** Read `.sdp-solution-workflow/state.json`. If `current_phase`
-    is not `null` (phases 1–7 still in progress for this solution): halt — do not start any loop.
-    Invoke `/sdp-create-banner icon=error row=0 row: Status | sdp-auto: phases 1-7 are still active for this solution (current_phase: [value]) — use direct sdp-solution-phase-coordinator dispatch, not the recurring loop, until Phase 7's gate passes.`
-    Stop; skip the remaining sub-steps of Step 5.
+    is not `null` (phases 1–7 still in progress for this solution): delegate loop startup to
+    `/sdp-solution-phase-auto` instead of starting the loop this step would otherwise start —
+    the immediate dispatch above (Steps 1-4) already ran. Invoke
+    `/sdp-create-banner icon=info row=0 row: Status | sdp-auto: phases 1-7 are still active for this solution (current_phase: [value]) — delegating to /sdp-solution-phase-auto for loop startup (the immediate dispatch above already ran).`
+    Invoke `/sdp-solution-phase-auto` via the Skill tool. Terminate once it returns — do not
+    proceed to the remaining sub-steps of Step 5.
 2b. **One-time cron-target pick.** Read the current, live count of `SDP-Solution.json`'s
     `projects` array. This read happens once, here — never re-evaluated on any later cron fire.
     - Exactly 1 project → target = `/sdp-project-state-loop` (unmodified, today's single-project
@@ -189,13 +192,14 @@ exist at the root at all. This step determines which case applies before Steps 1
 - Never run Steps 1-4 when Step 0b determines the resolved project's path is not exactly `"."`
   (a real `sdp-project_[Name]/` subfolder, whether one project or several) — those steps assume
   `.sdp-workflow/state.json` and `sdp-docs/00_prompt.txt` sit at the solution root, which is false
-  for any solution-scoped project. Step 0b's branching (halt toward
-  `/sdp-solution-phase-coordinator`, or delegate to `/sdp-state-loop-start`) replaces them for
-  that case.
-- Never start a loop or attempt any dispatch when Step 0b finds phases 1-7 still active
-  (`current_phase` not `null`) for a non-dot-collapse project — per the bootstrap doc's Loop
-  Entry Point invariant, that regime is always human-gated via direct
-  `/sdp-solution-phase-coordinator` sessions, never `/sdp-auto` or any recurring loop.
+  for any solution-scoped project. Step 0b's branching (delegate to
+  `/sdp-solution-phase-auto` when phases 1-7 are active, or delegate to `/sdp-state-loop-start`
+  when phases 1-7 are complete) replaces them for that case.
+- Never dispatch directly, or re-derive `sdp-solution-phase-coordinator`'s own dispatch logic,
+  when phases 1-7 are found still active (`current_phase` not `null`) — whether at Step 0b for a
+  non-dot-collapse project, or at Step 5 sub-step 2a for the dot-collapse project's own solution.
+  `sdp-auto` delegates to `/sdp-solution-phase-auto` for this case in both places, rather than
+  starting a loop or dispatching itself.
 - Do not parse the Step 4 dispatch subagent's text output to determine its outcome — always
   re-read the phase state file instead (mirrors core invariant #7, Outcome Detection Via State
   File Only).
@@ -215,9 +219,16 @@ exist at the root at all. This step determines which case applies before Steps 1
   unreachable via this path, since a dot-collapse project is always the sole project). Subagent
   spawned to invoke `sdp-project-run-prompt` for the immediate next dispatch; new task status read
   from phase state file after return.
-- **Non-dot-collapse path, phases 1-7 active (Step 0b sub-step 4):** No loop started, no
-  dispatch attempted — halt banner only, directing the user to `/sdp-solution-phase-coordinator`.
+- **Non-dot-collapse path, phases 1-7 active (Step 0b sub-step 4):** No loop started or dispatch
+  attempted by this skill directly — `/sdp-solution-phase-auto` invoked via the Skill tool
+  instead; that skill's own outputs apply. This skill performs none of Steps 1-5 itself in this
+  case.
 - **Non-dot-collapse path, phases 1-7 complete (Step 0b sub-step 4):** `/sdp-state-loop-start`
   invoked via the Skill tool — that skill's own outputs (loop start + COORDINATOR priming) apply;
   this skill performs none of Steps 1-5 itself in this case.
+- **Dot-collapse path, phases 1-7 active for this solution (Step 5 sub-step 2a):** Steps 1-4's
+  immediate dispatch above still runs normally; only Step 5's loop-start is redirected —
+  `/sdp-solution-phase-auto` invoked via the Skill tool in place of starting
+  `sdp-project-state-loop`/`sdp-solution-state-loop`. Terminate once it returns; the remaining
+  Step 5 sub-steps are skipped.
 - No files written or modified by this skill directly in any path.

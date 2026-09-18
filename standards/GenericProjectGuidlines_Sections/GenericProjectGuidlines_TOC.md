@@ -1,6 +1,6 @@
 # Generic Project Guidelines — Table of Contents
 
-**Source Document:** `GenericProjectGuidlines_V1.10_20260323.md`  
+**Source Document:** `GenericProjectGuidlines_V1.11_20260904.md`  
 **Target Framework:** .NET 10 LTS | **Audience:** All project contributors
 
 ---
@@ -41,7 +41,7 @@
    - Include the chapter number, section name, chapters covered, audience, and file link
    - File name format: `GenericProjectGuidlines_{SectionName}.md`
 
-2. **Update the Contents list** in the parent document `GenericProjectGuidlines_V1.10_20260323.md`:
+2. **Update the Contents list** in the parent document `GenericProjectGuidlines_V1.11_20260904.md`:
    - Sync the chapter number and section name to match this TOC exactly
    - Keep the link target as `#chapter-N--section-name` (lowercase, hyphens)
 

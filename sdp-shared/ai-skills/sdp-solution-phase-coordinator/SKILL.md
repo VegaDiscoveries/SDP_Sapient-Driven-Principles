@@ -44,11 +44,18 @@ All paths are relative to the solution root.
 - `.sdp-solution-workflow/state.json` — provides `current_phase`, `phase_gate`, `last_session`,
   `migration_checked`, `phase_readiness`, and (dead-code path only) the solution task entry,
   children list, `workflow_status`, `halt_reason`
-- `.sdp-solution-workflow/registry.md` — phase 1-7 rows, Depends On column
+- `.sdp-solution-workflow/registry.md` — phase 1-7 rows, Depends On column, Phase File column
+  (the authoritative phase-document value for the row matching `current_phase` — see Step 2a
+  item 4; always relative to `sdp-solution-docs/`, never including that prefix itself; never
+  reconstruct this value positionally from `current_phase`'s text)
 - `.sdp-solution-workflow/dependencies.json`/`.md` — cross-project dependency ledger
 - `[project]/.sdp-workflow/registry.md`, `state.json` — read for Phase 7 decomposition and
   post-Phase-7 dispatch gating (Steps 2b/2d)
 - `.sdp-solution-workflow/sessions/` — directory where session dispatch files are written
+- `sdp-shared/scripts/sdp-select-model.ps1` and
+  `sdp-shared/scripts/script-support/sdp-subagent-model-roster.json` — Step 2a item 5 (Model
+  Evaluation); the roster is read directly by the LLM only on the script's `resolved: false`
+  fallback path
 
 ## Procedure
 
@@ -113,7 +120,8 @@ top-level fields).
 Before suggesting, selecting, or introducing a language, runtime, framework, library/package (any
 source/registry), IDE/tool/plugin, database/data-platform engine, cloud/hosting provider,
 third-party API/service, or anything similar that is not already explicitly settled — in `.speq`
-(project-scoped, from Phase 7 onward) or, pre-Phase-7, in `01_concept.md`/`03_expanded_concept.md`/
+(project-scoped, from Phase 7 onward) or, pre-Phase-7, in this cycle's own
+`[CycleNNN]-[CycleName]/001_concept.md`/`[CycleNNN]-[CycleName]/003_expanded_concept.md`/
 a prior resolved Material Decision Escalation record — or an architectural pattern with no GPG
 precedent: stop. If `SDP-Config.json` `materialDecisionEscalation.enabled` is `true` (default), do
 not proceed. Halt per the bootstrap doc's Halt Behavior Contract instead — set `workflow_status:
@@ -178,15 +186,50 @@ Parse the single-line JSON result. Branch on `status`:
 
 ### Step 2a: Phases 1-7 Driving Role
 
-This step only ever runs when `.sdp-solution-workflow/state.json`'s `current_phase` is set (i.e.
-phases 1-7 are in progress for this solution). If `current_phase` is absent or null: phases 1-7
-have not started (or already finished — see Step 2d below) for this solution; skip to whichever
-of Step 2's other branches applies, or terminate if none does.
+This step runs when phases 1-7 are in progress, or have been seeded but not yet dispatched, for
+this solution. **Do not treat `current_phase` being null/absent as proof phases 1-7 haven't
+started** — `sdp-solution-new-concept-intake` seeds `.sdp-solution-workflow/registry.md` rows for
+a new mini-cycle without ever writing `current_phase` itself (confirmed: that skill's procedure
+never touches `.sdp-solution-workflow/state.json`), so a freshly-seeded solution or a mid-stream
+mini-cycle can have live, dispatchable registry rows while `current_phase` is still null. Resolve
+it first, then proceed to item 1:
 
-**No cron job ever exists while this step's path is active** — phases 1-7 are always human-gated,
-direct session-by-session dispatch (bootstrap doc, Loop Entry Point). This step's logic only ever
-runs from a manually-invoked `sdp-solution-phase-coordinator` session, never from a recurring
-loop fire.
+0. **Resolve/validate `current_phase` against the registry — never trust a pre-set value
+   blindly.** Read `.sdp-solution-workflow/registry.md`.
+   - **Zero phase 1-7 rows:** nothing to resolve; phases 1-7 genuinely have not started for this
+     solution. Skip to whichever of Step 2's other branches applies, or terminate if none does.
+   - **At least one row:** check whether the current `current_phase` value (if any) equals, by
+     exact string match, some row's Phase column that is not yet `[x]`. If it does: no correction
+     needed — proceed to item 1 below.
+   - **No match** (null/absent, or set but matching no live row — including a bare phase-type
+     slug such as `"concept"` left over from before a disambiguated mid-stream cycle was seeded):
+     resolve it using the same scan item 3 below performs for ordinary advancement — scan the
+     registry top to bottom and select the first row that is not yet `[x]` and has every
+     `Depends On` phase already `[x]`. Write the selected row's exact Phase-column text into
+     `current_phase` directly (the same narrow write exception granted to item 4 below — see
+     Constraints). Note the correction to the user:
+     `icon=info row=0 row: Status | current_phase was unset or stale — resolved to '[value]' from registry.md.`
+     If no eligible row is found (every row blocked or already complete): treat as "phases 1-7 not
+     in progress this cycle" — skip to whichever of Step 2's other branches applies, or terminate
+     if none does.
+
+**Phase-type, as distinct from `current_phase`'s literal value:** items 2b, 3a, and 3b below key
+off which of the seven canonical phase names `current_phase` currently represents (`"Concept"`,
+`"Architecture"`, etc.), not off `current_phase`'s exact text — which, for a disambiguated
+cycle (every cycle under the current cycle-folder convention, including a solution's first and
+only cycle), is `"Concept — GPGDocEval"` or similar, never the bare canonical name. Wherever
+those items say `current_phase` "is" a given canonical name, read that as: `current_phase` equals
+that name exactly, **or** starts with that name followed by `" — "` (the exact separator
+`sdp-solution-new-concept-intake` Step 4 item 2 uses). Do not use exact string equality against
+the bare canonical name alone for these checks — it silently never matches a disambiguated cycle
+(every cycle under the current cycle-folder convention, including a solution's first and only
+cycle), which is a silent-skip failure mode, not a halt, and therefore easy to miss.
+
+**Both manual and automated invocation are valid for this step.** Phases 1-7 can be driven by a
+directly, manually-invoked `sdp-solution-phase-coordinator` session, or by a subagent dispatched
+from the recurring `sdp-solution-phase-state-loop` loop (started via `/sdp-solution-phase-auto`)
+— this step's own logic is identical either way; it does not need to know which triggered it,
+and nothing below this line changes dispatch-target decisions based on invocation context.
 
 1. Read `.sdp-solution-workflow/state.json` for `current_phase` and `phase_gate.status`.
 2. Duplicate `sdp-project-coordinator/SKILL.md` Step 4's decision algorithm exactly (REJECTED-priority
@@ -202,8 +245,8 @@ loop fire.
    > here, not in `sdp-project-coordinator`. See the design doc's Section 6 for the full reasoning behind
    > this accepted, one-directional limitation.
 
-2b. **SOURCE COVERAGE CHECK** — Before advancing `current_phase` past `"Concept"` or `"Expanded
-   Concept"` in item 3 below (i.e. when `phase_gate.status` is `"passed"` and the just-completed
+2b. **SOURCE COVERAGE CHECK** — Before advancing `current_phase` past the `"Concept"`- or
+   `"Expanded Concept"`-type phase (per the phase-type definition above) in item 3 below (i.e. when `phase_gate.status` is `"passed"` and the just-completed
    phase is one of those two): read that phase's own `[phase]_state.json` for a
    `source_document` field. If present and `sdp_source_coverage.completed` is not `true`: run
    `sdp-solution-source-coverage-check` against it before completing the advancement — do not proceed to
@@ -218,11 +261,13 @@ loop fire.
    `.sdp-solution-workflow/state.json` — phases 1-7 are complete for this solution; proceed to
    Step 2d below instead of dispatching further phase work this cycle.
 3a. **[Phase 1/3 interactive capture]** When step 2's algorithm determined the dispatch target is
-   a **WORKER** task (not REVIEWER/GATE_REVIEWER) and `current_phase` is `"Concept"` or
-   `"Expanded Concept"`: before writing the session dispatch file (item 4 below), assemble the
+   a **WORKER** task (not REVIEWER/GATE_REVIEWER) and `current_phase` is `"Concept"`-type or
+   `"Expanded Concept"`-type (per the phase-type definition above): before writing the session
+   dispatch file (item 4 below), assemble the
    input material, then run `/brainstorming` interactively with the user in this COORDINATOR
-   session — permitted by the bootstrap doc's Role Separation carve-out (writing to
-   `sdp-solution-docs/01_concept.md` / `sdp-solution-docs/03_expanded_concept.md` and their
+   session — permitted by the bootstrap doc's Role Separation carve-out (writing to this cycle's
+   `sdp-solution-docs/[CycleNNN]-[CycleName]/001_concept.md` /
+   `sdp-solution-docs/[CycleNNN]-[CycleName]/003_expanded_concept.md` and their
    section files during a `/brainstorming` capture session is not an implementation-file edit).
 
    **Input material to read first, before opening the brainstorming session:**
@@ -234,8 +279,9 @@ loop fire.
      section (same convention `sdp-solution-source-coverage-check` uses — never load a large parent doc in
      one pass). If the field is absent (conversational intake — no tracked source exists for this
      cycle): skip this bullet, nothing to read.
-   - **`"Expanded Concept"` only, additionally:** read `sdp-solution-docs/01_concept.md` and
-     `sdp-solution-docs/02_research_findings.md`.
+   - **`"Expanded Concept"` only, additionally:** read this cycle's
+     `sdp-solution-docs/[CycleNNN]-[CycleName]/001_concept.md` and
+     `sdp-solution-docs/[CycleNNN]-[CycleName]/002_research_findings.md`.
 
    Bring whatever was read into the brainstorming session as the material being expanded, merged,
    or drafted from — per the bootstrap doc's Phase 3 Mechanics entry. This is a proactive
@@ -245,7 +291,7 @@ loop fire.
 
    **State what was read, by name, before opening the brainstorming conversation.** Invoke
    `/sdp-create-banner` with a `Source` row, e.g.
-   `icon=info row=0 row: Source | Tracked source (user-design-docs/processed/[filename]), 01_concept.md, and 02_research_findings.md (6 angles) loaded.`
+   `icon=info row=0 row: Source | Tracked source (user-design-docs/processed/[filename]), [CycleNNN]-[CycleName]/001_concept.md, and [CycleNNN]-[CycleName]/002_research_findings.md (6 angles) loaded.`
    A row that only gestures at "the tracked source" without naming the actual file read is not
    sufficient — the user has no way to tell from that phrasing whether `source_document` was
    actually resolved and its file actually read, or whether this bullet was silently skipped (e.g.
@@ -253,7 +299,7 @@ loop fire.
    substitute for this — the user should not have to scroll back through raw tool calls to confirm
    what COORDINATOR already knows it read. If no tracked source exists for this cycle
    (conversational intake), the row must say that explicitly too, e.g.
-   `row: Source | No tracked source document for this cycle — proceeding from 01_concept.md and 02_research_findings.md only.`
+   `row: Source | No tracked source document for this cycle — proceeding from [CycleNNN]-[CycleName]/001_concept.md and [CycleNNN]-[CycleName]/002_research_findings.md only.`
    — rather than omitting the line silently.
 
    Transcribe every decision, constraint, and design choice surfaced into the phase document
@@ -262,8 +308,9 @@ loop fire.
    finish/formalize the phase document to the task's full spec from the material just captured,
    not to originate Phase 1/3 content from nothing.
 3b. **[Pros-Cons-Gaps cycle setup]** When step 2's algorithm determined the dispatch target is
-   **REVIEWER** and `current_phase` is `"Architecture"` or `"Implementation Overview"`: before
-   writing the session dispatch file (item 4 below), read this phase's own `[phase]_state.json`.
+   **REVIEWER** and `current_phase` is `"Architecture"`-type or `"Implementation Overview"`-type
+   (per the phase-type definition above): before writing the session dispatch file (item 4
+   below), read this phase's own `[phase]_state.json`.
    If it has no `pros_cons_gaps` object yet (this is the first REVIEWER dispatch for this task):
    write one directly to that file — `{"cycle_target": 2, "cycle_count": 0}`. Use a target higher
    than 2 only when there is a concrete complexity signal already on record for this phase (e.g.
@@ -276,13 +323,40 @@ loop fire.
    file **directly** — `sdp-solution-create-prompt` does not write session files (confirmed: its
    own Inputs/Constraints never included this, in either its shared-task or phases-1-7 branch;
    the original Step 2a text delegating this to it was simply wrong). Read `last_session` from
-   `.sdp-solution-workflow/state.json`, increment it, and write
+   `.sdp-solution-workflow/state.json`, increment it. Resolve the phase document value by reading
+   `.sdp-solution-workflow/registry.md`'s **Phase File column** for the row whose Phase column
+   equals `current_phase` — never reconstruct it positionally from `current_phase`'s text (e.g.
+   guessing `sdp-solution-docs/[PhaseNNN]_phase_name.md` with no cycle folder at all). The
+   `[CycleNNN]-[CycleName]/` folder segment has no derivable relationship to `current_phase`'s
+   text, and even the bare `[PhaseNNN]_phase_name.md` portion only coincidentally matches when
+   `current_phase` is exactly one of the seven canonical phase names, breaking for any
+   disambiguated cycle row. The Phase File column value is always relative to `sdp-solution-docs/` and never
+   includes that prefix itself — write it into the `Phase Document:` field below bare, exactly as
+   stored in the registry; every consumer (`sdp-solution-phase-worker`, `sdp-solution-phase-reviewer`,
+   `sdp-solution-phase-gate-review`) prepends the literal `sdp-solution-docs/` itself, and a
+   pre-prefixed value here would double it. (Mirrors `sdp-project-coordinator/SKILL.md`'s identical
+   discipline and rationale for the project-scoped equivalent.) If `current_phase` is not exactly
+   one of the seven canonical
+   phase names (Concept / Research / Expanded Concept / Architecture / Implementation Overview /
+   Refined Implementation Plan / Phase Readiness) — i.e. it carries a disambiguating suffix — this
+   is a cycle seeded by `sdp-solution-new-concept-intake`, which — under the current cycle-folder
+   convention — names every cycle's rows with a disambiguating ` — [CycleName]` suffix, including
+   a solution's first and only cycle (`sdp-solution-new-concept-intake` Step 4 item 2); include
+   the `Pipeline:` line below so the dispatched subagent's scope is unambiguous. Omit the
+   `Pipeline:` line only when `current_phase` matches a canonical name exactly, with no suffix —
+   a legacy/pre-convention case, not the normal path; no template change from before when it does
+   occur. Write
    `.sdp-solution-workflow/sessions/session-NNN.md` directly with:
    ```
    Role: [WORKER|REVIEWER|GATE_REVIEWER]
+   Pipeline: [only when current_phase carries a disambiguating suffix — the matched registry
+     row's Phase-column text, plus: "One of [N] concurrent phase 1-7 cycles in this registry —
+     do not act on any other cycle's rows or documents." N is the count of registry rows sharing
+     this row's base phase-type name across all cycles.]
    Work Item: [current_phase]
    Bootstrap Doc: [resolved bootstrap doc filename]
-   Phase Document: sdp-solution-docs/[NN_phase_name].md
+   Phase Document: [Phase File column value from registry.md for the matched row, verbatim/bare —
+     do not prepend sdp-solution-docs/ here]
    Solution State File: .sdp-solution-workflow/state.json
    Re-Gate Trigger: [GATE_REVIEWER dispatches only, and only on a re-gate cycle — Step 2e's
      Re-gate path (gate_review_attempts was 0) or Real-prior-block path (gate_review_attempts was
@@ -293,9 +367,49 @@ loop fire.
    No `Project:` field — this is a solution-scoped dispatch. Then write the incremented
    `last_session` back to `.sdp-solution-workflow/state.json` directly — a narrow, explicit
    exception to the "script owns every write" constraint (Constraints below), scoped to exactly
-   this field on this path, mirroring the exception already granted for the Step 0
-   preflight-halt write.
-5. Proceed to Step 3, which for this path invokes `sdp-solution-create-prompt` to write the
+   this field (and, per item 0 above, `current_phase` itself when it needed correction) on this
+   path, mirroring the exception already granted for the Step 0 preflight-halt write.
+5. **[NEW — Model Evaluation]** Runs for every Step 2a dispatch, every phase, every role — item
+   3b (when it applies) is one more input into this item, not a gate on whether it runs at all.
+   Run
+   `./sdp-shared/scripts/sdp-select-model.ps1 -workspaceRoot . -role [role from item 4] -phase [current_phase] -phaseStateFile sdp-solution-docs/[phase_file]_state.json -taskId [the TASK-ID step 2's algorithm selected for this dispatch]`
+   via the PowerShell tool — `sdp-solution-docs/[phase_file]_state.json` uses the same Phase File
+   column value (`.md` replaced by `_state.json`) item 3b and `sdp-solution-phase-state-loop`
+   already use. Omit `-taskId` entirely for a phase-level dispatch (a GATE_REVIEWER verdict
+   covers the whole phase, not one task). Parse the single-line JSON result:
+
+   - **`status: "success"`, `resolved: true`:** use `model_id` directly as this dispatch's chosen
+     model. If `diversityDegraded` is present and `true`: invoke `/sdp-create-banner` with a
+     `Model` row, e.g.
+     `icon=warning row=0 row: Model | Pros-Cons-Gaps diversity could not be satisfied this cycle — fewer than 2 standard-or-above models are configured; dispatching [model_id] anyway.`
+     — never silently claim diversity was satisfied when this flag is present.
+   - **`status: "success"`, `resolved: false`, `status: "error"`, or no parseable JSON on
+     stdout:** the script could not resolve a tier from file-derivable signals alone (or failed
+     operationally) — do not halt the dispatch over this; treat identically to `resolved: false`.
+     Apply the task-shape-to-tier taxonomy in
+     `sdp-shared/scripts/script-support/sdp-subagent-model-roster.json` (each tier's `use_when`
+     field) directly to the task text already read while writing this dispatch (item 4), choose
+     a tier, then select that tier's first listed model `id`. Never choose `least_capable` for a
+     REVIEWER or GATE_REVIEWER dispatch; never choose `frontier_escalation` unless a
+     `most_capable` pass has already been tried against this exact task and found insufficient
+     (the roster's `frontier_escalation` tier is reserved for escalation only, never a default).
+
+   Either way, this is now the chosen `model_id` for this dispatch — carry it into Step 3's
+   `sdp-solution-create-prompt` invocation and, on the phases-1-7 branch of Step 4, directly into
+   the Agent tool's own `model` parameter.
+
+   **Pros-Cons-Gaps rotation bookkeeping.** When this dispatch is the Architecture/Implementation-
+   Overview REVIEWER dispatch item 3b seeds/reads `pros_cons_gaps` for, and the script resolved a
+   model (`resolved: true`, whether or not `diversityDegraded`): append the chosen `model_id` to
+   `pros_cons_gaps.cycle_models` in this phase's own `[phase]_state.json` directly — the write
+   responsibility `sdp-select-model.ps1` explicitly leaves to this skill, since the script itself
+   never writes state (it is read-only by design). Do **not** append to `cycle_models` when the
+   script returned `resolved: false` for this same dispatch — this includes the case where
+   `SDP-Config.json`'s `prosConsGapsModelDiversity.enabled` is `false`, since the script's own
+   documented behavior for that gate is `resolved:false` (today's-behavior revert, no model
+   specified); nothing is written to `cycle_models` in that case, matching the disabled rotation
+   exactly.
+6. Proceed to Step 3, which for this path invokes `sdp-solution-create-prompt` to write the
    **prompt text** (`sdp-solution-docs/00_solution_prompt.txt`) — a separate file from the
    session dispatch file just written in item 4 above, serving a separate purpose (the
    self-contained prompt a new subagent session reads, per `sdp-solution-run-prompt`'s job).
@@ -312,8 +426,10 @@ Include in the WORKER session's instructions (added to the session file content)
    for the first time this cycle** — before assigning that project's registry rows (item 1
    below). `sdp-workspace-setup`'s Add-Project Steps already created these as empty template
    stubs; this is the first point where the actual settled decisions exist to populate them with.
-   For each such project: read the sections of `sdp-solution-docs/04_architecture.md` and
-   `sdp-solution-docs/05_implementation_overview.md` applicable to it (a solution-scoped document
+   For each such project: read the sections of this cycle's
+   `sdp-solution-docs/[CycleNNN]-[CycleName]/004_architecture.md` and
+   `sdp-solution-docs/[CycleNNN]-[CycleName]/005_implementation_overview.md` applicable to it
+   (a solution-scoped document
    may cover more than one project), and replace the stub content with the real tech stack,
    naming conventions, file structure, and product-shape decisions already recorded there — do
    not originate new decisions here, only transcribe already-settled ones. Also populate the
@@ -596,11 +712,12 @@ called — boundary invariant), operating on the solution's own state instead of
 whenever Step 2a finds `phase_gate.status == "blocked"` for the solution's `current_phase`.
 
 0. **Disambiguate first, using `phase_gate.gate_review_attempts` — never blockquote content, and
-   never assume the relevant document is `07_phase_readiness.md`.** `phase_gate.status ==
-   "blocked"` means one of two distinct things: a real `sdp-solution-phase-gate-review` verdict
-   returned GATE_BLOCKED for whatever phase is *currently* current, or item 3.b below force-set it
-   on a target/intermediate phase to require a fresh gate. Append-Only Discipline means
-   `07_phase_readiness.md`'s Remediation Proposals heading, once written, is never removed — so
+   never assume the relevant document is the current cycle's `007_phase_readiness.md`.**
+   `phase_gate.status == "blocked"` means one of two distinct things: a real
+   `sdp-solution-phase-gate-review` verdict returned GATE_BLOCKED for whatever phase is *currently*
+   current, or item 3.b below force-set it on a target/intermediate phase to require a fresh gate.
+   Append-Only Discipline means a cycle's own `[CycleNNN]-[CycleName]/007_phase_readiness.md`
+   Remediation Proposals heading, once written, is never removed — so
    checking that fixed file unconditionally, regardless of what `current_phase` actually is, would
    make every later `"blocked"` occurrence for any phase misread as "the same unresolved
    proposals," forever, once a single regression has ever happened. Instead:
@@ -614,20 +731,26 @@ whenever Step 2a finds `phase_gate.status == "blocked"` for the solution's `curr
      `phase_readiness.regressions[]` (target phase, date, chosen remediation). Do not perform
      steps 1-2 below for this branch — there is no blockquote to check.
    - **`gate_review_attempts >= 1`:** A real verdict exists. Proceed to step 1, which reads *the
-     current phase's own document* — `sdp-solution-docs/[NN_phase_name].md` per Step 2a item 4's
-     naming (e.g. `06_refined_implementation_plan.md`, not always `07_phase_readiness.md`) — not a
-     hardcoded path.
+     current phase's own document* — `sdp-solution-docs/` plus the Phase File column value from
+     `registry.md` for the row matching `current_phase` (per Step 2a item 4's discipline: the
+     registry value is bare, never a path reconstructed positionally from `current_phase`'s text)
+     — not a hardcoded path, and not always
+     the current cycle's `007_phase_readiness.md`.
 1. Check whether the GATE_BLOCKED blockquote in the current phase's own document (resolved above)
    contains a `**Remediation Proposals:**` heading (always produced by `sdp-solution-phase-gate-review`
    for a Phase Readiness gate at this scope — see the disambiguation note above for why this
-   heading can only appear when `current_phase` actually is "Phase Readiness").
+   heading can only appear when `current_phase` contains the substring "Phase Readiness", per the
+   same phase-type convention Step 2a establishes — not necessarily an exact match, since a
+   disambiguated cycle's row (every cycle's row, under the current cycle-folder convention) is
+   named e.g. "Phase Readiness — GPGDocEval").
 2. **Remediation Proposals present:** halt per the Halt Behavior Contract —
    `workflow_status = "halted"`, `halt_reason = "Phase Readiness gate found a traceability gap —
-   read the Remediation Proposals in sdp-solution-docs/07_phase_readiness.md and select one before
+   read the Remediation Proposals in [resolved phase document path, e.g.
+   sdp-solution-docs/009-GPGDocEval/007_phase_readiness.md] and select one before
    resuming."` Surface all numbered proposals (each with its `Target Phase:` value) verbatim as
    plain markdown first — a banner row can't hold a list — then invoke `/sdp-create-banner` with a
    `Readiness` row carrying a short version of this, e.g.
-   `icon=error row=0 row: Readiness | Traceability gap found — see sdp-solution-docs/07_phase_readiness.md. Select a remediation proposal above before resuming.`
+   `icon=error row=0 row: Readiness | Traceability gap found — see [resolved phase document path]. Select a remediation proposal above before resuming.`
    Terminate — never pick a proposal automatically.
 3. **On the next invocation, once the user has stated their chosen proposal:**
    a. Read the chosen proposal's `Target Phase:` value — the exact `.sdp-solution-workflow/
@@ -651,9 +774,10 @@ whenever Step 2a finds `phase_gate.status == "blocked"` for the solution's `curr
 
 **Step 2a path only:** Invoke `sdp-solution-create-prompt` (via the Skill tool)
 to write `sdp-solution-docs/00_solution_prompt.txt`. Provide `role`: the WORKER/REVIEWER/
-GATE_REVIEWER value determined in Step 2a item 4; no `projects` value (a Step 2a dispatch is
-always solution-scoped, never per-project). This exercises `sdp-solution-create-prompt`'s
-existing phases-1-7 branch (`mode: "phases_1_7"`), added when that gap was originally closed.
+GATE_REVIEWER value determined in Step 2a item 4; `model`: the `model_id` chosen in Step 2a item
+5 (Model Evaluation); no `projects` value (a Step 2a dispatch is always solution-scoped, never
+per-project). This exercises `sdp-solution-create-prompt`'s existing phases-1-7 branch
+(`mode: "phases_1_7"`), added when that gap was originally closed.
 
 **Step 2d path: skip this step entirely — do not invoke `sdp-solution-create-prompt`.** A Step 2d
 per-project dispatch is already complete once item 4 runs: it writes its own session file
@@ -675,7 +799,12 @@ every entry in the result's `laggards` array — unchanged from `sdp-solution-co
 **Phases-1-7 path:** Dispatch one subagent using the session file written directly in Step 2a
 item 4 (or Step 2d item 4) as its prompt, invoking the skill named in that file's `Instruction:`
 field (`sdp-solution-phase-worker`, `sdp-solution-phase-reviewer`, `sdp-solution-phase-gate-review`, or
-— Step 2d only — `sdp-project-coordinator` for a per-project dispatch). Wait for it to complete.
+— Step 2d only — `sdp-project-coordinator` for a per-project dispatch). For a **Step 2a** dispatch
+only, pass the `model_id` chosen in Step 2a item 5 (Model Evaluation) directly to the Agent
+tool's own `model` parameter — same session, no file re-read needed. A **Step 2d** per-project
+dispatch never carries a `model` parameter here — that path dispatches a project-level
+`sdp-project-coordinator` session, whose own model evaluation (if any) is out of scope for this
+skill. Wait for it to complete.
 
 **Shared-task path (dead code here):** Branch on `solution_reviewer_dispatch` and `dispatch_mode`
 from the script result exactly as `sdp-solution-coordinator` does — parallel/sequenced dispatch
@@ -710,7 +839,8 @@ invocation, not within this session.
 - For the phases-1-7 path: the LLM writes the session dispatch file and the incremented
   `last_session` directly (Step 2a item 4) — a narrow, explicit exception to "the script owns
   every write," scoped to exactly this path, mirroring the Step 0 preflight-halt exception already
-  granted in the original skill.
+  granted in the original skill. The same exception covers writing a corrected `current_phase`
+  value directly (Step 2a item 0), scoped to exactly that field, on exactly this path.
 - For Step 2d only: the LLM also writes `last_active_projects` and `updated` directly in
   `SDP-Solution.json` (Step 2d item 5) — a second narrow, explicit exception alongside the one
   above, scoped to exactly this field. This is the only point in the phases-1-7 path that touches
@@ -727,6 +857,15 @@ invocation, not within this session.
 - Script calling convention: `sdp-solution-phase-coordinator.ps1` is called with no arguments (it
   self-resolves the solution root).
 - Never invoke `sdp-solution-coordinator`, and is never invoked by it.
+- Never write to `pros_cons_gaps.cycle_models` except in Step 2a item 5, and never when
+  `sdp-select-model.ps1` returned `resolved: false` for that same dispatch.
+- Never run `sdp-select-model.ps1` for a Step 2d per-project dispatch — that path dispatches a
+  project-level `sdp-project-coordinator` session and carries no `model` parameter of its own
+  here.
+- Never pass a fabricated or guessed `model_id` to `sdp-solution-create-prompt` or to the Agent
+  tool's `model` parameter — use only a value returned by `sdp-select-model.ps1`, or one derived
+  by applying the roster's tier taxonomy to the task text already read for this dispatch, mapped
+  to a roster `id` via `sdp-subagent-model-roster.json`.
 
 ## Outputs
 
@@ -735,8 +874,9 @@ invocation, not within this session.
   dispatch and writes no new session file); written by the script for the shared-task dead-code
   path
 - `.sdp-solution-workflow/state.json` — `last_session` (written directly for the phases-1-7 path;
-  by the script for the shared-task path), `current_phase`/`phase_gate` advancement, dependency
-  ledger state, `migration_checked`
+  by the script for the shared-task path), `current_phase`/`phase_gate` advancement,
+  `current_phase` correction when it was unset/stale relative to the registry (Step 2a item 0),
+  dependency ledger state, `migration_checked`
 - `SDP-Solution.json` — `last_active_projects` (Step 2d item 5: full-replace with the set of
   projects cleared and dispatched this cycle), `projects[].status` (Step 2d item 6: every
   registered project's `work_complete`/`work_pending`/`waiting`/`blocked`/`in_shared_task`

@@ -155,6 +155,7 @@ if ($role -ne "GATE_REVIEWER") {
 # ---------------------------------------------------------------------------
 
 $workItem = Get-Field $dispatchContent "Work Item"
+$pipeline = Get-Field $dispatchContent "Pipeline"
 $phaseDocField = Get-Field $dispatchContent "Phase Document"
 if (-not $phaseDocField) {
     Exit-Halted "Dispatch file '.sdp-solution-workflow/sessions/$lastSession.md' has no 'Phase Document:' field. Cannot locate the phase document to review."
@@ -162,9 +163,17 @@ if (-not $phaseDocField) {
 
 $regateTriggerReason = Get-Field $dispatchContent "Re-Gate Trigger"
 
-# Phase document paths here are always relative to the solution root - no per-project prefix
-# stripping is needed (that concern is sdp-gate-review-setup.ps1's, for the project-scoped case).
-$phaseDocRelToSolution = $phaseDocField -replace '\\', '/'
+# The dispatch file's Phase Document field is the registry's Phase File column value verbatim,
+# which is always relative to sdp-solution-docs/ and never includes that prefix itself - confirmed
+# against this same skill's own Step 8, which prepends sdp-solution-docs/ onto this script's own
+# reported phase_document_path result field when writing the Gate Verdict blockquote, so the value
+# reported in $r.phase_document_path below must stay bare (Step 8 owns the prefix at write time).
+# $phaseDocRelToSolution is the solution-root-relative path used only for THIS script's own Step 5
+# read below - it needs the prefix Step 8 doesn't apply until later. Bug fixed 2026-09-10: this
+# line previously omitted the prefix here too, so Join-Path resolved to a nonexistent path and
+# halted every phases-1-7 GATE_REVIEWER dispatch.
+$phaseDocBareValue = $phaseDocField -replace '\\', '/'
+$phaseDocRelToSolution = "sdp-solution-docs/" + $phaseDocBareValue
 
 # ---------------------------------------------------------------------------
 # Step 4.2: Confirm current_phase matches the phase identifier in the dispatch file
@@ -223,9 +232,10 @@ $r.status                       = "success"
 $r.session_id                   = $lastSession
 $r.role_confirmed                = $true
 $r.current_phase                = $currentPhase
+$r.pipeline                     = $pipeline
 $r.phase_gate_status             = $phaseGateStatus
 $r.gate_eval_cycles              = $gateEvalCycles
-$r.phase_document_path           = $phaseDocRelToSolution
+$r.phase_document_path           = $phaseDocBareValue
 $r.is_regate_cycle               = $isRegateCycle
 $r.regate_trigger_reason         = $regateTriggerReason
 $r.phase_document_content        = $strippedContent

@@ -43,7 +43,9 @@ nothing to parameterize.
 - `.sdp-solution-workflow/sessions/[last_session].md` (dispatch file) — read by the setup
   script; provides role confirmation, phase document path, and re-gate trigger reason if
   applicable. Never carries a `Project:` field.
-- Completed phase document — `sdp-solution-docs/[NN_phase_name].md`; read by the setup script,
+- Completed phase document — `sdp-solution-docs/[phase_file]` (this cycle's own
+  `[CycleNNN]-[CycleName]/[PhaseNNN]_phase_name.md`, e.g.
+  `sdp-solution-docs/009-GPGDocEval/007_phase_readiness.md`); read by the setup script,
   path provided in the dispatch file.
 - `standards/GenericProjectGuidlines_Sections/GenericProjectGuidlines_TOC.md` — required for GPG
   alignment check (Step 6); read directly by the LLM, not by any script.
@@ -90,19 +92,24 @@ Parse the single-line JSON result. Branch on `status`:
   Halt. (Covers: no `last_session` recorded; the dispatch file not found; the dispatch file's
   `Role:` field not equal to `GATE_REVIEWER`; no `Phase Document:` field; `current_phase` not
   matching the dispatch file's `Work Item:` field; or the phase document not found.)
-- **`"success"`** — Record `session_id`, `role_confirmed`, `current_phase`, `phase_gate_status`,
-  `gate_eval_cycles`, `phase_document_path`, `is_regate_cycle`, `regate_trigger_reason`,
-  `phase_document_content` (Gate Verdict blockquotes already stripped; every surviving line
-  prefixed with its original line number from the real file, same convention as the Read tool —
-  cite these numbers directly in findings), and `prior_gate_blocked_blockquotes`. Proceed to
-  Step 6.
+- **`"success"`** — Record `session_id`, `role_confirmed`, `current_phase`, `pipeline` (empty only
+  for a legacy/pre-convention row whose Phase-column text matches a canonical phase name exactly,
+  with no ` — [CycleName]` suffix — under the current cycle-folder convention every cycle's rows
+  carry that suffix, including a solution's first and only cycle), `phase_gate_status`, `gate_eval_cycles`,
+  `phase_document_path`, `is_regate_cycle`, `regate_trigger_reason`, `phase_document_content`
+  (Gate Verdict blockquotes already stripped; every surviving line prefixed with its original line
+  number from the real file, same convention as the Read tool — cite these numbers directly in
+  findings), and `prior_gate_blocked_blockquotes`. If `pipeline` is non-empty, state it back to the
+  user before proceeding, e.g. `icon=info row=0 row: Pipeline | [pipeline value]` — confirming
+  scope before assessing the gate, not after. Proceed to Step 6.
 
 ### Material Decision Escalation Check
 
 Before suggesting, selecting, or introducing a language, runtime, framework, library/package (any
 source/registry), IDE/tool/plugin, database/data-platform engine, cloud/hosting provider,
 third-party API/service, or anything similar that is not already explicitly settled — in `.speq`
-(project-scoped, from Phase 7 onward) or, pre-Phase-7, in `01_concept.md`/`03_expanded_concept.md`/
+(project-scoped, from Phase 7 onward) or, pre-Phase-7, in this cycle's own
+`[CycleNNN]-[CycleName]/001_concept.md`/`[CycleNNN]-[CycleName]/003_expanded_concept.md`/
 a prior resolved Material Decision Escalation record — or an architectural pattern with no GPG
 precedent: stop. If `SDP-Config.json` `materialDecisionEscalation.enabled` is `true` (default), do
 not proceed. Halt per the bootstrap doc's Halt Behavior Contract instead — set `workflow_status:
@@ -176,7 +183,8 @@ never ten):**
 - **Traceability:** if a tracked source doc exists (`user-design-docs/processed/[file]`), trace
   every element in that original source doc forward through every solution-level phase
   deliverable to the final plan and each project's decomposed `registry.md` — every element must
-  land somewhere. If no source doc exists, trace from `sdp-solution-docs/01_concept.md` instead.
+  land somewhere. If no source doc exists, trace from this cycle's own
+  `sdp-solution-docs/[CycleNNN]-[CycleName]/001_concept.md` instead.
   Any element with no downstream landing is a finding.
 - **Rightsizing:** each decomposed row, in each affected project's own `registry.md`, is a unit
   of work one WORKER dispatch sequence can reasonably complete.
@@ -291,6 +299,15 @@ here. Do not spawn subagents. Do not perform `sdp-solution-phase-coordinator` ac
 
 ## Constraints
 
+- GATE_REVIEWER dispatch for this skill must never use a `least_capable`-tier model — a gate
+  review is the review-of-record for a whole phase, with no downstream check to catch a false
+  `GATE_PASSED`. Dispatch should default to `most_capable`. This is a requirement on the dispatching coordinator
+  (`sdp-solution-phase-coordinator`, or the state-loop/script path behind it) — not something this
+  skill's own session can act on, since a spawned subagent cannot change what model it is already
+  running as. The coordinator resolves the current tier-to-model mapping via
+  `sdp-select-model.ps1` against the roster
+  (`sdp-shared/scripts/script-support/sdp-subagent-model-roster.json`) rather than hardcoding a
+  model name here.
 - Never invoked for a project-level gate review — that is `sdp-project-gate-review`'s exclusive job.
   This skill exists only for solution-scoped phases 1-7.
 - Never invokes and is never invoked by `sdp-project-gate-review` — no dependency in either direction,

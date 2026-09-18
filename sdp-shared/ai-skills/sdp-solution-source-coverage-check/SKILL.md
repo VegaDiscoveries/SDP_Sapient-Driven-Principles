@@ -31,9 +31,10 @@ Invoked in two contexts:
   `sdp-solution-new-concept-intake` (in the concept cycle's phase state or `state.json`) to the source doc
   under `sdp-solution-docs/user-design-docs/processed/`, including its `[doc_name]_Sections/`
   folder and `[doc_name]_TOC.md` if one exists
-- The downstream phase document(s) produced so far for this cycle — now resolved against
-  `sdp-solution-docs/01_concept.md` / `03_expanded_concept.md` (or the mini-cycle's equivalently
-  numbered stubs) instead of a project's `sdp-docs/`, as many as exist at the time this check runs
+- The downstream phase document(s) produced so far for this cycle — now resolved against this
+  cycle's own `sdp-solution-docs/[CycleNNN]-[CycleName]/001_concept.md` /
+  `[CycleNNN]-[CycleName]/003_expanded_concept.md` instead of a project's `sdp-docs/`, as many as
+  exist at the time this check runs
 
 ## Procedure
 

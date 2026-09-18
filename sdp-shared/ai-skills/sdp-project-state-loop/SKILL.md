@@ -150,17 +150,22 @@ Proceed to Step 2.
    tool (limit: 1 line). (`[resolved_project]` was set in Step 1b; this read may reuse the
    cached first line from Step 1b if already in context — the path is identical.)
 2. Attempt to parse the sentinel pattern:
-   `[sdp-prompt work_item="<ID>" expected_status="<STATUS>" role="<ROLE>" projects="<PROJECTS>"]`
-   The `role` and `projects` fields may be absent in prompts written before these attributes
-   were introduced — treat a missing `role` as unknown; a missing `projects` is already
-   handled by Step 1b's fallback.
+   `[sdp-prompt work_item="<ID>" expected_status="<STATUS>" role="<ROLE>" projects="<PROJECTS>" model="<MODEL>"]`
+   The `role`, `projects`, and `model` fields may be absent — `role`/`projects` in prompts
+   written before those attributes were introduced, `model` on any dispatch
+   `sdp-select-model.ps1`/`sdp-project-create-prompt`'s own fallback did not resolve (a
+   dispatch can legitimately carry no `model` attribute). Treat a missing `role` as unknown;
+   a missing `projects` is already handled by Step 1b's fallback; a missing `model` means the
+   dispatched subagent inherits this session's own running model, unchanged from today's
+   behavior.
 3. If the file cannot be read, is empty, contains the stub
    `(empty — COORDINATOR writes this after each dispatch)`, or the first line does not match
    the sentinel pattern: record **action = GENERATE**. Reason: "no valid sentinel".
    Proceed to Step 5.
-4. Extract `work_item`, `expected_status`, `role`, and `projects` from the sentinel (record
-   `role` as `sentinel_role`; if the field is absent, record `sentinel_role` as unknown;
-   `projects` was already consumed in Step 1b for path resolution).
+4. Extract `work_item`, `expected_status`, `role`, `projects`, and `model` from the sentinel
+   (record `role` as `sentinel_role`; if the field is absent, record `sentinel_role` as
+   unknown; `projects` was already consumed in Step 1b for path resolution; record `model` as
+   `sentinel_model`, or as absent/null if the attribute is not present).
 5. **If `sentinel_role` is `GATE_REVIEWER`:** bypass the `work_item == active_work_item`
    comparison. Instead:
    a. Compare `work_item` against `current_phase` from `state.json`. If they do not match:
@@ -280,6 +285,13 @@ Act based on the action recorded in Steps 1–4.
 4. Spawn a subagent via the Agent tool with the following prompt:
    "You are an SDP workflow dispatch subagent. Invoke `sdp-project-run-prompt` to execute the current
    dispatch prompt at `[resolved_project]/sdp-docs/00_prompt.txt`. Do not take any other action."
+   If `sentinel_model` (extracted in Step 4) is present, pass it as the Agent tool's own
+   `model` parameter on this spawn call — this is the actual EXECUTE-fire dispatch point,
+   reading back the value `sdp-create-prompt.ps1`
+   or `sdp-project-create-prompt`'s fallback step recorded on the sentinel at GENERATE time; no
+   independent re-derivation of model-selection logic occurs here. If `sentinel_model` is
+   absent, omit the `model` parameter — the subagent inherits this session's own running
+   model, unchanged from today's behavior.
 5. After the subagent returns:
    - **Task dispatch (`sentinel_role` is WORKER, REVIEWER, or COORDINATOR):** Read the phase
      state file identified in Step 3 to confirm the new task status. Invoke
@@ -540,6 +552,15 @@ recording the outcome of this fire, then stop. This step runs for every action t
 file. The file rotates purely by calendar date, independent of loop start/stop or any other
 workflow action — there is no "current run" to look up, just today's date.
 
+0. **Self-cancel the recurring loop on a terminal outcome.** If this fire's recorded `action` is
+   `STOP`, or `halted` is `true`: invoke `/sdp-cancel-auto` to stop the recurring loop. Every such
+   outcome (a Step 2/3 STOP, `GATE_REPAIR`'s failed-repair halt, or any Halt Evaluation branch)
+   cannot change on a later fire without a human resolving it — continuing to fire at the
+   configured interval only repeats an identical, wasted STOP. `/sdp-cancel-auto` is the sole
+   place cron cancellation logic (`CronList`/`CronDelete`) lives in SDP; this skill never
+   duplicates that mechanism itself. If `/sdp-cancel-auto` reports no matching cron job: this fire
+   was not actually running under a recurring loop (e.g. a manual invocation) — treat this as a
+   normal no-op, not an error, and continue to sub-step 1.
 1. Assemble the JSON object using the values recorded earlier in this fire. Fields not
    applicable to this action's path are written as `null`:
    ```json
@@ -567,7 +588,11 @@ workflow action — there is no "current run" to look up, just today's date.
 
 ## Constraints
 
-- Do not invoke any SDP skill directly — all dispatch is via the Agent tool (subagent).
+- Do not invoke any SDP skill directly — all dispatch (WORKER, REVIEWER, GATE_REVIEWER,
+  COORDINATOR, or dispatch-repair) is via the Agent tool (subagent). The one exception:
+  `/sdp-cancel-auto`, invoked directly (Step 6 sub-step 0) when this fire's outcome is `STOP` or a
+  halt — it is a cron-management utility, not a role dispatch, so this does not weaken the
+  role-isolation this rule protects.
 - `GATE_REPAIR` never increments `gate_review_attempts` — it is dispatch-file repair, not a
   review attempt; only `EXECUTE` increments it.
 - `GATE_REPAIR` spawns `sdp-project-coordinator`, not `sdp-project-create-prompt`. Re-running
@@ -592,6 +617,10 @@ workflow action — there is no "current run" to look up, just today's date.
   from `API Error: ` found in earlier conversation turns, documents, or planning text.
 - Read only the first line of `[resolved_project]/sdp-docs/00_prompt.txt` in Steps 1b and
   4 — do not read the full file.
+- EXECUTE applies the sentinel's `model` attribute (when present) directly to its own
+  Agent-tool spawn call — never re-derives a model choice from role/phase/flags itself. Model
+  selection logic belongs solely to `sdp-select-model.ps1`/`sdp-project-coordinator`/
+  `sdp-project-create-prompt`; this skill only reads back what one of those already decided.
 - Outcome detection after EXECUTE: read the phase state file to determine the new task status.
   Do not parse subagent text output for the outcome.
 - Never leave `[resolved_project]` unresolved because the sentinel's `projects=` field is
@@ -622,6 +651,8 @@ workflow action — there is no "current run" to look up, just today's date.
   re-verified on return. Self-heals into a correct GATE_REVIEWER dispatch, or halts
   immediately if the repair did not take — no repeated silent retries.
 - **STOP:** Reason reported; no subagent spawned.
+- **Every fire ending in `STOP` or a halt:** `/sdp-cancel-auto` invoked (Step 6 sub-step 0) to stop
+  the recurring loop — a no-op if no matching cron job exists.
 - **Every fire (Step 6):** One JSON line appended to today's
   `.sdp-solution-workflow/logging/loop-logs/loop-metrics-*.jsonl` file at the solution root
   recording `timestamp`, `project`, `action`, `work_item`, `role`, `reason`, `status_before`,

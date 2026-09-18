@@ -1,8 +1,8 @@
 ﻿# Chapter 13 — Coding Standards
 
-> *Section file for `GenericProjectGuidlines_V1.10_20260323.md`*
+> *Section file for `GenericProjectGuidlines_V1.11_20260904.md`*
 >
-> **⚠️ Sync rule — agent instruction:** This is a section file. Any change made here **must be mirrored in the corresponding chapter** of `GenericProjectGuidlines_V1.10_20260323.md`. Any change made in the parent document's corresponding chapter must be mirrored back here. Both files must remain identical in content for their shared sections.
+> **⚠️ Sync rule — agent instruction:** This is a section file. Any change made here **must be mirrored in the corresponding chapter** of `GenericProjectGuidlines_V1.11_20260904.md`. Any change made in the parent document's corresponding chapter must be mirrored back here. Both files must remain identical in content for their shared sections.
 >
 > **TOC Maintenance:** If this section is renamed or deleted, update both the parent document's Contents list AND the `GenericProjectGuidlines_TOC.md` file. See the TOC file for detailed maintenance instructions.
 
@@ -44,13 +44,13 @@ bool coinWasFound = requestedCoin is not null;
 - **MUST** Every I/O-bound operation is `async`/`await` across all project tiers. Never use `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()`.
 - **MUST** Every `async` method name ends with `Async`.
 - **MUST** Return `Task`, never `void`, from `async` methods. `async void` is permitted only for Blazor event handlers.
-- **SHOULD** Pass `CancellationToken` through the full call stack for long-running or HTTP-triggered operations.
+- **SHOULD** Pass `CancellationToken` through the full call stack for long-running or HTTP-triggered operations, unless the operation must complete independent of caller cancellation (e.g. audit/compliance logging such as Chapter 8's DAT writes, payment/transaction finalization, or any write already committed that must not be left half-applied).
 
 ## Comments & Documentation
 
 - **MUST** Do not add comments that restate what the code already says. `// increment the counter` above `counter++` adds no value.
 - **MUST** Use `// TODO: description` (Visual Studio Task List) for known incomplete work. Never leave `// REMEMBER!!!` style comments in committed code.
-- **SHOULD** Add XML doc comments to all public API controller actions, service interface members, and all `Contracts` library members.
+- **MUST** Add XML doc comments to all public API controller actions, service interface members, and all `Contracts` library members.
 - **SHOULD** Comment genuinely complex logic: business rules, state machines, and cryptographic operations.
 
 ## General Code Style
@@ -68,14 +68,7 @@ All user-facing strings must be stored in `.resx` resource files. Embedding stri
 
 **Rationale:** Literal strings scattered across service and controller code cannot be audited, are duplicated silently, and make future localization a full-codebase rewrite. Resource files give one authoritative location per message and generate a strongly-typed accessor class at build time.
 
-> **Addition — 2026-07-23 — Code vs. data-file distinction:** The distinction drawn above
-> generalizes beyond resource files: a file is evaluated as *code* or *data* by whether it
-> contains executable logic, not by its physical location in the project or its role in the
-> build. A `.resx` file participates in compilation (it generates a `*.Designer.cs` accessor) and
-> is still a data file, because it contains no executable logic. The same test applies to
-> `appsettings.json`/`appsettings.*.json` and any other JSON, XML, or YAML configuration file. See
-> Chapter 4 (Versioning Strategy) and Chapter 14 (Configuration & Secrets) for two rules this
-> distinction resolves directly.
+**Code vs. data-file distinction:** This distinction generalizes beyond resource files: a file is evaluated as *code* or *data* by whether it contains executable logic, not by its physical location in the project or its role in the build. A `.resx` file participates in compilation (it generates a `*.Designer.cs` accessor) and is still a data file, because it contains no executable logic. The same test applies to `appsettings.json`/`appsettings.*.json` and any other JSON, XML, or YAML configuration file. See Chapter 4 (Versioning Strategy) and Chapter 14 (Configuration & Secrets) for two rules this distinction resolves directly.
 
 ### File Location and Naming
 
@@ -120,17 +113,11 @@ throw new AuthException("UNDERAGE", "You must be at least 16 years old to regist
 - **MUST** Every string that appears in an API response body, exception message, or UI label originates from a resource file. No exceptions for "simple" or "temporary" messages.
 - **MUST** Never define a `private const string` or `static readonly string` that duplicates a resource key. The resource file is the constant.
 - **MUST** The `Resources/` folder is committed. The generated `*.Designer.cs` file is committed alongside its `.resx` source.
-- **SHOULD** Group related messages under a common prefix key rather than creating a new resource file for a single additional message.
-- **SHOULD** Write resource values in full, grammatical sentences with correct punctuation — these may be displayed directly to end users.
+- **MUST** Group related messages under a common prefix key (e.g. `Common_`, `[PageName]_`, `[ContainerName]_`, etc.) rather than creating a new resource file for a single additional message.
+- **MUST** Write resource values in full, grammatical sentences with correct punctuation — these are displayed directly to end users.
 - **MAY** Define a `Common_` prefix group for error strings shared across multiple service classes within the same project.
 
 ## Data-Driven Content — Preferred Default
-
-> **Addition — 2026-08-13:** Elevates the "Code vs. data-file distinction" Addition above from a
-> single blockquote into a first-class, named rule other chapters can cross-reference. Prompted by
-> a real incident: a version-history page's content list had no data source separate from the
-> markup rendering it, so adding an entry required editing the page itself. See Chapter 11 and
-> Chapter 12 for this rule's concrete, per-project-type instantiations.
 
 Whenever content values change independently of the logic that renders them, source those values
 from a data file — or, for a distributed client, the API — rather than embedding them in code.
@@ -145,11 +132,11 @@ string-externalization case above.
 - **MUST** For a distributed client's mobile targets (`{AppName}.MAUI`, `Platforms/iOS/` and
   `Platforms/Android/`), content that changes independently of app releases is sourced through the
   API, never bundled as a local file in the app package — see Chapter 12.
-- **SHOULD** For a distributed client's desktop targets (`{AppName}.MAUI`, `Platforms/Windows/`
+- **MUST** For a distributed client's desktop targets (`{AppName}.MAUI`, `Platforms/Windows/`
   and `Platforms/MacCatalyst/`), prefer a local content file the app syncs from the API at
   runtime over a purely bundled-at-install file, for content whose source of truth is shared with
   other clients — see Chapter 12.
-- **SHOULD** Escalate to a database-backed content table (Chapter 17 seed-data pattern) only on a
+- **MUST** Escalate to a database-backed content table (Chapter 17 seed-data pattern) only on a
   confirmed requirement for live, non-developer editing — do not build admin-editable content
   storage speculatively.
 - **MUST** Escalate to a headless CMS or other external content service only through Material
@@ -158,3 +145,29 @@ string-externalization case above.
   releases (fixed onboarding copy, bundled legal text for offline access) in a bundled data file
   even on a mobile target — the MUST rules above target content whose value is *independent*
   update cadence, not literally all content.
+
+## Cookie / Tracking Consent — Required for Any Web-Rendering Project Type
+
+> **Addition — 2026-08-23:** Stated here framework-neutral (not only in Chapter 11) so a future
+> non-Blazor web project type inherits this requirement automatically. Chapter 11 holds the
+> concrete, current instantiation for this stack's Blazor Web App.
+
+Whenever a project renders pages to an end user's browser, and any part of that rendering sets or
+reads non-essential cookies or equivalent client-side tracking storage (`localStorage`,
+`IndexedDB`, or similar used for the same purpose) — regardless of frontend framework — that
+project implements cookie/tracking consent to the GDPR/ePrivacy baseline (opt-in, equal-prominence
+Accept/Reject, granular categories, block-before-consent, a durable consent audit record, and the
+CCPA/PIPEDA/LGPD reconciliation items) before any non-essential storage or script executes.
+
+- **MUST** Every web-rendering project type governed by GPG implements this requirement.
+  "Website — Blazor" (Chapter 11) is the current stack's only such project type, but the rule is
+  stated here, not there, precisely so a future non-Blazor web project type added to GPG inherits
+  it automatically rather than depending on someone remembering to copy it over.
+- **MUST** See Chapter 11 for this rule's concrete, current instantiation (component pattern,
+  category model, consent audit log, multi-jurisdiction reconciliation, Consent Mode v2 mapping).
+  A future non-Blazor web project type added to GPG gets its own concrete instantiation
+  chapter/subsection, cross-referenced from here — mirroring how Chapter 12 (MAUI) sits alongside
+  Chapter 11 for the Data-Driven Content rule above.
+- **MUST** This requirement is included by default in Phase 4 (Architecture) whenever a web
+  project type — of any frontend framework — is identified in the solution, per the bootstrap
+  doc's Phase 4 Mechanics addition. The user may explicitly opt out per project.

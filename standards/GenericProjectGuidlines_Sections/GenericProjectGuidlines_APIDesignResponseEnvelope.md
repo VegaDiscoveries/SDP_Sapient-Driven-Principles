@@ -1,8 +1,8 @@
 ﻿# Chapter 10 — API Design & Response Envelope
 
-> *Section file for `GenericProjectGuidlines_V1.10_20260323.md`*
+> *Section file for `GenericProjectGuidlines_V1.11_20260904.md`*
 >
-> **⚠️ Sync rule — agent instruction:** This is a section file. Any change made here **must be mirrored in the corresponding chapter** of `GenericProjectGuidlines_V1.10_20260323.md`. Any change made in the parent document's corresponding chapter must be mirrored back here. Both files must remain identical in content for their shared sections.
+> **⚠️ Sync rule — agent instruction:** This is a section file. Any change made here **must be mirrored in the corresponding chapter** of `GenericProjectGuidlines_V1.11_20260904.md`. Any change made in the parent document's corresponding chapter must be mirrored back here. Both files must remain identical in content for their shared sections.
 >
 > **TOC Maintenance:** If this section is renamed or deleted, update both the parent document's Contents list AND the `GenericProjectGuidlines_TOC.md` file. See the TOC file for detailed maintenance instructions.
 
@@ -291,7 +291,7 @@ The following table specifies the exact HTTP codes for all identity and account 
 - **MUST** Route parameters use the GUID: `/api/v1/coins/{coinGuid}`. Never expose integer IDs in routes or in `RequestKeys`.
 - **MUST** Never return the domain entity directly. Always map to a response DTO, then wrap in the envelope.
 - **MUST** Service and repository methods that return role-restricted data must evaluate the caller's application role internally. When access is denied at the data level, they must surface this so the controller calls `ApiResponseFactory.Unauthorized`. The data layer must never assume the calling application pre-checked roles — this is a required defence-in-depth guard.
-- **SHOULD** For paginated list endpoints, wrap results in `PagedResultDto<T>`.
-- **SHOULD** Mark public endpoints with `[AllowAnonymous]` explicitly rather than relying on the absence of `[Authorize]`.
-- **SHOULD** Enable CORS explicitly with named origins. Never use wildcard (`*`) origins in production.
+- **MUST** For paginated list endpoints, wrap results in `PagedResultDto<T>`.
+- **MUST** Mark public endpoints with `[AllowAnonymous]` explicitly rather than relying on the absence of `[Authorize]`.
+- **MUST** Enable CORS explicitly with named origins. Never use wildcard (`*`) origins in production.
 - **SHOULD** Include the endpoint string constant (e.g., `private const string EndpointGetCoin = "GET /api/v1/coins/{coinGuid}"`) as a `private const` at the top of each controller class to avoid magic strings in every action method.

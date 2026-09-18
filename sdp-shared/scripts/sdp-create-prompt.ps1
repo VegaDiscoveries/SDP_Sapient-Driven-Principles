@@ -17,6 +17,19 @@
     The halt and error paths do NOT touch sdp-docs/00_prompt.txt.
     Stdout: single-line JSON result object.
     Exit 0 on success or halted workflow; Exit 1 on error.
+
+    Model evaluation: when $nextRole is WORKER, REVIEWER, or GATE_REVIEWER, this script
+    calls sdp-select-model.ps1 (script-to-script) before building the sentinel. On
+    resolved:true, the returned model_id is appended to the sentinel as a model="..."
+    attribute and echoed as modelId/modelResolved:true in the stdout envelope. On
+    resolved:false (no file-derivable rule matched) or an operational error from
+    sdp-select-model.ps1, no model attribute is written and the envelope carries
+    modelResolved:false - the calling skill (sdp-project-create-prompt) is the fallback
+    owner: it reads the task text, applies the tier taxonomy in the roster
+    (sdp-shared/scripts/script-support/sdp-subagent-model-roster.json), and patches
+    model="..." onto the sentinel this script already wrote. This script never guesses a
+    model itself. No call is made when $nextRole is COORDINATOR - that dispatch defers
+    model resolution to sdp-project-coordinator's own MODEL EVAL step.
 #>
 param(
     [string]$workspaceRoot = ""
@@ -341,6 +354,55 @@ if ($activeWorkItem -ne "none" -and $activeWorkItem -ne $null) {
 }
 
 # ---------------------------------------------------------------------------
+# Model evaluation - resolve which model the dispatched session should run
+# as. Only meaningful for a role sdp-select-model.ps1 accepts (WORKER, REVIEWER, GATE_REVIEWER) -
+# a COORDINATOR dispatch defers model resolution to sdp-project-coordinator's
+# own MODEL EVAL step when it determines the real dispatch, so no call is
+# made here for that case. Advisory only: any failure here (missing script,
+# unparseable output) falls through to modelResolved:false rather than
+# blocking prompt generation - sdp-project-create-prompt applies the LLM
+# fallback in that case (Section 7.4's Exception).
+# ---------------------------------------------------------------------------
+
+$modelId       = $null
+$modelResolved = $false
+$modelReason   = $null
+
+$modelEvalRoles = @("WORKER", "REVIEWER", "GATE_REVIEWER")
+if ($modelEvalRoles -contains $nextRole -and $phaseStateRelPath) {
+    try {
+        $selectModelPath = Join-Path $PSScriptRoot "sdp-select-model.ps1"
+        if (Test-Path $selectModelPath) {
+            $selectArgs = @{
+                workspaceRoot  = $workspaceRoot
+                role           = $nextRole
+                phase          = "$($state.current_phase)"
+                phaseStateFile = $phaseStateRelPath
+            }
+            if ($activeWorkItem -and $activeWorkItem -ne "none") { $selectArgs.taskId = $activeWorkItem }
+            $selectOutput = & $selectModelPath @selectArgs
+            $selectResult = [string]$selectOutput | ConvertFrom-Json
+            if ($selectResult.status -eq "success" -and $selectResult.resolved) {
+                $modelId       = $selectResult.model_id
+                $modelResolved = $true
+                $modelReason   = "$($selectResult.reason)"
+            } else {
+                # resolved:false (no file-derivable rule matched) or status:"error"
+                # (operational failure) both mean the calling skill must apply the LLM
+                # fallback - this script never guesses a model itself.
+                $modelResolved = $false
+                $modelReason   = "$($selectResult.reason)"
+            }
+        }
+    } catch {
+        # sdp-select-model.ps1 is advisory - a failure here must never block prompt
+        # generation. Falls through to modelResolved:false so the calling skill
+        # applies the LLM fallback.
+        $modelResolved = $false
+    }
+}
+
+# ---------------------------------------------------------------------------
 # Gate state (read-only here — no longer overrides nextRole). Removed the prior
 # GATE_REVIEWER shortcut (user direction, 2026-07-12; root-caused against
 # CapEx-Watch's 8 recurring GATE_REPAIR fires this same period): this script is
@@ -427,6 +489,11 @@ if ($nextRole -eq "GATE_REVIEWER") {
     $sentinelStatus   = if ($taskStatus -ne "none") { $taskStatus } else { "none" }
 }
 $sentinel = "[sdp-prompt work_item=`"$sentinelWorkItem`" expected_status=`"$sentinelStatus`" role=`"$nextRole`"]"
+if ($modelResolved -and $modelId) {
+    # Same attribute position the solution-level sentinel uses - appended before the
+    # closing bracket, no other attribute reordered.
+    $sentinel = "[sdp-prompt work_item=`"$sentinelWorkItem`" expected_status=`"$sentinelStatus`" role=`"$nextRole`" model=`"$modelId`"]"
+}
 
 # --- Section 1 ---
 $section1 = "You are acting as $nextRole for the **$projectName** project using the SDP workflow."
@@ -605,6 +672,9 @@ $tempContent = [ordered]@{
     sentinel        = $sentinel
     next_role       = $nextRole
     flags           = $taskFlags
+    model_resolved  = $modelResolved
+    model_id        = $modelId
+    model_reason    = $modelReason
     section_1       = $section1
     section_2       = $section2
     section_3       = $section3
@@ -708,6 +778,8 @@ Write-Result @{
     nextRole        = $nextRole
     workItem        = $sentinelWorkItem
     flags           = $taskFlags
+    modelResolved   = $modelResolved
+    modelId         = $modelId
 }
 
 exit 0

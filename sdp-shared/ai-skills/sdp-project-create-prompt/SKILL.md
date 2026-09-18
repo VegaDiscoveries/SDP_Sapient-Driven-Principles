@@ -24,14 +24,24 @@ everything deterministic is the script's.
 2. **Script — state read, section build, and write.** With no override, the script
    reads all state and writes `[resolved_project]/sdp-docs/00_prompt.txt` directly in
    single-option form. The section strings it produces are the final content; there is
-   no LLM assembly step.
+   no LLM assembly step. The script also resolves the dispatched session's model via
+   `sdp-select-model.ps1` (script-to-script) and, on `resolved:true`, writes a
+   `model="..."` attribute onto the sentinel itself — no LLM step needed for that case.
 3. **LLM — rare two-option overwrite.** Only when conversational context shows the
    two-option case (same role, ambiguous specific task) does the LLM read the temp file
    and overwrite `[resolved_project]/sdp-docs/00_prompt.txt` with the two-option form.
    Otherwise the script's output stands.
+4. **LLM — rare model fallback.** Only when the script's JSON output carries
+   `modelResolved: false` for a WORKER/REVIEWER/GATE_REVIEWER dispatch (no file-derivable
+   rule matched) does the LLM read the task text, apply the tier taxonomy in
+   `sdp-shared/scripts/script-support/sdp-subagent-model-roster.json`, and patch
+   `model="..."` onto the sentinel already written. This is the one point in the
+   loop-orchestrated project-level path where that judgment can still be applied before the
+   dispatched session's model is fixed at spawn time.
 
 Normal path tool calls: 1 (script invocation). The two-option case adds 2 (temp read +
-overwrite).
+overwrite). The model-fallback case adds 2 (00_prompt.txt read + patch); both rare cases
+can apply to the same dispatch (see Step 4a).
 
 ## Procedure
 
@@ -113,8 +123,15 @@ of three forms:
 
 **Success:**
 ```json
-{"status":"success","resolvedProject":"sdp-project_VirtualCoinFolio.API","tempFile":"<rel-path>","promptFile":"sdp-docs/00_prompt.txt","nextRole":"WORKER","workItem":"WI-007","flags":[]}
+{"status":"success","resolvedProject":"sdp-project_VirtualCoinFolio.API","tempFile":"<rel-path>","promptFile":"sdp-docs/00_prompt.txt","nextRole":"WORKER","workItem":"WI-007","flags":[],"modelResolved":true,"modelId":"sonnet"}
 ```
+
+`modelResolved`/`modelId` reflect `sdp-select-model.ps1`'s own result (called internally by
+the script — see How This Skill Works item 2): `modelResolved:true` means the sentinel
+already carries a `model="..."` attribute; `modelResolved:false` means it does not, and
+Step 4a below applies only when `nextRole` is `WORKER`, `REVIEWER`, or `GATE_REVIEWER` in
+that case (a `COORDINATOR` dispatch always reads `modelResolved:false` and needs no
+action here — see Step 4a).
 
 Valid `nextRole` values: `WORKER`, `REVIEWER`, `COORDINATOR`, `GATE_REVIEWER`. When
 `nextRole` is `GATE_REVIEWER`, `workItem` is the current phase identifier (e.g.
@@ -189,6 +206,38 @@ If it applies:
 
 This is rare — default to leaving the script's single-option output untouched.
 
+### Step 4a: Model Fallback (rare)
+
+Runs after Step 4 (whether or not Step 4 fired) so that whichever write is `00_prompt.txt`'s
+most recent — the script's normal write, or Step 4's two-option overwrite — is the one this
+step patches, never the reverse.
+
+Check `nextRole` and `modelResolved` from the script's Step 2 JSON output:
+
+- **No action** when `nextRole` is `COORDINATOR`, or `modelResolved` is `true` (the script
+  already resolved the model via `sdp-select-model.ps1` and wrote `model="..."` onto the
+  sentinel itself — see How This Skill Works item 2). Proceed to Step 5.
+- **Apply the fallback** when `nextRole` is `WORKER`, `REVIEWER`, or `GATE_REVIEWER` and
+  `modelResolved` is `false`: `sdp-select-model.ps1` found no file-derivable rule for this
+  dispatch. This skill is the designated fallback
+  owner for the loop-orchestrated project-level GENERATE path — no later session gets a
+  chance to apply this judgment, since the dispatched session's Agent-tool `model` parameter
+  is already fixed by the time it exists. Apply it now:
+  1. Read the task description this dispatch is for. For a WORKER/REVIEWER dispatch, this is
+     the `workItem` entry in the phase file at `active_phase_file` (`state.json`, already
+     read via the project resolution above). For a GATE_REVIEWER dispatch, read the phase
+     document instead, resolved from `registry.md`'s Phase File column for `current_phase` —
+     the same source `sdp-project-coordinator`'s Gate Dispatch Variant uses. This is a new file
+     read for this skill, made only on this rare path.
+  2. Apply the tier taxonomy in
+     `sdp-shared/scripts/script-support/sdp-subagent-model-roster.json` (each tier's `use_when`
+     field) to that task description and select a model id from the current roster.
+  3. Read `[resolved_project]/sdp-docs/00_prompt.txt` and patch its sentinel line only,
+     appending `model="[chosen id]"` immediately before the closing `]` — the same attribute
+     position `sdp-create-prompt.ps1` writes on `resolved:true`. Do not alter any other
+     attribute, any section content, or re-run Step 2/3/4.
+  4. Proceed to Step 5.
+
 ### Step 5: Confirm
 
 Invoke `/sdp-create-banner` with a `Prompt` row: `[resolved_project]/sdp-docs/00_prompt.txt`
@@ -203,9 +252,14 @@ Do not reproduce the prompt content in the confirmation message.
   Option A override is detected.
 - The script is the normal-path writer of `[resolved_project]/sdp-docs/00_prompt.txt`
   — do not re-author or rewrite it on the normal path. Overwrite it only for the
-  two-option case (Step 4).
+  two-option case (Step 4); patch only the sentinel's `model="..."` attribute for the
+  model-fallback case (Step 4a) — never touch any other line for that case.
 - Never substitute non-verbatim content for a temp-file section unless that section is
   being reshaped for the two-option case.
+- Never apply Step 4a's model fallback when `nextRole` is `COORDINATOR`, and never apply
+  it when `modelResolved` is already `true` — that would silently override
+  `sdp-select-model.ps1`'s file-derivable resolution with independent LLM judgment,
+  producing two different, possibly conflicting resolutions for the same dispatch.
 - Do not write session files, update `state.json`, or take any COORDINATOR action.
 - Do not dispatch agents or invoke other skills within this skill.
 - Do not read files for the Option A assessment — use only the current conversation.
@@ -215,8 +269,9 @@ Do not reproduce the prompt content in the confirmation message.
 
 - `[resolved_project]/sdp-docs/00_prompt.txt` — complete, self-contained prompt for the
   next agent session. Written by the script in single-option form on every non-override
-  success; overwritten by the LLM only for the rare two-option case. Not written when an
-  Option A override is detected, nor on halt/error.
+  success; overwritten by the LLM only for the rare two-option case (Step 4); its sentinel
+  patched with a `model="..."` attribute by the LLM only for the rare model-fallback case
+  (Step 4a). Not written when an Option A override is detected, nor on halt/error.
 - `[resolved_project]/.sdp-workflow/temp/phase-{N}/phase{N}-sdp-create-prompt-{timestamp}.json`
   — temp file (written by script; retained permanently for debugging and as the data
   source for a two-option overwrite)

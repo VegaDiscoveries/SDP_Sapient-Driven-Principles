@@ -161,13 +161,28 @@ folders alongside the actual code project folders.
 ├── sdp-solution-docs/                       ← solution-level orchestration docs
 │   ├── 00_solution_prompt.txt               ← written by sdp-solution-coordinator after each dispatch
 │   ├── 00_user_notes.txt                    ← freeform notes at solution level (not agent-read)
-│   ├── 01_concept.md                        ← Phase 1 — solution-scoped, never per-project (see bootstrap doc)
-│   ├── 02_research_findings.md              ← Phase 2
-│   ├── 03_expanded_concept.md               ← Phase 3
-│   ├── 04_architecture.md                   ← Phase 4
-│   ├── 05_implementation_overview.md        ← Phase 5
-│   ├── 06_refined_plan.md                   ← Phase 6
-│   ├── 07_phase_readiness.md                ← Phase 7 — build-phase decomposition + dependency declaration
+│   ├── 001-[CycleName]/                     ← one folder per phase-1-7 mini cycle — including a
+│   │   │                                       solution's first/only cycle; no flat, un-foldered
+│   │   │                                       convention. [CycleNNN] = 3-digit zero-padded
+│   │   │                                       sequential cycle ordinal, [CycleName] = short
+│   │   │                                       PascalCase identifier (e.g. `009-GPGDocEval/`)
+│   │   ├── 001_concept.md                   ← Phase 1 — solution-scoped, never per-project (see bootstrap doc)
+│   │   ├── 001_concept_state.json
+│   │   ├── 002_research_findings.md         ← Phase 2
+│   │   ├── 002_research_findings_state.json
+│   │   ├── 003_expanded_concept.md          ← Phase 3
+│   │   ├── 003_expanded_concept_state.json
+│   │   ├── 004_architecture.md              ← Phase 4
+│   │   ├── 004_architecture_state.json
+│   │   ├── 005_implementation_overview.md   ← Phase 5
+│   │   ├── 005_implementation_overview_state.json
+│   │   ├── 006_refined_plan.md              ← Phase 6
+│   │   ├── 006_refined_plan_state.json
+│   │   ├── 007_phase_readiness.md           ← Phase 7 — build-phase decomposition + dependency declaration
+│   │   └── 007_phase_readiness_state.json
+│   ├── 002-[NextCycleName]/                 ← additional mini cycles seeded by
+│   │                                           sdp-solution-new-concept-intake, identical 7-file
+│   │                                           + 7-state-file shape
 │   ├── user-design-docs/                    ← drop zone for source design docs — read by sdp-solution-new-concept-intake
 │   │   ├── README.md
 │   │   └── processed/                       ← relocated here after intake; tracked reference for sdp-solution-source-coverage-check
@@ -204,6 +219,17 @@ folders alongside the actual code project folders.
 ├── [AppName].Domain/                        ← actual code project
 └── [AppName].sln                            ← solution file (if applicable)
 ```
+
+> **Correction — 2026-09-10:** The `sdp-solution-docs/` block above previously showed
+> `01_concept.md` through `07_phase_readiness.md` as flat, un-foldered files directly under
+> `sdp-solution-docs/` — stale language from before every phase-1-7 cycle (including a solution's
+> very first/only cycle) was formalized to live in its own `[CycleNNN]-[CycleName]/` folder, with
+> 3-digit zero-padded phase files (`001_concept.md` … `007_phase_readiness.md`) plus sibling
+> `_state.json` files alongside each. See `sdp-solution-new-concept-intake/SKILL.md` Step 4 items
+> 1-3 for the authoritative convention. The diagram is corrected in place (rather than
+> strikethrough-in-place) because it is a live structural reference, not historical narrative —
+> the same treatment already given to the `current_phase` field's default value in the
+> `.sdp-workflow/state.json` template below (see that template's own 2026-08-19 Correction note).
 
 > **Visual grouping:** All `sdp-project_*` folders sort together alphabetically.
 > `sdp-shared/`, `sdp-solution-docs/`, and `sol-shared/` sort among them — distinguishable
@@ -268,9 +294,23 @@ recently dispatched project(s), and tracks the active solution-level task.
 }
 ```
 
-Start with empty `projects` and `last_active_projects` arrays. Add a `projects` entry for
+~~Start with empty `projects` and `last_active_projects` arrays. Add a `projects` entry for
 each `sdp-project_[name]/` folder at creation time, then set `last_active_projects` to
-`["sdp-project_[AppName.xxx]"]` after registering the first project.
+`["sdp-project_[AppName.xxx]"]` after registering the first project.~~
+
+> **Correction — 2026-09-10:** `last_active_projects` is left as the empty array through every
+> Add-Project pass too, not set after the first one — it stays meaningless as a Level-3 fallback
+> until phases 1-7 have run at least once (Solution Setup Step 3's existing rule; confirmed
+> consistent with `sdp-solution-read-docs`'s own resolution logic, which already handles an empty
+> `last_active_projects` during phases 1-7 by skipping active-project resolution entirely rather
+> than requiring a value — see that skill's Step 2 sub-step 2). Setting it per-project here is
+> stale language from before the solution-scoped model, where each project ran its own
+> independent phase pipeline and "last active project" was meaningful immediately at creation;
+> under the current model project identity/assignment doesn't begin until Phase 7 decomposition,
+> so naming one arbitrary just-registered project "active" before then is actively misleading, not
+> merely unused. Start with empty `projects` and `last_active_projects` arrays. Add a `projects`
+> entry for each `sdp-project_[name]/` folder at creation time; leave `last_active_projects` empty
+> through every such pass.
 
 #### Single-project workspace
 
@@ -437,6 +477,10 @@ bootstrap doc's Phase Readiness Regression Bookkeeping section. `regression_coun
 `regressions[]` start empty; COORDINATOR appends to `regressions[]` only when the user selects a
 remediation proposal after a Phase Readiness `GATE_BLOCKED` verdict. Never edited by humans.
 
+`gpg_version` is the version-key segment only, never the full filename — see the extraction rule
+and worked example at Setup Checklist → Solution Setup → Step 0 Q6, and the round-trip check
+performed immediately after this field is written (Add-Project Steps below).
+
 ---
 
 #### `.sdp-solution-workflow/state.json`
@@ -468,6 +512,34 @@ coexist: a solution can be mid-Phase-4 architecture work and simultaneously have
 shared cross-project task in flight. No `dependency_ledger` pointer field is added — the ledger
 lives in its own two fixed-path files (`.sdp-solution-workflow/dependencies.md`/
 `dependencies.json`); `state.json` doesn't need to point at them.
+
+---
+
+#### `.sdp-solution-workflow/registry.md`
+```markdown
+# Work Item Registry
+
+Solution: [SolutionName]
+Created: [DATE]
+
+| # | Phase | Phase File | Status | Session | Depends On |
+|---|-------|-----------|--------|---------|------------|
+
+<!-- Append rows as phases are created. Never delete rows. -->
+<!-- Status: [ ] not started | [-] in progress | [x] complete -->
+<!-- Task-level status is tracked by checkboxes within each phase section file -->
+<!-- Session: last session ID that touched this phase -->
+<!-- Depends On: phase numbers that must be [x] complete before this phase dispatches; "none" if independent -->
+<!-- Phase File: always relative to sdp-solution-docs/ — never include that prefix in this column. Every consumer (sdp-solution-phase-coordinator, sdp-solution-create-prompt, sdp-solution-phase-worker, sdp-solution-phase-reviewer, sdp-solution-phase-gate-review) prepends it itself; a pre-prefixed value here doubles it and halts dispatch. E.g. "009-GPGDocEval/001_concept.md" (3-digit cycle ordinal + PascalCase cycle name + 3-digit phase-file ordinal — see sdp-solution-new-concept-intake/SKILL.md Step 4 items 1-3), never "sdp-solution-docs/009-GPGDocEval/001_concept.md". -->
+<!-- COORDINATOR does not dispatch tasks in phase N until all phases listed in Depends On show [x] complete -->
+<!-- COORDINATOR selects the next current_phase by scanning rows for the first not-yet-complete phase whose Depends On phases are already [x] complete — not simply the next row. Row order is only the tiebreaker among equally-eligible phases; rows do not need to be pre-sorted by dependency order. -->
+```
+
+Identical shape to `.sdp-workflow/registry.md` below (same columns, same footer-comment
+conventions) — only the header's `Project:` label becomes `Solution:`. Created empty (zero rows)
+at Solution Setup Step 2; `sdp-solution-new-concept-intake` appends the first rows when a concept
+cycle is seeded, one set of seven per cycle (see that skill's own Step 4) — multiple concurrent
+cycles share this one file, each set of rows named distinctly (e.g. `Concept — [FeatureName]`).
 
 ---
 
@@ -1060,7 +1132,15 @@ Setup is two-level: first establish the solution root (steps 1–4), then add ea
          is the version they intend, or name a different one — a filesystem check can prove the
          file exists, not that it is the version the user wants. Ask this here, before any
          scaffolding begins — do not defer it to Step 4's infrastructure verification, which runs
-         after scaffolding has already started.
+         after scaffolding has already started. **`gpg_version` field format:** the confirmed
+         answer here is the full filename; the `gpg_version` value later written to `state.json`
+         (see the `.sdp-workflow/state.json` and `.sdp-solution-workflow/state.json` templates
+         below) is the version-key segment only — strip the `GenericProjectGuidlines_` prefix and
+         the `.md` extension. Example: `GenericProjectGuidlines_V1.10_20260323.md` →
+         `gpg_version: "V1.10_20260323"`. The GPG-check scripts re-add the prefix themselves when
+         constructing the file path (`standards/GenericProjectGuidlines_[gpg_version].md`) —
+         including the prefix in `gpg_version` produces a doubled, nonexistent path and a false
+         halt at the first gate review.
       6. Present the complete setup plan (solution name, synopsis text, full project list,
          IDE file to be created or "none", and the confirmed GPG standards version from Q6) and
          wait for explicit user confirmation. The conduct-rules check (Step 1.5) runs after
@@ -1112,7 +1192,19 @@ Setup is two-level: first establish the solution root (steps 1–4), then add ea
         Phase 7 decomposition onward: `dependencies.json` = `[]` (an empty JSON array; Phase 7
         decomposition — Task 9 Step 2b — appends real edge objects to it later) and
         `dependencies.md` = a short header (`# Dependency Ledger` plus a one-line note that
-        entries are appended at Phase 7 decomposition)
+        entries are appended at Phase 7 decomposition). Also create
+        `.sdp-solution-workflow/registry.md` using the
+        [`.sdp-solution-workflow/registry.md` template](#sdp-solution-workflowregistrymd) below —
+        it is listed in the folder-structure diagram above but easy to miss creating here since it
+        starts genuinely empty (no rows) until `sdp-solution-new-concept-intake` or Phase 7
+        decomposition appends the first ones; `SDP-Solution-Setup.json` registers it as a
+        `file-exists` check at the `setup` tier, same as the dependency-ledger files.
+      - `.sdp-solution-workflow/state.json`'s `gpg_version` field is populated here using the
+        extraction rule from Step 0 Q6 (version-key segment only, no `GenericProjectGuidlines_`
+        prefix). Immediately after writing it, verify the round trip: construct
+        `standards/GenericProjectGuidlines_[gpg_version].md` and confirm that file is the same
+        one confirmed at Q6. If it does not resolve, the field was set incorrectly — fix it
+        before proceeding; do not continue setup with a `gpg_version` that fails this check.
       - `sdp-solution-docs/` — create with `00_solution_prompt.txt` stub (leave empty; written
         by `sdp-solution-coordinator`), `00_user_notes.txt` stub (freeform user notes), and
         `user-design-docs/` + `user-design-docs/processed/` (drop zone for source design docs —
@@ -1130,9 +1222,14 @@ Setup is two-level: first establish the solution root (steps 1–4), then add ea
       single-project template from the [`SDP-Solution.json` Templates](#sdp-solutionjson-templates)
       section above. Set `solution_name` to the confirmed solution name from Step 0. Register all
       projects from Q4 in the `projects` array (each with `name`, `path`, and `description`).
-      Leave `last_active_projects` as the empty array the template already defaults to — do not
-      set it to the first project. Meaningless as a Level-3 fallback until phases 1–7 have run at
-      least once (nothing routine depends on it before then). Leave `active_solution_task: null`.
+      **Multi-project template:** leave `last_active_projects` as the empty array the template
+      already defaults to — do not set it to the first project, here or in any later Add-Project
+      pass (see the corrected note on the [`SDP-Solution.json` Templates](#sdp-solutionjson-templates)
+      section above). Meaningless as a Level-3 fallback until phases 1–7 have run at least once
+      (nothing routine depends on it before then). **Single-project template:** set
+      `last_active_projects: ["."]` once, here, exactly as that template shows — unambiguous
+      (there is only one possible value) and never revisited afterward. Leave
+      `active_solution_task: null` either way.
 
 - [ ] **Step 3.5 — Create IDE workspace file (based on Q5 answer from Step 0):**
       - **Visual Studio or Rider:** Create `[SolutionName].sln` using the `.sln` stub template
@@ -1147,12 +1244,20 @@ Setup is two-level: first establish the solution root (steps 1–4), then add ea
 - [ ] **Step 4 — Verify solution infrastructure:**
       - **Create `SDP-Solution-Setup.json` manifest** — create at the solution root: the
         solution-tailored preflight check inventory read by `sdp-preflight.ps1` when invoked
-        with `-workspaceRoot .`. Enumerate the sdp- skill pairs (`skill-pair`), the three
+        with `-workspaceRoot .`. Enumerate the sdp- skill pairs (`skill-pair`), ~~the three
         Level-1-only fully-scriptable skills' Level 1 (`file-exists`) and Level 2
         (`file-absent`) checks — `sdp-tone`, `sdp-create-banner`, and `sdp-claude-new-terminal`
         all get both checks equally; "Level-1-only" means none of the three may ever have a
-        Level 2 SKILL.md, so the drift guard applies uniformly, not to `sdp-tone` alone — plus
-        their script/config files (`file-exists`), the standalone
+        Level 2 SKILL.md, so the drift guard applies uniformly, not to `sdp-tone` alone~~
+        **(Correction — 2026-09-10: five, not three — confirmed by diffing `.claude/skills/`
+        against `sdp-shared/ai-skills/`; this repo's own `SDP-Solution-Setup.json` already
+        reflected all five, only this prose had drifted)** — enumerate all five Level-1-only
+        fully-scriptable skills' (`sdp-tone`, `sdp-create-banner`, `sdp-claude-new-terminal`,
+        `sdp-claude-session-get-agentcount`, `sdp-claude-session-get-sessionid`) Level 1
+        (`file-exists`) and Level 2 (`file-absent`) checks — all five get both checks equally;
+        "Level-1-only" means none of the five may ever have a Level 2 SKILL.md, so the drift
+        guard applies uniformly, not to `sdp-tone` alone — plus their script/config files
+        (`file-exists`), the standalone
         solution-root scripts (`file-exists`), `sdp-shared/scripts/script-support/SDP-Tones.json`,
         the Session Start hook registration (`hook-registered`), the `permissions.allow` entry
         for each script (`json-array-contains`), the Standards Sections folder's existence
@@ -1173,8 +1278,12 @@ Setup is two-level: first establish the solution root (steps 1–4), then add ea
         Level 2 — sdp-project-coordinator, sdp-project-create-prompt, sdp-project-doc-review, sdp-evaluate-skill,
         sdp-project-gate-review, sdp-project-pre-work-verify, sdp-project-read-docs, sdp-project-reviewer, sdp-project-run-prompt,
         sdp-standards-setup, sdp-project-worker, the loop/automation pairs, and the solution-level
-        pairs), the three Level-1-only fully-scriptable skills (`sdp-tone`,
-        `sdp-claude-new-terminal`, `sdp-create-banner` and their script/config files), every
+        pairs), ~~the three Level-1-only fully-scriptable skills (`sdp-tone`,
+        `sdp-claude-new-terminal`, `sdp-create-banner` and their script/config files)~~
+        **(Correction — 2026-09-10: five, not three — see the corrected count above)** the five
+        Level-1-only fully-scriptable skills (`sdp-tone`, `sdp-claude-new-terminal`,
+        `sdp-create-banner`, `sdp-claude-session-get-agentcount`,
+        `sdp-claude-session-get-sessionid` and their script/config files), every
         standalone solution-root script's existence, the `permissions.allow` entry for each
         script, the Standards Sections folder's existence, and the
         `materialDecisionEscalation.enabled` field's presence in `SDP-Config.json`. Read the
@@ -1226,14 +1335,28 @@ Repeat for each project added to the solution. Solution-level folders
 - [ ] Create `[doc_name]_Sections/` folder alongside each doc that has sections
 - [ ] Confirm folder structure with user before proceeding
 - [ ] Initialize `.sdp-workflow/state.json` with project name, current date,
-      `adopted_patterns: []`, and `gpg_version: "[version]"`
+      `adopted_patterns: []`, and `gpg_version: "[version]"` — the version-key segment only, per
+      the extraction rule at Solution Setup Step 0 Q6 (no `GenericProjectGuidlines_` prefix).
+      Immediately after writing it, verify the round trip: construct
+      `standards/GenericProjectGuidlines_[gpg_version].md` and confirm it resolves to the
+      confirmed standards doc. If it does not resolve, fix `gpg_version` before proceeding.
 - [ ] Initialize `.sdp-workflow/registry.md` (phase-level tracking; task-level tracked inline
       in phase files)
 - [ ] Create `.sdp-workflow/sessions/README.md`
 - [ ] Create `PATTERNS.md` with project name and bootstrap version recorded
 - [ ] **Register the project in `SDP-Solution.json`** — add an entry to the `projects` array
       with `name`, `path` (relative to solution root, e.g. `"sdp-project_[AppName.xxx]"`),
-      and `description`. Then set `last_active_projects` to `["sdp-project_[AppName.xxx]"]`.
+      and `description`. ~~Then set `last_active_projects` to `["sdp-project_[AppName.xxx]"]`.~~
+      **Correction — 2026-09-10:** do not set `last_active_projects` here — leave it as the empty
+      array. It stays meaningless as a Level-3 fallback until phases 1-7 have run at least once
+      (Solution Setup Step 3's rule; see the corrected note on the
+      [`SDP-Solution.json` Templates](#sdp-solutionjson-templates) section above for the full
+      reasoning). Setting it per-project here predates the solution-scoped model and is
+      superseded — this applies to every project registered via Add-Project Steps, including the
+      first, since the multi-project template is what governs a workspace that reaches
+      Add-Project Steps at all (a genuinely single-project workspace sets
+      `last_active_projects: ["."]` once, directly, at Solution Setup Step 3, and never revisits
+      it here).
 - [ ] **Update `README.md` projects table** — read the current table, then append a row for
       this project (name, path as `sdp-project_[AppName.xxx]/`, one-line description). Do not
       modify any other README section. If a row exists in the table for a project no longer in
@@ -1292,7 +1415,13 @@ Repeat for each project added to the solution. Solution-level folders
       `sdp-solution-phase-worker` session: for each project receiving decomposed build-phase
       tasks for the first time, replace the stub content created above with the real tech stack,
       naming conventions, file structure, and product-shape decisions already recorded in
-      `sdp-solution-docs/04_architecture.md` and `sdp-solution-docs/05_implementation_overview.md`
+      ~~`sdp-solution-docs/04_architecture.md` and `sdp-solution-docs/05_implementation_overview.md`~~
+      **(Correction — 2026-09-10: these paths are flat-file examples from the superseded
+      un-foldered convention — a cycle's phase files now live inside its own
+      `sdp-solution-docs/[CycleNNN]-[CycleName]/` folder, see
+      sdp-solution-new-concept-intake/SKILL.md Step 4)** that cycle's `004_architecture.md` and
+      `005_implementation_overview.md` phase files, inside its
+      `sdp-solution-docs/[CycleNNN]-[CycleName]/` folder
       (the sections applicable to that project — a solution-scoped document may cover more than
       one project). This must complete before that project's first WORKER dispatch —
       `sdp-solution-phase-gate-review`'s Phase Readiness gate checks it. A session that finds only
@@ -1504,6 +1633,12 @@ as needed; do not nest unrelated config under existing sections. Tone/tune confi
     "notes": "Gates the Material Decision Escalation rule (bootstrap doc, Dispatch and Halt Contracts section). When enabled, any dispatched session (any role) must halt rather than suggest, select, or introduce an external dependency not already named in .speq, or an architectural pattern with no GPG precedent, until the user resolves it. This field is loop-owned by policy: no skill, in any role, may write it. Changing it requires a human editing SDP-Config.json directly, outside any dispatched session.",
     "enabled": true
   },
+  "solutionPhaseLoop": {
+    "notes": "Gates sdp-solution-phase-state-loop's own start-of-cycle mechanical-vs-judgment triage. When enabled (default), a halt/block/discovery classified as mechanical (reuses Material Decision Escalation's own triggers as the judgment anchor: anything tripping either of those, or changing scope/behavior/acceptance criteria, is judgment; everything else is mechanical) gets a bounded fix-and-verify attempt, capped by autoResolveHalt.evalCycleAttemptThreshold, before the loop gives up and surfaces it like any other halt. When false, every non-judgment halt/discovery is treated as a plain STOP instead — the loop never attempts an auto-fix. This field is loop-owned by policy, same as materialDecisionEscalation.enabled: no skill, in any role, may write it.",
+    "autoResolveMechanicalFindings": {
+      "enabled": true
+    }
+  },
   "tones": "Tone/tune configuration moved to SDP-Tones.json (see SDP-Tone-Notifications.md). This key is a pointer only; sdp-tone.ps1 no longer reads SDP-Config.json.",
   "newTerminalNotes": "The newTerminals array is read by sdp-claude-new-terminal.ps1. initialPrompt is passed as the positional argument to `claude` when a new terminal window is spawned; empty string launches interactive Claude Code with no initial prompt. startingDirectory sets the new window's working directory - absolute path, or relative to the solution root; empty/absent defaults to the solution root. hoursToSaveSessionHistory controls SDP-Terminal-Sessions.json retention: on every invocation the script checks each recorded pid; a process no longer running is marked status=not_running with a notRunningAt timestamp, and any not_running entry older than this many hours is deleted from the registry. Per-profile hoursToSaveSessionHistory, if present, wins; otherwise falls back to newTerminalDefaultHoursToSaveSessionHistory below; if that is also absent/invalid, the script's own last-resort default (168 hours, one week) applies. permissionMode sets the starting permission mode via `claude --permission-mode <value>`; empty string passes no flag (Claude Code's own default). See newTerminalPermissionModeOptions for the exact accepted values.",
   "newTerminalDefaultHoursToSaveSessionHistory": 168,
@@ -1540,6 +1675,10 @@ as needed; do not nest unrelated config under existing sections. Tone/tune confi
   bootstrap doc's Dispatch and Halt Contracts section). Default: `true`, scaffolded at workspace
   setup. Loop-owned by policy — no skill, in any role, may write this field; changing it requires
   a human editing `SDP-Config.json` directly, outside any dispatched session.
+- `solutionPhaseLoop.autoResolveMechanicalFindings.enabled` — gates
+  `sdp-solution-phase-state-loop`'s mechanical-fix-and-verify auto-resolution. Default: `true`.
+  Loop-owned by policy — no skill, in any role, may write this field; changing it requires a
+  human editing `SDP-Config.json` directly, outside any dispatched session.
 - `tones` — a pointer string only. All tone/tune configuration lives in `SDP-Tones.json`.
 - `newTerminals` — array of named launch profiles read by `sdp-claude-new-terminal.ps1`. Each
   entry is selected by the script's `-terminal` parameter (matched by numeric `id` first, then by

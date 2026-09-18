@@ -37,6 +37,11 @@ falls back to reading both files manually with the Read tool.
   on which is set, the current solution task entry's `status` (shared-task mode) or
   `current_phase`/`phase_gate` (phases-1–7 mode), plus the top-level `last_session` and
   `workflow_status` fields either way
+- `.sdp-solution-workflow/registry.md` (solution root) — phases-1–7 mode only, read directly by
+  the LLM (not the script): provides the Phase File column for the row matching `current_phase` —
+  always relative to `sdp-solution-docs/`, never including that prefix itself (see Step 3's
+  Substitution rules for how `[phase_document_path]` combines the two). Never reconstruct this
+  value positionally from `current_phase`'s text.
 - `role` — the role being dispatched; passed by the invoking coordinator. Shared-task mode:
   `SOLUTION_COORDINATOR`, `SOLUTION_WORKER`, `SOLUTION_REVIEWER`, passed by
   `sdp-solution-coordinator`. Phases-1–7 mode: `WORKER`, `REVIEWER`, `GATE_REVIEWER` — the same
@@ -45,6 +50,10 @@ falls back to reading both files manually with the Read tool.
 - `projects` — comma-separated list of project paths (relative to solution root) involved in
   this dispatch; passed by `sdp-solution-coordinator` in shared-task mode. Empty for a
   phases-1–7 dispatch.
+- `model` — optional. The chosen model id for this dispatch (e.g. `"opus"`, `"sonnet"`), passed
+  by `sdp-solution-phase-coordinator` in `phases_1_7` mode after its own Model Evaluation step
+  resolves one. Never passed by `sdp-solution-coordinator`'s shared-task dispatch. Absent when
+  the invoking coordinator could not resolve a model for this dispatch.
 
 ## Procedure
 
@@ -83,7 +92,10 @@ available and matches the Step 1 `mode`:
   `"sdp-project_AppName.API,sdp-project_AppName.Website"`).
 - `mode: "phases_1_7"` — `role` must be one of `WORKER`, `REVIEWER`, `GATE_REVIEWER`, provided
   by `sdp-solution-phase-coordinator` (Step 2a item 4 of that skill deliberately omits
-  `projects`) — do not treat an empty `projects` as an error in this mode.
+  `projects`) — do not treat an empty `projects` as an error in this mode. `model`, when
+  provided, is only ever meaningful in this mode — carry it through unchanged to Step 3. Do not
+  require it and do not halt if it is absent; a coordinator that could not resolve a model for
+  this dispatch simply omits it.
 
 If `role` is absent or empty, or (`mode: "shared_task"` only) `projects` is absent or empty:
 halt: invoke `/sdp-create-banner icon=error row=0` with
@@ -110,9 +122,19 @@ entirely (no `projects=""` fragment — the field simply does not appear):
 [sdp-solution-prompt current_phase="[current_phase]" expected_status="[phase_gate_status]" role="[role]"]
 ```
 
-Example:
+When `model` was provided by the invoking coordinator, append it as a 4th attribute:
+
+```
+[sdp-solution-prompt current_phase="[current_phase]" expected_status="[phase_gate_status]" role="[role]" model="[model]"]
+```
+
+When `model` is absent, the sentinel keeps its current 3-attribute form above — backward
+compatible with every consumer that has never seen a `model` attribute.
+
+Examples:
 ```
 [sdp-solution-prompt current_phase="Architecture" expected_status="pending" role="WORKER"]
+[sdp-solution-prompt current_phase="Architecture" expected_status="pending" role="REVIEWER" model="opus"]
 ```
 
 `expected_status` is the status **at the time of writing** — the status it holds now, not the
@@ -183,6 +205,12 @@ check after all children reach `VERIFIED`, and set the solution task to `SOL_VER
 ```
 [sentinel line from Step 3]
 
+[If `[pipeline_note]` is set (see Substitution rules below), lead with it before Section 1 —
+the same "scope first" placement `sdp-solution-phase-coordinator` uses for its own dispatch
+instructions:]
+
+**Pipeline scope:** [pipeline_note]
+
 ## Section 1 — Role Declaration
 
 You are acting as [role] for the **[solution_name]** solution using the SDP workflow.
@@ -210,7 +238,7 @@ are loaded.
 
 **For WORKER:**
 Implement the assigned task within the `[current_phase]` phase document at
-`sdp-solution-docs/[NN_phase_name].md` and record completion. Invoke
+`[phase_document_path]` and record completion. Invoke
 `/sdp-solution-phase-worker` to begin — never `/sdp-project-worker`, which is project-scoped only.
 
 **For REVIEWER:**
@@ -228,7 +256,7 @@ project-scoped only and has no way to be pointed at solution-level work.
 - `.sdp-solution-workflow/state.json` — `current_phase`, `phase_gate`, and session counter
 - `.sdp-solution-workflow/sessions/[last_session].md` — most recent solution session file
   (or "no prior session" if last_session is null/absent)
-- `sdp-solution-docs/[NN_phase_name].md` — the phase document under review
+- `[phase_document_path]` — the phase document under review
 ```
 
 **Substitution rules (both modes):**
@@ -239,10 +267,33 @@ project-scoped only and has no way to be pointed at solution-level work.
 - Shared-task mode: `[active_solution_task]` = `active_solution_task`; `[status]` =
   `task_status`; both from the Step 1 script result
 - Phases-1-7 mode: `[current_phase]` = `current_phase`; `[phase_gate_status]` =
-  `phase_gate_status`; both from the Step 1 script result; `[NN_phase_name].md` is the file
-  matching `current_phase`'s position in the seven-phase sequence (e.g. `current_phase:
-  "Architecture"` → `04_architecture.md`) — do not guess a filename that doesn't match this
-  convention.
+  `phase_gate_status`; both from the Step 1 script result. `[phase_document_path]` — read
+  `.sdp-solution-workflow/registry.md` directly and take the Phase File column value for the row
+  whose Phase column equals `current_phase`; that value is always relative to `sdp-solution-docs/`
+  and never includes that prefix itself (confirmed against `sdp-solution-phase-gate-review/SKILL.md`
+  Step 8, which prepends the same literal prefix onto its own script's identically-scoped result
+  field), so construct `[phase_document_path]` as the literal `sdp-solution-docs/` followed by that
+  Phase File value — do not substitute the raw registry value for the whole
+  `sdp-solution-docs/[CycleNNN]-[CycleName]/[PhaseNNN]_phase_name.md` string in place of just the
+  `[CycleNNN]-[CycleName]/[PhaseNNN]_phase_name.md` portion;
+  doing so silently drops the `sdp-solution-docs/` segment entirely. Never derive it positionally
+  from `current_phase`'s text (e.g. `current_phase: "Architecture"` → guessing `004_architecture.md`
+  with no cycle folder at all) — that guess has no derivable relationship to the
+  `[CycleNNN]-[CycleName]/` folder the file actually lives in, and even the bare filename portion
+  only coincidentally holds when `current_phase` is exactly one of the seven canonical
+  phase names, breaking for a disambiguated cycle row (e.g.
+  `"Architecture — GPGDocEval"`), which has no fixed positional filename. `[pipeline_note]` — if `current_phase` is not exactly one of the
+  seven canonical phase names (Concept / Research / Expanded Concept / Architecture /
+  Implementation Overview / Refined Implementation Plan / Phase Readiness), this is a cycle
+  seeded by `sdp-solution-new-concept-intake`, which — under the current cycle-folder convention —
+  names every cycle's rows with a disambiguating ` — [CycleName]` suffix, including a solution's
+  first and only cycle;
+  set `[pipeline_note]` to `current_phase`'s own text plus: "One of [N] concurrent phase
+  1-7 cycles in this registry — do not act on any other cycle's rows or documents," where `[N]` is
+  the count of registry rows sharing this row's base phase-type name. Otherwise leave
+  `[pipeline_note]` unset — omit the `Pipeline` row/sentence entirely — a legacy/pre-convention
+  case where `current_phase` matches a canonical name exactly with no suffix, not the normal path;
+  no template change from before when it does occur.
 - `[one-line description]` — shared-task mode: infer from the role exactly as before
   (`SOLUTION_COORDINATOR` → "Coordinate dispatch across involved projects", etc.). Phases-1-7
   mode: `WORKER` → "Implement the assigned task and record completion"; `REVIEWER` →
@@ -251,6 +302,9 @@ project-scoped only and has no way to be pointed at solution-level work.
 - Use the role-specific Task Instruction paragraph for Section 4 — write only the paragraph
   that matches the current `role`, from whichever mode's set applies; do not include paragraphs
   for other roles or the other mode
+- `[model]` — phases-1-7 mode only: the `model` value passed by `sdp-solution-phase-coordinator`,
+  written verbatim as the sentinel's 4th attribute when provided. When absent, omit the
+  attribute entirely — do not write `model=""`.
 - Shared-task mode only: in Section 5, list one state file per involved project (one line per
   project path in the `projects` list)
 
@@ -281,6 +335,10 @@ Phases-1-7 mode:
   performed by the LLM in Step 4.
 - Never write Section 4 paragraphs for roles other than the current `role` — write only the
   paragraph that matches it.
+- Never write a `model="..."` attribute onto a `shared_task`-mode sentinel — that attribute is
+  scoped to `phases_1_7` mode only in this skill's current wiring.
+- Never fabricate or infer a `model` value when the invoking coordinator did not provide one —
+  omit the attribute entirely rather than guessing.
 
 ## Outputs
 

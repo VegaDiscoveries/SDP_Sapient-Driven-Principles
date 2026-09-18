@@ -89,20 +89,42 @@ For each set (project assignment is no longer determined here — see Section 2 
 project discovery happens inside phases 1–7, not before them), in the solution's own
 `.sdp-solution-workflow/registry.md`:
 
-1. Determine a project-appropriate phase numbering/naming scheme for the new mini-cycle. If the
-   existing `registry.md`'s convention doesn't make the extension obvious (e.g., how phase
-   numbers/names should be appended after the highest existing entry), ask the user rather than
-   guessing.
+1. **Fixed folder/file scheme — no judgment call, never ask the user.** Formalized 2026-09-10:
+   every mini-cycle, including a solution's very first (there is no separate "original pipeline"
+   mechanism — every phase-1-7 cycle, first or Nth, is seeded here), gets its own folder
+   `sdp-solution-docs/[CycleNNN]-[CycleName]/`. `[CycleNNN]` is the next sequential cycle ordinal
+   solution-wide, zero-padded to 3 digits (`001` for the first cycle ever seeded; scan existing
+   `sdp-solution-docs/` subfolders and/or `registry.md`'s `#` column for the highest one in use and
+   increment — never reuse or guess a gap). `[CycleName]` is a short PascalCase identifier for the
+   concept (e.g. `GPGDocEval`), matching the style already used in Phase-column names (item 2
+   below). Three digits even though a solution is unlikely to reach into the hundreds of cycles —
+   one fixed width, never a per-solution judgment call about how many digits to use.
 2. Append seven new rows: Concept, Research, Expanded Concept, Architecture, Implementation
    Overview, Refined Implementation Plan, and **Phase Readiness** — each named for this cycle
-   (e.g. "Concept — [FeatureName]", "Phase Readiness — [FeatureName]"), sequentially chained via
+   (e.g. "Concept — [CycleName]", "Phase Readiness — [CycleName]"), sequentially chained via
    `Depends On` to each other in that order. The first row's `Depends On` is `"none"` unless the
    new concept is explicitly dependent on already-built project scope — ask the user if this
    isn't obvious from the source document; never infer a dependency silently. The "Phase
    Readiness" row's name must contain that exact substring (not abbreviated or reworded) —
    `sdp-project-coordinator` and `sdp-project-gate-review` detect this phase by that literal substring match.
-3. Create each phase's document stub and `[phase]_state.json`, matching the bootstrap
-   document's phase document and phase state file templates.
+   Set the `#` column to `[CycleNNN].[1-7]` (e.g. `009.1` through `009.7` for the seventh cycle) —
+   the cycle-ordinal portion matches `[CycleNNN]` from item 1 exactly, so a registry row number and
+   its folder name are directly cross-referenceable without translation; the phase-position suffix
+   after the dot stays a plain `1`-`7`, not zero-padded (it can never exceed 7).
+3. Create each phase's document stub and `[phase]_state.json`, matching the bootstrap document's
+   phase document and phase state file templates, named `[PhaseNNN]_[phase_name].md` inside the
+   `[CycleNNN]-[CycleName]/` folder from item 1 — `[PhaseNNN]` is the phase's fixed position in the
+   sequence (`001_concept.md` through `007_phase_readiness.md`), zero-padded to 3 digits for the
+   same one-fixed-width reason as item 1, and is unrelated to `[CycleNNN]` (every cycle's folder
+   contains the identical `001`-`007` filename set). Set the registry row's Phase File column to
+   `[CycleNNN]-[CycleName]/[PhaseNNN]_[phase_name].md` — **always relative to `sdp-solution-docs/`,
+   never including that prefix in the column itself.** Confirmed 2026-09-10 across every consumer
+   of this column (`sdp-solution-phase-coordinator`, `sdp-solution-create-prompt`,
+   `sdp-solution-phase-worker`, `sdp-solution-phase-reviewer`, `sdp-solution-phase-gate-review`) —
+   each one prepends the literal `sdp-solution-docs/` itself; a Phase File value that already
+   includes it produces a doubled, nonexistent path and halts every subsequent dispatch for that
+   row. Example, ninth cycle, Concept phase: `009-GPGDocEval/001_concept.md`, never
+   `sdp-solution-docs/009-GPGDocEval/001_concept.md`.
 4. **Document-driven mode only:** move the source document — and its Sections folder, if Step 2
    identified one — from the drop zone to `sdp-solution-docs/user-design-docs/processed/`. Only
    move after the registry rows and file stubs above have been successfully written; never
@@ -118,13 +140,16 @@ project discovery happens inside phases 1–7, not before them), in the solution
 
 ### Step 4a: Cancel Any Running Loop
 
-Mid-stream seeding re-enters phases 1–7 — under the no-cron-during-phases-1–7 model (bootstrap
-doc, Phase Readiness / Loop Entry Point), no cron job may be active while phases 1–7 are being
-worked.
+Mid-stream seeding re-enters phases 1–7 with fresh, unreviewed concept material — any loop already
+running (a post-Phase-7 project/solution loop, or an existing `sdp-solution-phase-state-loop`) is
+cancelled here so a human re-confirms the workflow before automated dispatch resumes, rather than
+having a stale loop fire against a solution mid-reseed. If phases 1-7 automation is still wanted
+afterward, `/sdp-solution-phase-auto` starts a fresh loop once this cycle's seeding is reviewed.
 
 1. List active scheduled jobs via the `CronList` tool.
-2. If any active job's command invokes `/sdp-project-state-loop` or `/sdp-solution-state-loop`: cancel it
-   via the `CronDelete` tool. Note the cancellation for Step 5's hand-off banner.
+2. If any active job's command invokes `/sdp-project-state-loop`, `/sdp-solution-state-loop`, or
+   `/sdp-solution-phase-state-loop`: cancel it via the `CronDelete` tool. Note the cancellation
+   for Step 5's hand-off banner.
 3. If no matching job is found: note nothing to report — Step 5's banner omits the Loop row
    entirely in this case.
 

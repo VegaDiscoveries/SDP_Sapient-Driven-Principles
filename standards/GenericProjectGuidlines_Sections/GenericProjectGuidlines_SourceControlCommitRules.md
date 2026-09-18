@@ -1,8 +1,8 @@
 ﻿# Chapter 16 — Source Control & Commit Rules
 
-> *Section file for `GenericProjectGuidlines_V1.10_20260323.md`*
+> *Section file for `GenericProjectGuidlines_V1.11_20260904.md`*
 >
-> **⚠️ Sync rule — agent instruction:** This is a section file. Any change made here **must be mirrored in the corresponding chapter** of `GenericProjectGuidlines_V1.10_20260323.md`. Any change made in the parent document's corresponding chapter must be mirrored back here. Both files must remain identical in content for their shared sections.
+> **⚠️ Sync rule — agent instruction:** This is a section file. Any change made here **must be mirrored in the corresponding chapter** of `GenericProjectGuidlines_V1.11_20260904.md`. Any change made in the parent document's corresponding chapter must be mirrored back here. Both files must remain identical in content for their shared sections.
 >
 > **TOC Maintenance:** If this section is renamed or deleted, update both the parent document's Contents list AND the `GenericProjectGuidlines_TOC.md` file. See the TOC file for detailed maintenance instructions.
 
@@ -32,8 +32,7 @@ Source control discipline makes it possible to trace why a change was made, roll
 ```
 {type}({scope}): {short description in present tense, under 72 chars}
 
-Body: explain WHY the change was made, not what was changed.
-The diff already shows what changed.
+Body: explain WHY the change was made; briefly note what changed if it adds context beyond the diff.
 
 Refs: #{issue-number}
 
@@ -44,9 +43,9 @@ Types: feat | fix | refactor | docs | test | chore
 
 - **MUST** Credentials and secrets are never committed. Period.
 - **MUST** Every commit must build cleanly and pass all existing tests.
-- **MUST** Commit messages describe *why* the change was made, not what changed.
+- **MUST** Commit messages describe *why* the change was made as well as what changed.
 - **SHOULD** Commit at logical stopping points: a completed feature, a passing test, a fixed bug. Avoid mixing unrelated changes in one commit.
-- **SHOULD** Commit at least once every 4 active working days on a feature branch to reduce merge conflict risk.
-- **SHOULD** Tag releases on the main branch: `git tag -a v1.3.0 -m "Release 1.3.0"`
+- **MUST** Perform a commit no less than once every 4 active working days on a feature branch, to reduce merge conflict risk.
+- **SHOULD** Where the project maintains semantic version releases, tag them on the main branch: `git tag -a v1.3.0 -m "Release 1.3.0"`
 
-> **✅ Note:** Add a `.copilotignore` file in the solution root that mirrors `.gitignore` entries for all files containing credentials, to prevent GitHub Copilot from reading or suggesting edits to those files.
+> **✅ Note:** Add a `.copilotignore` file in the solution root that mirrors `.gitignore` entries for all files containing credentials, to prevent any external tool from reading or suggesting edits to those files.

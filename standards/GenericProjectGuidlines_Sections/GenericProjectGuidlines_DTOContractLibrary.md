@@ -1,8 +1,8 @@
 ﻿# Chapter 9 — DTO & Contract Library
 
-> *Section file for `GenericProjectGuidlines_V1.10_20260323.md`*
+> *Section file for `GenericProjectGuidlines_V1.11_20260904.md`*
 >
-> **⚠️ Sync rule — agent instruction:** This is a section file. Any change made here **must be mirrored in the corresponding chapter** of `GenericProjectGuidlines_V1.10_20260323.md`. Any change made in the parent document's corresponding chapter must be mirrored back here. Both files must remain identical in content for their shared sections.
+> **⚠️ Sync rule — agent instruction:** This is a section file. Any change made here **must be mirrored in the corresponding chapter** of `GenericProjectGuidlines_V1.11_20260904.md`. Any change made in the parent document's corresponding chapter must be mirrored back here. Both files must remain identical in content for their shared sections.
 >
 > **TOC Maintenance:** If this section is renamed or deleted, update both the parent document's Contents list AND the `GenericProjectGuidlines_TOC.md` file. See the TOC file for detailed maintenance instructions.
 
@@ -26,8 +26,8 @@ The `{AppName}.Contracts` library is the formal boundary between the API and all
 - **MUST** Request DTOs carry all validation attributes so validation can be applied identically on the API server and in a MAUI client.
 - **MUST** DTOs never contain EF Core attributes, navigation properties, or `DbContext` references.
 - **SHOULD** Name patterns: `Create{Entity}RequestDto`, `Update{Entity}RequestDto`, `{Entity}ResponseDto`, `{Entity}SummaryDto` (for list items).
-- **SHOULD** Flatten nested data into response DTOs rather than nesting DTOs. Simplifies mobile data binding.
-- **MAY** Use a generic `PagedResultDto<T>` wrapper for paginated list endpoints: `{ Items, TotalCount, PageNumber, PageSize }`.
+- **SHOULD** Flatten nested data into response DTOs rather than nesting DTOs by default; nest only when the data's real shape is hierarchical (a tree or parent-child structure) and flattening would destroy or obscure that structure. Flattening simplifies mobile data binding.
+- **MUST** Use a generic `PagedResultDto<T>` wrapper for paginated list endpoints: `{ Items, TotalCount, PageNumber, PageSize }`.
 
 ## Example DTO Pair
 

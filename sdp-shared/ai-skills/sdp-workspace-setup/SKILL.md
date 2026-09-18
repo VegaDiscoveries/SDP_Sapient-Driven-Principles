@@ -54,7 +54,12 @@ Follow `SDP-Workspace-Setup.md`'s **Setup Checklist → Solution Setup** section
    confirmation folded in as a trailing row:
    `/sdp-create-banner icon=info,info,info,info,info row=0,1,2,3,4 row: Solution | [confirmed name] row: Synopsis | [synopsis] row: Projects | [Q4 project list] row: IDE File | [IDE file to create] row: Standards | [confirmed Q6 version] row: | row: Confirm | Proceed with this setup plan?`
    Wait for explicit user confirmation. **Do not create any file or folder before this
-   confirmation.**
+   confirmation.** Q6's confirmed answer is the standards doc's full filename — every
+   `gpg_version` value this skill writes (sub-step 4 below, and Step 2) is a derived value, not a
+   copy of that answer: the version-key segment only, with the `GenericProjectGuidlines_` prefix
+   and `.md` extension stripped (e.g. `GenericProjectGuidlines_V1.10_20260323.md` →
+   `gpg_version: "V1.10_20260323"`). See `SDP-Workspace-Setup.md`'s Q6 checklist item for the full
+   rule and rationale.
 2. **Verify the SDP framework is already present** — `sdp-shared/`, `standards/`, `.claude/`, the
    bootstrap doc(s), `SDP-Config.json`. (`SDP-Tones.json` is not part of this check — it is
    created during this setup, not copied in; see the "Create `SDP-Tones.json`" checklist step.)
@@ -68,7 +73,10 @@ Follow `SDP-Workspace-Setup.md`'s **Setup Checklist → Solution Setup** section
 4. **Create solution-level workflow folders (Step 2)** — `.sdp-solution-workflow/` (`state.json`
    stub, `sessions/`), `sdp-solution-docs/` (`00_solution_prompt.txt` stub,
    `00_user_notes.txt` stub, `user-design-docs/` + `user-design-docs/processed/` with READMEs),
-   `sol-shared/` placeholder.
+   `sol-shared/` placeholder. Populate `state.json`'s `gpg_version` per the extraction rule above,
+   then immediately verify the round trip: construct
+   `standards/GenericProjectGuidlines_[gpg_version].md` and confirm it resolves to the file
+   confirmed at Q6. Fix `gpg_version` before proceeding if it does not.
 5. **Create `README.md` (Step 2.5)** — using that checklist's template, with the confirmed
    synopsis and the Q4 project list.
 6. **Create `SDP-Solution.json` (Step 3)** — using the multi-project or single-project template,
@@ -113,7 +121,9 @@ decomposition assigns it implementation tasks. Create empty stub `[PROJECT]-Cont
 (template placeholders only, per `SDP-Workspace-Setup.md`'s `.speq` Contract Template),
 registered in the project's `SDP-Document-List.json` — population with real, settled content is
 deferred to Phase 7's build-phase decomposition (`sdp-solution-phase-coordinator` Step 2b), not
-to any project-local "Phase 1," which no longer exists under the solution-scoped model.
+to any project-local "Phase 1," which no longer exists under the solution-scoped model. When
+initializing `.sdp-workflow/state.json`, the same `gpg_version` extraction rule and round-trip
+check from Step 1 sub-step 4 apply here, per project.
 
 ### Step 3: Report and Hand Off
 
@@ -123,7 +133,13 @@ just created empty by this same invocation (Step 2 always scaffolds it empty —
 scaffolded project always has zero phase rows, so COORDINATOR has nothing to dispatch and would
 immediately halt on first invocation):
 
-`/sdp-create-banner icon=success,success,success,success row=0,1,2,3 row: Structure | [created solution/project structure] row: IDE File | [confirmed IDE file, if any] row: Next Step — Have Docs | Drop them in sdp-solution-docs/user-design-docs/ and run /sdp-solution-new-concept-intake for the active project ([name]). row: Next Step — No Docs Yet | Run /brainstorming first — save the resulting doc to sdp-solution-docs/user-design-docs/ (not Superpowers' own default spec location) — then run /sdp-solution-new-concept-intake to advance it.`
+`/sdp-create-banner icon=success,success,success,success row=0,1,2,3 row: Structure | [created solution/project structure] row: IDE File | [confirmed IDE file, if any] row: Have Docs | Drop them in sdp-solution-docs/user-design-docs/ and run /sdp-solution-new-concept-intake for the active project ([name]). row: No Docs Yet | Run /brainstorming first — save the resulting doc to sdp-solution-docs/user-design-docs/ (not Superpowers' own default spec location) — then run /sdp-solution-new-concept-intake to advance it.`
+
+`Have Docs`/`No Docs Yet` (not `Next Step — Have Docs`/`Next Step — No Docs Yet`) — confirmed
+2026-09-10: `sdp-create-banner.ps1`'s `$LABEL_WIDTH` is 11 characters and it hard-`Fail`s rather
+than wrapping a label that exceeds it (`Next Step — Have Docs` is 21 characters). Reuses the
+short-label convention `sdp-initialize-sdp` already established for this identical two-way
+choice, rather than inventing a new one.
 
 If this invocation was triggered by `sdp-solution-new-concept-intake`'s "new project" pause, also change
 `icon=success,success,success,success row=0,1,2,3` to
@@ -153,6 +169,8 @@ already applies to itself.
   Step 2b), not during Add-Project setup.
 - Never include more than one `row=` directive across the invocations this skill issues in a
   single run.
+- `gpg_version` is always the version-key segment, never the full filename — verified by a
+  round-trip file-resolution check immediately after every write (solution-level and per-project).
 
 ## Outputs
 

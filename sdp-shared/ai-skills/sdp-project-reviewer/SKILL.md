@@ -141,7 +141,12 @@ section (Dispatch and Halt Contracts).
 4. **Spawn one `general-purpose` sub-agent per group, in parallel.** Tune the prompt to
    the output precision the synthesis step requires. If 2 or more independent verification
    reads are needed and Superpowers is installed: optionally invoke
-   `/dispatching-parallel-agents` to structure the parallel dispatch.
+   `/dispatching-parallel-agents` to structure the parallel dispatch. Never spawn a verification
+   sub-agent on a `least_capable`-tier model — these dispatches feed directly into a formal Eval
+   verdict with no downstream safety net. Pass a `standard`-or-above tier model as the Agent tool's `model`
+   parameter for each child spawn — consult
+   `sdp-shared/scripts/script-support/sdp-subagent-model-roster.json` for the model currently
+   assigned to each tier rather than hardcoding a model name here.
 
    - **Summary-sufficient sessions** (document review, Pros-Cons-Gaps, concept review):
      > "Read [file list]. For each file, answer: does it satisfy [criterion or GPG rule]?
@@ -249,6 +254,10 @@ section (Dispatch and Halt Contracts).
 - Never auto-trigger Superpowers code review — it must be invoked explicitly.
 - GPG alignment scope is limited to topics directly affected by this task — do not audit
   unrelated sections.
+- Never spawn a Step 4 item 4 verification sub-agent on a `least_capable`-tier model — these
+  dispatches feed a formal Eval verdict with no downstream safety net. Use the roster
+  (`sdp-shared/scripts/script-support/sdp-subagent-model-roster.json`) to identify the current
+  `standard`-or-above tier model rather than hardcoding a model name.
 
 ## Outputs
 

@@ -1,8 +1,8 @@
 ﻿# Chapter 12 — Mobile Readiness
 
-> *Section file for `GenericProjectGuidlines_V1.10_20260323.md`*
+> *Section file for `GenericProjectGuidlines_V1.11_20260904.md`*
 >
-> **⚠️ Sync rule — agent instruction:** This is a section file. Any change made here **must be mirrored in the corresponding chapter** of `GenericProjectGuidlines_V1.10_20260323.md`. Any change made in the parent document's corresponding chapter must be mirrored back here. Both files must remain identical in content for their shared sections.
+> **⚠️ Sync rule — agent instruction:** This is a section file. Any change made here **must be mirrored in the corresponding chapter** of `GenericProjectGuidlines_V1.11_20260904.md`. Any change made in the parent document's corresponding chapter must be mirrored back here. Both files must remain identical in content for their shared sections.
 >
 > **TOC Maintenance:** If this section is renamed or deleted, update both the parent document's Contents list AND the `GenericProjectGuidlines_TOC.md` file. See the TOC file for detailed maintenance instructions.
 
@@ -39,16 +39,10 @@ var storedRefreshToken = await SecureStorage.Default.GetAsync("refresh_token");
 
 - **MUST** Never store JWT tokens in `Preferences` or plain text files. Use `SecureStorage` exclusively.
 - **MUST** MAUI references only `{AppName}.Contracts`. Never `Domain` or `API`.
-- **SHOULD** Handle `401 Unauthorized` globally in the HTTP client by attempting a silent token refresh before showing a login prompt.
-- **SHOULD** Test localization using device locale settings on both iOS Simulator and Android Virtual Device before release.
-
----
+- **SHOULD** Handle `401 Unauthorized` globally in the HTTP client by attempting a silent token refresh before showing a login prompt, unless the solution's security posture requires forcing an explicit re-login instead (e.g. banking-grade re-auth requirements, or a deliberately short-lived/absent refresh token).
+- **SHOULD** Where the app supports multiple cultures/locales (Chapter 5's culture routing), test localization using device locale settings on both iOS Simulator and Android Virtual Device before release.
 
 ## Adaptive Layout (MAUI UI)
-
-> **Addition — 2026-08-11:** The rest of this chapter prepares the API/contracts layer for a
-> future MAUI app; it does not address whether the MAUI app's own UI adapts across phone,
-> tablet, and orientation. This subsection closes that gap.
 
 Every MAUI page must render correctly on phone and tablet form factors, in both portrait and
 landscape.
@@ -60,18 +54,18 @@ landscape.
   screen profile, in both portrait and landscape, before marking the task complete; for
   `[VERIFY DURING IMPLEMENTATION]`-flagged UI tasks, note the profiles checked in the Completed
   blockquote.
-- **SHOULD** Prefer declarative XAML sizing (Grid ratios, `HorizontalOptions="FillAndExpand"`,
-  etc.) over manual `OnSizeAllocated`/pixel-math layout logic.
-- **SHOULD** Verify orientation-change behavior doesn't clip or truncate content.
+- **MUST** Prefer declarative XAML sizing (Grid ratios, `HorizontalOptions="FillAndExpand"`,
+  etc.) over manual `OnSizeAllocated`/pixel-math layout logic, unless declarative sizing cannot
+  express the required behavior (e.g. a custom-drawn surface such as a canvas/game view or a
+  custom renderer).
+- **MUST** Verify orientation-change behavior doesn't clip or truncate content.
 - **MAY** Use a UI toolkit's adaptive-layout component (e.g. .NET MAUI Community Toolkit,
   Syncfusion, Telerik) in place of hand-rolled adaptive layout, provided it doesn't override
   the platform's own size-class behavior in a way that defeats the MUST rules above.
 
 ## Dynamic Content Delivery
 
-> **Addition — 2026-08-13:** Concrete MAUI instantiation of Chapter 13's "Data-Driven Content —
-> Preferred Default" rule, split by target — mobile and desktop do not share one delivery model
-> for content that changes independently of app releases.
+Concrete MAUI instantiation of Chapter 13's "Data-Driven Content — Preferred Default" rule.
 
 **Mobile (`Platforms/iOS/`, `Platforms/Android/`):** structured, independently-changing content
 (version-history/changelog entries, announcements, and similar) is fetched through a dedicated
@@ -93,7 +87,7 @@ that is genuinely desktop-specific.
 - **MUST** Mobile targets source independently-changing structured content through the API —
   never a bundled local file — except content that shares the app's own release cadence
   (Chapter 13).
-- **SHOULD** Desktop targets source the same centrally-authored content through an API-synced
+- **MUST** Desktop targets source the same centrally-authored content through an API-synced
   local cache rather than a bundled-at-install file, to keep desktop and mobile reading from one
   source of truth.
 - **MAY** Desktop targets use a purely bundled local file for content that is genuinely

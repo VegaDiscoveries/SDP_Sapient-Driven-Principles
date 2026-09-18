@@ -118,6 +118,14 @@ step.
 > — handle them in a script and follow `SDP-Script-Authoring.md`. Catching scripting
 > candidates at design time is cheaper than retrofitting them after a skill is in use.
 
+> **Model selection for sub-agent dispatch:** If a procedure step spawns a sub-agent (an
+> Agent-tool call, in any role), classify the dispatched task against the tier taxonomy in
+> `sdp-shared/scripts/script-support/sdp-subagent-model-roster.json` (each tier's `use_when`
+> field) before writing the step. Prefer resolving the tier via
+> `sdp-shared/scripts/sdp-select-model.ps1` (role/phase/flags-derived) over an ad hoc judgment
+> call in the step's own prose — reserve the skill's own judgment for the residual case the
+> script reports as unresolved.
+
 > **Constraint phrasing:** Phrase every `## Constraints` entry as a negative bounding rule —
 > what must never happen — rather than a positive reminder of what to do. "Never ship a stub
 > body" bounds the solution space; "remember to finish the implementation" is a reminder an

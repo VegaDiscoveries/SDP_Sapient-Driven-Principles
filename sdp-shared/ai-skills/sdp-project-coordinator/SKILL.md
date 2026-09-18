@@ -429,15 +429,50 @@ or the `"blocked"` branch's Re-gate path):
    the mechanical PreToolUse/PostToolUse trail in `sdp-hook-log.ps1` — the reasoning behind a
    dispatch decision is not recoverable from tool-call telemetry alone.
 
+### Step 6a: Model Evaluation
+
+Read `orchestration_mode` from `[resolved_project]/.sdp-workflow/state.json` (already read in
+Step 2 item 1). **Skip this entire step when `orchestration_mode` is `"loop-orchestrated"`** —
+proceed directly to Step 7. That path resolves its own dispatch's model independently, later,
+inside `sdp-create-prompt.ps1`'s GENERATE-fire script call and — on a `resolved:false`
+envelope — `sdp-project-create-prompt`'s own LLM fallback step. Running this step's own
+resolution for that mode too would risk two independent, possibly conflicting model choices
+for the same dispatch, so it must not run there.
+
+For `"human-gated"` and `"agent-orchestrated"` dispatch (including the Gate Dispatch Variant):
+
+1. Run `./sdp-shared/scripts/sdp-select-model.ps1 -workspaceRoot .\[resolved_project] -role
+   "[WORKER|REVIEWER|GATE_REVIEWER]" -phase "[current_phase, or the dispatched task's phase]"
+   -phaseStateFile "[the phase state file path used in Step 2/5 for this dispatch]" -taskId
+   "[TASK-ID]"` via the PowerShell tool. Omit `-taskId` for a gate dispatch (gate review is
+   phase-scoped, not task-scoped — see the Gate Dispatch Variant in Step 5).
+2. Read the single-line JSON envelope:
+   - `resolved: true` — the chosen model for this dispatch is `model_id`, used exactly as
+     returned (the roster's short `id`, valid directly as the Agent tool's own `model`
+     parameter).
+   - `resolved: false` (whether `status` is `"success"` with no matching rule, or `"error"`
+     from an operational failure — the script is advisory only here and never a halt
+     condition) — apply the tier taxonomy in
+     `sdp-shared/scripts/script-support/sdp-subagent-model-roster.json` (each tier's `use_when`
+     field) directly to the task description already read in Step 2/4 (or the phase document,
+     for a gate dispatch) and choose the model yourself from the current roster.
+3. Record the chosen model as `[chosen model_id]` for use in Step 7. No file write happens in
+   this step — Step 7 applies the value directly, in-session.
+
 ### Step 7: Notify User
 
 1. Read `orchestration_mode` from `[resolved_project]/.sdp-workflow/state.json`.
-2. **If `"human-gated"`:** Invoke `/sdp-create-banner` with a `Dispatch` row, e.g.
-   `icon=success row=0 row: Dispatch | Ready to dispatch [ROLE] for [TASK-ID] — [resolved_project]/sdp-docs/00_prompt.txt contains the ready-to-paste prompt. Open a new subagent and paste it to begin.`
-   Terminate. Do not wait for or attempt to detect the outcome.
+2. **If `"human-gated"`:** Invoke `/sdp-create-banner` with a `Dispatch` row and a `Suggested
+   model` row, e.g.
+   `icon=success row=0 row: Dispatch | Ready to dispatch [ROLE] for [TASK-ID] — [resolved_project]/sdp-docs/00_prompt.txt contains the ready-to-paste prompt. Open a new subagent and paste it to begin. row: Suggested model | [chosen model_id from Step 6a] — not enforced in this mode; start the new session with this model manually if desired.`
+   The suggested-model row is advisory only — no programmatic lever exists to enforce a model
+   choice in `"human-gated"` mode. Terminate. Do not
+   wait for or attempt to detect the outcome.
 3. **If `"agent-orchestrated"`:** Spawn a subagent via the Agent tool with the content of
    `[resolved_project]/.sdp-workflow/sessions/session-NNN.md` as the prompt, plus the bootstrap
-   doc path. After the Agent tool returns:
+   doc path, passing `[chosen model_id from Step 6a]` as the Agent tool's `model` parameter —
+   this is the one spawn point in this mode, in the same session that just resolved the model,
+   so no file re-read is needed. After the Agent tool returns:
    - **Task dispatch:** Derive the phase state file from `active_phase_file` (just written in
      Step 6) by replacing its trailing `.md` with `_state.json`, and read it to get the
      outcome. Continue COORDINATOR logic based on outcome: VERIFIED → find next task;
@@ -447,7 +482,11 @@ or the `"blocked"` branch's Re-gate path):
      GATE_BLOCKED → halt per the blocked-gate halt defined in Step 4 sub-step 5.
 4. **If `"loop-orchestrated"`:** Do not spawn a subagent — the recurring `sdp-project-state-loop`
    performs all execution. The session dispatch file, `state.json`, and `00_prompt.txt` written
-   in Steps 5–6 are the complete handoff. Invoke `/sdp-create-banner` with a `Dispatch` row, e.g.
+   in Steps 5–6 are the complete handoff. Step 6a did not run for this mode; model resolution
+   for the eventual dispatch happens later, inside `sdp-create-prompt.ps1`'s GENERATE-fire
+   script call and `sdp-project-create-prompt`'s own fallback step — this step takes no
+   action regarding model. Invoke
+   `/sdp-create-banner` with a `Dispatch` row, e.g.
    `icon=success row=0 row: Dispatch | Dispatch prompt written for [ROLE] / [TASK-ID]. The running sdp-project-state-loop will execute it on its next fire (start it with /sdp-auto or /sdp-state-loop-start if it is not running).`
    Terminate. Do not wait for or attempt to detect the outcome.
 5. **If `orchestration_mode` is absent or any other value:** Treat it as `"human-gated"` —
@@ -505,6 +544,14 @@ or the `"blocked"` branch's Re-gate path):
 - No role other than COORDINATOR may clear a halt, and COORDINATOR must never clear one without
   first reading `workflow_status` and confirming the blocking condition is resolved — only then
   set `workflow_status` back to `"active"` and clear `halt_reason`.
+- Step 6a's MODEL EVAL must never run when `orchestration_mode` is `"loop-orchestrated"` —
+  that path's model resolution belongs solely to `sdp-create-prompt.ps1`/
+  `sdp-project-create-prompt`. Running
+  it in both places risks two different, possibly conflicting model choices for the same
+  dispatch.
+- Step 6a's resolved model is applied directly, in-session, at Step 7's one
+  `"agent-orchestrated"` spawn point — never written to a file, and never re-derived at a
+  later spawn point (this mode has only one).
 
 ## Outputs
 

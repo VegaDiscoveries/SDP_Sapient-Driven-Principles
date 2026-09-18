@@ -35,7 +35,7 @@ Open Claude Code at the solution root
    ▼
 ┌───────────────────────────────────────────────────────────────────────┐
 │  PHASES 1-7 — solution-scoped concept cycle                           │
-│  driven by /sdp-solution-phase-coordinator, human-gated only          │
+│  driven by /sdp-solution-phase-coordinator, manual or via auto-loop   │
 │  Concept → Research → Expanded Concept → Architecture →               │
 │  Implementation Overview → Refined Plan → Phase Readiness             │
 │  (each phase: draft → gate review → next phase)                       │
@@ -103,37 +103,41 @@ or more `sdp-project_*/` folders each with their own `.sdp-workflow/` + `sdp-doc
 
 ## 3. Stage: Phases 1–7 — The Solution-Scoped Concept Cycle
 
-Every phase below runs **once per solution** (not per project) — driven by
-`/sdp-solution-phase-coordinator`, always human-gated (no cron/loop dispatch during this stage),
-with deliverables at `sdp-solution-docs/*.md` and tracking in
-`.sdp-solution-workflow/registry.md` / `state.json`. Project identity does not exist yet — it
-first appears at Phase 7's decomposition step.
+Every phase below runs **once per solution cycle** (not per project) — driven by
+`/sdp-solution-phase-coordinator`, either a direct, manually-invoked session or a subagent
+dispatched from the recurring `sdp-solution-phase-state-loop` (started via
+`/sdp-solution-phase-auto`), with deliverables inside that cycle's own folder,
+`sdp-solution-docs/[CycleNNN]-[CycleName]/*.md` — `[CycleNNN]` a 3-digit zero-padded sequential
+cycle ordinal, `[CycleName]` a short PascalCase identifier (e.g. `sdp-solution-docs/001-[CycleName]/`
+for a solution's first/only cycle — there is no separate flat, un-foldered convention, even for
+that first cycle) — and tracking in `.sdp-solution-workflow/registry.md` / `state.json`. Project
+identity does not exist yet — it first appears at Phase 7's decomposition step.
 
 ```
-Phase 1: Concept                                     sdp-solution-docs/01_concept.md
+Phase 1: Concept                    sdp-solution-docs/001-[CycleName]/001_concept.md
    │  Source-doc intake check (see below) → COORDINATOR reads the tracked source doc (if one
    │  exists for this cycle), runs /brainstorming interactively with the user, captures
    │  decisions → WORKER formalizes the document → Gate: concept review
    ▼
-Phase 2: Research                                     sdp-solution-docs/02_research_findings.md
+Phase 2: Research                   sdp-solution-docs/001-[CycleName]/002_research_findings.md
    │  Internal WORKER fan-out — one child subagent per research angle
    │  → synthesized findings, every claim sourced → Gate: research review
    ▼
-Phase 3: Expanded Concept                             sdp-solution-docs/03_expanded_concept.md
-   │  COORDINATOR reads 01_concept.md + 02_research_findings.md + the tracked source doc (if
+Phase 3: Expanded Concept           sdp-solution-docs/001-[CycleName]/003_expanded_concept.md
+   │  COORDINATOR reads 001_concept.md + 002_research_findings.md + the tracked source doc (if
    │  one exists), runs /brainstorming interactively, captures decisions → WORKER formalizes,
    │  citing every research angle → Gate: expanded concept review
    ▼
-Phase 4: Architecture                                 sdp-solution-docs/04_architecture.md
+Phase 4: Architecture               sdp-solution-docs/001-[CycleName]/004_architecture.md
    │  Pros-Cons-Gaps cycle × 2-N iterations → Gate: architecture review
    ▼
-Phase 5: Implementation Overview                      sdp-solution-docs/05_implementation_overview.md
+Phase 5: Implementation Overview    sdp-solution-docs/001-[CycleName]/005_implementation_overview.md
    │  Pros-Cons-Gaps cycle × 2-N iterations → Gate: implementation overview review
    ▼
-Phase 6: Refined Implementation Plan                  sdp-solution-docs/06_refined_plan.md
+Phase 6: Refined Implementation Plan   sdp-solution-docs/001-[CycleName]/006_refined_plan.md
    │  Acceptance criteria written per work item → Gate: plan review
    ▼
-Phase 7: Phase Readiness                               sdp-solution-docs/07_phase_readiness.md
+Phase 7: Phase Readiness             sdp-solution-docs/001-[CycleName]/007_phase_readiness.md
    │  A. Build-phase decomposition → each project's own .sdp-workflow/registry.md
    │  B. Full-lifecycle traceability audit (source doc → every phase → final plan/registry)
    │  → Gate: readiness review
@@ -141,18 +145,23 @@ Phase 7: Phase Readiness                               sdp-solution-docs/07_phas
 Work items exist in project registries → Implementation Loop begins (Section 5 below)
 ```
 
+Each phase file has a sibling `_state.json` alongside it in the same cycle folder (e.g.
+`001_concept_state.json`) — omitted above for brevity. A later mini-cycle seeded mid-solution by
+`/sdp-solution-new-concept-intake` gets its own `00[N]-[CycleName]/` folder with the identical
+seven-file shape; see Section 7 below.
+
 **Phase 1 — source-doc intake, checked first:**
 
 | Situation | Path |
 |-----------|------|
-| `sdp-solution-docs/user-design-docs/processed/` already has files | Intake already happened — draft `01_concept.md` from the tracked source directly |
+| `sdp-solution-docs/user-design-docs/processed/` already has files | Intake already happened — draft this cycle's `001_concept.md` from the tracked source directly |
 | Nothing there yet, user has existing docs/notes | Drop them in `sdp-solution-docs/user-design-docs/`, run `/sdp-solution-new-concept-intake` before drafting |
 | Nothing there yet, no docs but wants one developed | Run `/brainstorming`, save the result into `sdp-solution-docs/user-design-docs/`, then `/sdp-solution-new-concept-intake` |
 | Nothing there yet, wants to seed directly from conversation | Proceed conversationally — no source doc, no `sdp-solution-source-coverage-check` for this cycle |
 
 When a tracked source doc exists, `sdp-solution-source-coverage-check` runs immediately after Phase 1 and
-Phase 3 are drafted, comparing the source against `01_concept.md` / `03_expanded_concept.md` for
-coverage — mandatory, not optional.
+Phase 3 are drafted, comparing the source against that cycle's `001_concept.md` / `003_expanded_concept.md`
+for coverage — mandatory, not optional.
 
 **Phase 1 and Phase 3 are the only interactive drafting steps in the whole cycle.** For these two
 phases only, `/brainstorming` is COORDINATOR-scoped, not WORKER-scoped: COORDINATOR runs it
@@ -187,8 +196,9 @@ with their own work queue."
    the gate checks the field is present, not populated).
 2a. For any project receiving decomposed tasks for the first time, this same step also populates
    that project's `.speq.md` and `[PROJECT]-Context.md` — empty stubs since Add-Project time —
-   with the real tech stack/naming/structure/product-shape decisions already settled in
-   `04_architecture.md` / `05_implementation_overview.md`. The Phase 7 gate checks both files for
+   with the real tech stack/naming/structure/product-shape decisions already settled in that
+   cycle's `004_architecture.md` / `005_implementation_overview.md` (inside its
+   `sdp-solution-docs/[CycleNNN]-[CycleName]/` folder). The Phase 7 gate checks both files for
    real content, no template placeholders remaining.
 3. `/sdp-solution-loop-prep` runs once, the first time Phase 7's gate passes for this solution —
    it walks **every** registered project's freshly-decomposed registry, in dependency order,
@@ -260,9 +270,12 @@ Start at the top of this table; move down as the workflow proves stable.
 | **Agent-orchestrated** | COORDINATOR spawns subagents directly via the Agent tool, reads outcome from state file after return | Well-defined task sequences |
 | **Loop-orchestrated** | `/sdp-auto` starts a recurring `sdp-project-state-loop`; it evaluates `sdp-docs/00_prompt.txt`, dispatches, reads state, repeats | Sustained unattended runs |
 
-`/sdp-auto` **refuses to start until solution-level Phase 7's gate has passed** — phases 1–7 are
-always human-gated dispatch, with no cron job involved at any point during that stage. Once
-started, the loop handles WORKER/REVIEWER/GATE_REVIEWER dispatch, stuck-loop detection
+`/sdp-auto` **delegates to `/sdp-solution-phase-auto`** while solution-level Phase 7's gate has
+not yet passed — phases 1–7 can be driven by a direct, manually-invoked
+`/sdp-solution-phase-coordinator` session or by the recurring `sdp-solution-phase-state-loop` that
+`/sdp-solution-phase-auto` starts, rather than by any cron job `/sdp-auto` itself would start
+directly. Once Phase 7's gate has passed, `/sdp-auto` starts its own loop, which handles
+WORKER/REVIEWER/GATE_REVIEWER dispatch, stuck-loop detection
 (`eval_cycle_attempts` vs `eval_cycles`), and automatic halting on any blocking condition. Stop it
 with `/sdp-cancel-auto`; resume with `/sdp-auto` after resolving whatever caused the stop.
 
@@ -300,7 +313,7 @@ the condition itself. Common causes:
 | You want to... | Run | Produces / Updates |
 |-----------------|-----|---------------------|
 | Bring SDP into a new or existing solution | `/sdp-workspace-setup` | `SDP-Solution.json`, solution + first project scaffold |
-| Drive the Phases 1–7 concept cycle | `/sdp-solution-phase-coordinator` | `sdp-solution-docs/0N_*.md`, `.sdp-solution-workflow/registry.md` |
+| Drive the Phases 1–7 concept cycle | `/sdp-solution-phase-coordinator` | `sdp-solution-docs/[CycleNNN]-[CycleName]/00N_*.md`, `.sdp-solution-workflow/registry.md` |
 | Register a new concept mid-solution | `/sdp-solution-new-concept-intake` | Seven new registry rows + phase stubs |
 | Certify every project's registry before an unattended run | `/sdp-solution-loop-prep` (first time) / `/sdp-project-loop-prep` (targeted) | Doc review + source coverage + right-sizing pass |
 | Drive one project's implementation loop | `/sdp-project-coordinator` | `session-NNN.md`, `sdp-docs/00_prompt.txt`, `[phase]_state.json` |

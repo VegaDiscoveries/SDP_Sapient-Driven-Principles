@@ -16,13 +16,29 @@ substitute for the formal Eval blockquote.
 All paths below are relative to the solution root — there is no project to resolve.
 
 - `.sdp-solution-workflow/sessions/session-NNN.md` — role assignment, phase identifier, phase
-  document path, flags, re-evaluation trigger reason for Eval 2+ cycles. Session number from
-  `.sdp-solution-workflow/state.json`'s `last_session` field. Never carries a `Project:` field.
-- Phase document — `sdp-solution-docs/[NN_phase_name].md`, named by `current_phase` in
-  `.sdp-solution-workflow/state.json`; task description, Completed blockquote, and any prior
-  Eval/Verified blockquotes.
+  document path (`Phase Document:` field), a `Pipeline:` field when this task belongs to a
+  disambiguated cycle (every cycle under the current cycle-folder convention, including a
+  solution's first and only cycle — see `sdp-solution-new-concept-intake` Step 4 item 2), flags,
+  re-evaluation trigger reason for Eval 2+ cycles. Session
+  number from `.sdp-solution-workflow/state.json`'s `last_session` field. Never carries a
+  `Project:` field.
+- Phase document — the `Phase Document:` field value taken from the session dispatch file (Step
+  2) is **always relative to `sdp-solution-docs/`, never including that prefix itself** (confirmed
+  2026-09-10 against `sdp-solution-phase-gate-review/SKILL.md` Step 8, which applies the same
+  literal prefix to the identically-scoped field its own setup script reports). Elsewhere in this
+  document that bare value is written as `[phase_file]` shorthand, always preceded by the
+  literal `sdp-solution-docs/` (e.g. `sdp-solution-docs/009-GPGDocEval/001_concept.md`) — it is
+  not a positional convention to re-derive independently, since the value is always the full
+  `[CycleNNN]-[CycleName]/[PhaseNNN]_phase_name.md` registry Phase File entry for this cycle's
+  row, with no fixed positional filename to guess; only
+  `[phase_file]` comes from the dispatch file, the `sdp-solution-docs/` prefix
+  is always literal. `[phase_file]` already carries the `.md` extension — never write
+  `[phase_file].md`; the phase state file variant replaces that trailing `.md` with
+  `_state.json` (written below as `[phase_file]_state.json`). Task description, Completed
+  blockquote, and any prior Eval/Verified
+  blockquotes live in this same document.
 - `.sdp-solution-workflow/state.json` — `gpg_version`, `last_session`, `current_phase`
-- Phase state file (`sdp-solution-docs/[NN_phase_name]_state.json`) — `eval_cycles` and, for
+- Phase state file (`sdp-solution-docs/[phase_file]_state.json`) — `eval_cycles` and, for
   Architecture/Implementation Overview phases, `pros_cons_gaps.cycle_target`/`cycle_count`, for
   the assigned task
 
@@ -53,8 +69,11 @@ Inputs section for why.
    role definition and state machine before proceeding.
 2. Read the session dispatch file (`.sdp-solution-workflow/sessions/session-NNN.md` — session
    number from `.sdp-solution-workflow/state.json`'s `last_session` field). Confirm role
-   assignment is REVIEWER. Note any re-evaluation trigger reason or other instructions from
-   `sdp-solution-phase-coordinator`.
+   assignment is REVIEWER. Record the `Phase Document:` field value — this is `[phase_file]`
+   wherever it appears below. If a `Pipeline:` field is present, state it back to the user before
+   beginning review work, e.g. `icon=info row=0 row: Pipeline | [pipeline field text]` —
+   confirming scope before evaluating, not after. Note any re-evaluation trigger reason or other
+   instructions from `sdp-solution-phase-coordinator`.
 3. Read `.sdp-solution-workflow/state.json` — confirm `current_phase` and flags.
 
 ### Material Decision Escalation Check
@@ -62,7 +81,8 @@ Inputs section for why.
 Before suggesting, selecting, or introducing a language, runtime, framework, library/package (any
 source/registry), IDE/tool/plugin, database/data-platform engine, cloud/hosting provider,
 third-party API/service, or anything similar that is not already explicitly settled — in `.speq`
-(project-scoped, from Phase 7 onward) or, pre-Phase-7, in `01_concept.md`/`03_expanded_concept.md`/
+(project-scoped, from Phase 7 onward) or, pre-Phase-7, in this cycle's own
+`[CycleNNN]-[CycleName]/001_concept.md`/`[CycleNNN]-[CycleName]/003_expanded_concept.md`/
 a prior resolved Material Decision Escalation record — or an architectural pattern with no GPG
 precedent: stop. If `SDP-Config.json` `materialDecisionEscalation.enabled` is `true` (default), do
 not proceed. Halt per the bootstrap doc's Halt Behavior Contract instead — set `workflow_status:
@@ -72,7 +92,9 @@ section (Dispatch and Halt Contracts).
 
 ### Step 3: Load Task Context
 
-1. Read the task description in `sdp-solution-docs/[NN_phase_name].md`. Form an independent
+1. Read the task description at `sdp-solution-docs/[phase_file]` (the literal
+   `sdp-solution-docs/` prefix plus the `Phase Document:` value recorded in Step 2 — never the
+   `Phase Document:` value alone, which is bare). Form an independent
    understanding of the acceptance criteria — record what each criterion requires — before
    reading the Completed blockquote. Do not read the Completed blockquote until this sub-step is
    complete.
@@ -120,7 +142,12 @@ section (Dispatch and Halt Contracts).
 
 4. **Spawn one `general-purpose` sub-agent per group, in parallel.** If 2 or more independent
    verification reads are needed and Superpowers is installed: optionally invoke
-   `/dispatching-parallel-agents` to structure the parallel dispatch.
+   `/dispatching-parallel-agents` to structure the parallel dispatch. Never spawn a verification
+   sub-agent on a `least_capable`-tier model — these dispatches feed directly into a formal Eval
+   verdict with no downstream safety net. Pass a `standard`-or-above tier model as the Agent tool's `model`
+   parameter for each child spawn — consult
+   `sdp-shared/scripts/script-support/sdp-subagent-model-roster.json` for the model currently
+   assigned to each tier rather than hardcoding a model name here.
 
    - **Document-review sessions** (the common case for phases 1-6):
      > "Read [file]. For each criterion in [list], answer: does it satisfy the criterion? Return
@@ -165,7 +192,7 @@ section (Dispatch and Halt Contracts).
    the reason explicitly as "cycle target reached with N gaps still open," never worded as if
    the remaining gaps were resolved. Otherwise **non-compliant**. Skip item 3 below for this
    phase — do not also write the ordinary Eval N blockquote format.
-3. **All other phases:** append an Eval N blockquote to `sdp-solution-docs/[NN_phase_name].md`
+3. **All other phases:** append an Eval N blockquote to `sdp-solution-docs/[phase_file]`
    immediately after the most recent blockquote for this task:
    ```
    > **Eval N — [YYYY-MM-DD HH:MM]:** [Compliance assessment against task spec, criterion by
@@ -187,7 +214,7 @@ section (Dispatch and Halt Contracts).
 
 ### Step 6: Update State and Sync
 
-1. Update `sdp-solution-docs/[NN_phase_name]_state.json` (the phase document's path with `.md`
+1. Update `sdp-solution-docs/[phase_file]_state.json` (the phase document's path with `.md`
    replaced by `_state.json`) for the evaluated task:
    - **Compliant:** task status → `"VERIFIED"`, increment `eval_cycles` by 1
    - **Partially compliant:** status → `"VERIFIED"`, increment `eval_cycles` by 1, add
@@ -206,7 +233,7 @@ section (Dispatch and Halt Contracts).
 2. Record the eval outcome (non-blocking): run `./sdp-shared/scripts/sdp-workflow-log.ps1
    -trigger "reviewer.eval" -role "REVIEWER" -workItem "[current_phase]" -outcome
    "[VERIFIED | REJECTED]" -reason "[one sentence]"` via the PowerShell tool.
-3. If `sdp-solution-docs/[NN_phase_name].md` has a top-level `**Status:**` header (the standard
+3. If `sdp-solution-docs/[phase_file]` has a top-level `**Status:**` header (the standard
    document template in `SDP-Workspace-Setup.md` includes one) and its current value does not
    reflect this task's new evaluated state: strike it through in place and append the corrected
    value immediately after, per Append-Only Discipline — `VERIFIED`, `VERIFIED (partially
@@ -233,14 +260,18 @@ section (Dispatch and Halt Contracts).
 - GPG alignment scope is limited to topics directly affected by this task.
 - Never write `pros_cons_gaps.cycle_target` — owned solely by `sdp-solution-phase-coordinator`,
   set once before the first cycle. REVIEWER only increments `cycle_count`.
+- Never spawn a Step 4 item 4 verification sub-agent on a `least_capable`-tier model — these
+  dispatches feed a formal Eval verdict with no downstream safety net. Use the roster
+  (`sdp-shared/scripts/script-support/sdp-subagent-model-roster.json`) to identify the current
+  `standard`-or-above tier model rather than hardcoding a model name.
 
 ## Outputs
 
-- Phase document (`sdp-solution-docs/[NN_phase_name].md`) updated: Eval N blockquote appended
+- Phase document (`sdp-solution-docs/[phase_file]`) updated: Eval N blockquote appended
   (or, for Architecture/Implementation Overview, a Pros-Cons-Gaps — Cycle N evaluation); Verified
   N appended if compliant or partially compliant; top-level `**Status:**` header synced to the
   evaluated outcome if present and stale
-- Phase state file (`sdp-solution-docs/[NN_phase_name]_state.json`) updated: task status →
+- Phase state file (`sdp-solution-docs/[phase_file]_state.json`) updated: task status →
   `VERIFIED` or `REJECTED`; `eval_cycles` incremented; `PARTIAL_COMPLIANCE`/
   `PARTIAL_COMPLIANCE_ESCALATE` flags if applicable; for Architecture/Implementation Overview,
   `pros_cons_gaps.cycle_count` also incremented

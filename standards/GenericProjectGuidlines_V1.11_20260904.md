@@ -2,7 +2,7 @@
 
 A reusable template for multi-tier .NET solutions — web-first with planned mobile expansion
 
-**Version:** 1.10 | **Created:** 2026-03-13 | **Derived from:** DewFromHeavenWebsite & VirtualCoinFolio reviews | **Target Framework:** .NET 10 LTS
+**Version:** 1.11 | **Created:** 2026-03-13 | **Derived from:** DewFromHeavenWebsite & VirtualCoinFolio reviews | **Target Framework:** .NET 10 LTS
 
 > **⚠️ Sync rule — agent instruction:** This is the parent document. Each chapter has a corresponding section file in `docs/GenericProjectGuidlines_Sections/`. Any change made to a chapter here **must be mirrored in the corresponding section file**. Any change made in a section file must be mirrored in the corresponding chapter here. Both must remain identical in content for their shared sections.
 > 
@@ -55,8 +55,8 @@ Every new solution must be laid out with all future consumers — website, API, 
 ### Dependency Graph
 
 ```
-  {AppName}.Database         <— SSDT .sqlproj, no project references
-                             produces: .dacpac (deployed to SQL Server)
+  {AppName}.Database         <— DbUp class library (.csproj), no project references
+                             runs: DatabaseMigrator.Migrate() (deployed to SQL Server)
 
   {AppName}.Domain           <— no external project references
         ^
@@ -76,18 +76,11 @@ Every new solution must be laid out with all future consumers — website, API, 
                              NEVER hits: DB, HTTP, external services
 
   {AppName}.IntegrationTests references: Domain, Contracts, project under test (typically API)
-                             deployment dependency: {AppName}.Database (.dacpac)
+                             deployment dependency: {AppName}.Database (DbUp migration runner)
                              uses: elevated DB privileges per test access model
 ```
 
-> **Updated 2026-05-23 — `.Database` project changed from SSDT to DbUp class library:**  
-> ~~`{AppName}.Database  <— SSDT .sqlproj, no project references`~~  
-> ~~`                    produces: .dacpac (deployed to SQL Server)`~~  
-> `{AppName}.Database  <— DbUp class library (.csproj), no project references`  
-> `                    runs: DatabaseMigrator.Migrate() (deployed to SQL Server)`  
->  
-> ~~`deployment dependency: {AppName}.Database (.dacpac)`~~  
-> `deployment dependency: {AppName}.Database (DbUp migration runner)`
+> The `{AppName}.Database` project is a DbUp class library (`.csproj`), with no project references. It runs `DatabaseMigrator.Migrate()` to deploy to SQL Server. `.IntegrationTests`' deployment dependency is the DbUp migration runner.
 
 > **⚠️ Rule:** The `Contracts` library must never reference `Domain` or any web framework package. This single rule is what makes mobile adoption possible without rework.
 
@@ -98,7 +91,7 @@ Every new solution must be laid out with all future consumers — website, API, 
 - **MUST** All projects target `net10.0` or the then-current LTS release. Never target an out-of-support TFM (e.g., net5.0, net6.0).
 - **MUST** All projects in the same solution must target the same major .NET version.
 - **SHOULD** Plan to upgrade to the next LTS within 6 months of its release to stay ahead of support windows.
-- **SHOULD** Run `dotnet list package --vulnerable` as part of every CI build and treat any high-severity CVE as a blocking issue.
+- **MUST** Run `dotnet list package --vulnerable` as part of every CI build and treat any high-severity CVE as a blocking issue.
 
 ---
 
@@ -276,7 +269,7 @@ A consistent folder structure across all projects reduces the time needed to nav
 - **MUST** Controller files end with `Controller`. Service files end with `Service`. DbContext files end with `DbContext`.
 - **MUST** Namespaces mirror the folder path from the project root. File at `{AppName}.API/Controllers/V1/AuthController.cs` → namespace `{AppName}.API.Controllers.V1`.
 - **SHOULD** Use file-scoped namespace declarations (`namespace Foo.Bar;`) to reduce indentation depth.
-- **SHOULD** Extension method files end with `Extensions`. Example: `StringExtensions.cs`, `SessionExtensions.cs`.
+- **MUST** Extension method files end with `Extensions`. Example: `StringExtensions.cs`, `SessionExtensions.cs`.
 - **MAY** Group tightly related small classes (e.g., a set of custom exception types) in a single file when each class is under 30 lines.
 
 ---
@@ -300,8 +293,8 @@ public class CoinController : ControllerBase { }
 - **MUST** All controller routes include the version segment: `/api/v1/coins`, `/api/v2/coins`.
 - **MUST** A new version folder `Controllers/V{n}/` is created for each major API version. Never edit existing versioned controllers — only add new ones alongside them.
 - **MUST** Breaking changes (field removals, type changes, behavior changes) require a new major version. Additive changes (new optional fields) may be made in-place.
-- **SHOULD** Keep at least one prior major version live for a minimum of 90 days after a new major ships, to allow mobile clients time to update through app stores.
-- **SHOULD** Auto-generate the OpenAPI spec after each build and commit it to `docs/openapi.json` so mobile developers always have the current contract.
+- **SHOULD** Where a mobile app or other slow-deploying external client consumes the API, keep at least one prior major version live for a minimum of 90 days after a new major ships, to allow those clients time to update through app stores. Not applicable to a solution with no external API consumers.
+- **MUST** Auto-generate the OpenAPI spec after each build and commit it to `docs/openapi.json` so mobile developers always have the current contract.
 
 ```xml
 <!-- {AppName}.API.csproj — post-build OpenAPI spec generation -->
@@ -322,14 +315,7 @@ The website version is independent of the API version. It follows semantic versi
 </PropertyGroup>
 ```
 
-> **Addition — 2026-07-23 — "source files" scope:** "Never hardcoded in source files" above refers
-> to executable code files (`.cs`, `.razor`, etc.) only. `.resx`, JSON, XML, and other
-> configuration/data files are **not source code files**, even when they live inside a project
-> folder or participate in the build (e.g., `.resx` generating a `*.Designer.cs`). Storing an
-> application version value in `appsettings.json` for runtime display or telemetry is not a
-> violation of this rule — see Chapter 14's Configuration File Hierarchy, which explicitly lists
-> "app name/version" as valid `appsettings.json` content, and Chapter 13's code-vs-data-file
-> distinction for the general test.
+"Never hardcoded in source files" refers to executable code files (`.cs`, `.razor`, etc.) only — `appsettings.json`, `.resx`, and other configuration/data files are not source files under Chapter 13's code-vs-data-file distinction, so storing the version there for runtime display or telemetry is not a violation.
 
 ### Mobile App Versioning
 
@@ -345,7 +331,7 @@ Mobile apps carry two independent version numbers: the user-visible *display ver
 - **MUST** `ApplicationVersion` (build number) increments with every store submission, even hotfixes.
 - **MUST** The app declares the minimum API version it requires and gracefully degrades or prompts for update when that version is unavailable.
 - **MUST** All NuGet package versions are pinned explicitly. Never use floating versions (`*`).
-- **SHOULD** Run `dotnet list package --outdated` and `dotnet list package --vulnerable` before every release.
+- **MUST** Run `dotnet list package --outdated` and `dotnet list package --vulnerable` before every release.
 
 ---
 
@@ -473,8 +459,10 @@ Password resets use a short-lived **signed JWT reset token** embedded in the res
 ```
 1.  User requests password reset for Solution A
 
-2.  User is challenged for their Reset PIN
-    2a. PIN valid:
+2.  User is challenged for their Reset PIN. If the user has security questions configured, they
+    may answer those instead — either challenge type satisfies this step; the Reset PIN remains
+    the primary factor and security questions are the alternative for users who set them up.
+    2a. Challenge passed (PIN valid, or all configured security question answers correct):
         — Server generates a signed JWT reset token:
               { "sub":          "<userId>",
                 "resetPinHash": "<current AspNetUsers.PasswordHash>",
@@ -482,14 +470,17 @@ Password resets use a short-lived **signed JWT reset token** embedded in the res
                 "purpose":      "password-reset",
                 "jti":          "<unique token id>",
                 "exp":          <now + 20 minutes> }
-              Signed with the server JWT secret
+              Signed with the server JWT secret. `resetPinHash` is captured regardless of which
+              challenge type was used — it exists solely to detect a Reset PIN change between
+              token issuance and redemption (see step 4), not to record which factor was used.
         — Token embedded in the reset URL
         — Reset link sent to the user's registered email address
         — User shown confirmation screen with options:
               [ Resend Email ]  [ Contact Support ]  [ Back to Login ]
 
-    2b. PIN invalid:
-        — User notified that the Reset PIN was not recognised
+    2b. Challenge failed:
+        — User notified that the challenge was not recognised (no distinction disclosed between
+          "wrong PIN" and "wrong security question answers", to prevent enumeration)
         — Prompted to contact support
         — No email sent
 
@@ -510,7 +501,6 @@ Password resets use a short-lived **signed JWT reset token** embedded in the res
 
 6.  All other solution credentials untouched
 ```
-
 
 ### Refresh Tokens
 
@@ -533,7 +523,7 @@ Framework-level baselines for all solutions. Solutions may tighten (shorten) the
 - **MUST** `ClockSkew = TimeSpan.Zero` on all `TokenValidationParameters` — no grace period is applied on top of the configured lifetime.
 - **SHOULD** Access token lifetime is chosen to minimize the stolen-token exposure window without forcing excessive refresh requests.
 - **SHOULD** Refresh token lifetime balances session usability against the risk window of a long-lived stolen token.
-- **SHOULD** Where regulatory compliance mandates shorter lifetimes, the stricter value always takes precedence and must be documented.
+- **MUST** Where regulatory compliance mandates shorter lifetimes, the stricter value always takes precedence and must be documented.
 
 ### Account Lockout Baselines
 
@@ -554,7 +544,8 @@ Framework-level defaults for brute-force protection. Solutions may tighten these
 - **MUST** On successful login: reset `FailedLoginAttempts = 0` and `LockoutEndDateUtc = NULL`.
 - **MUST** The locked-out user receives a generic message: "Account is temporarily locked due to multiple failed login attempts. Please try again later." No threshold values are disclosed to the caller.
 - **MUST** Manual lockout unlock via the Admin Panel clears `LockoutEndDateUtc` and `FailedLoginAttempts` for the specific user/solution pair.
-- **SHOULD** Alert on more than 10 lockout events for the same account within 24 hours — this pattern indicates a credential-stuffing attack.
+- **MUST** Have an alerting mechanism for an account experiencing an anomalous volume of lockout events, since this pattern indicates a credential-stuffing attack.
+- **SHOULD** Use more than 10 lockout events for the same account within 24 hours as the default alerting threshold.
 
 ### Rate Limiting Architecture
 
@@ -586,8 +577,9 @@ This enables ops to tighten or adjust limits per-solution without code changes o
 
 - **MUST** Rate-limited responses return `429 Too Many Requests` with a `Retry-After` header. Never return `200 OK` for a rate-limited request.
 - **MUST** All rate limit policies are stored in `API_RateLimitPolicy` and loaded via the cache. Hard-coded limits in middleware are not permitted.
-- **SHOULD** Alert on more than 100 rate-limit hits from a single IP within 1 hour — this pattern indicates credential-stuffing or DDoS.
-- **SHOULD** Correlate rate-limit hit events with account lockout events in security monitoring.
+- **MUST** Have an alerting mechanism for a single IP generating an anomalous volume of rate-limit hits, since this pattern indicates credential-stuffing or DDoS.
+- **SHOULD** Use more than 100 rate-limit hits from a single IP within 1 hour as the default alerting threshold.
+- **MUST** Where a security-monitoring platform capable of cross-event correlation exists, correlate rate-limit hit events with account lockout events in it.
 
 ### JWKS Endpoint & Key Rotation
 
@@ -626,7 +618,6 @@ The `kid` claim is stamped into every JWT header and matched against the JWKS at
 - **MUST** Every issued JWT includes a `kid` header claim matching the signing key's `KeyId`.
 - **MUST** Consumer APIs use the `kid` claim to select the correct key from the cached JWKS — never iterate-and-try-all.
 - **MUST** Alert if `API_SigningKey` has no row with `IsCurrent = 1` — this indicates a failed rotation that must be resolved immediately.
-- **SHOULD** Rotate signing keys at least quarterly. Document rotation events in the audit log.
 
 ### Client-Side Token Storage Strategies
 
@@ -668,7 +659,7 @@ MAUI and other mobile clients use secure OS storage (Keychain on iOS, Keystore o
 - **MUST** Each encrypted token is single-use. Server marks it consumed on first validation; any subsequent use is a replay and is rejected.
 - **MUST** Replay attempts are logged and trigger a security alert.
 - **MUST NOT** Store plaintext JWTs in `localStorage` or `sessionStorage`.
-- **SHOULD** On replay detection, revoke the user's active refresh tokens and force re-authentication.
+- **MUST** On replay detection, revoke the user's active refresh tokens and force re-authentication.
 
 ### SMS Verification via Email-to-SMS Gateways
 
@@ -825,12 +816,12 @@ On login, if MFA is enabled and the user has a verified phone, they are prompted
 - **MUST** Code lifetime is 5–10 minutes (project-specific, documented in project guidelines).
 - **MUST** Codes are single-use; a second attempt generates a new code and re-sends it.
 - **MUST** If SMS delivery fails (invalid phone, carrier gateway down, etc.), offer email fallback immediately.
-- **SHOULD** Start with US, CA, AU carriers; extend via the extensible `SmsCarrier` seed table for other countries.
+- **MUST** Start with US, CA, AU carriers; extend via the extensible `SmsCarrier` seed table for other countries.
 - **SHOULD** A user can disable SMS to a specific phone without deleting the record (`IsSmsEnabled = 0`).
 
 ### Multi-Factor Authentication (MFA) Strategy
 
-MFA adds a second verification factor for sensitive operations. Two channels are supported: email (primary) and SMS (optional). This section specifies MFA strategy, flow, and channel selection.
+MFA adds a second verification factor for sensitive operations. Three channels are supported: email (primary), SMS (optional), and TOTP via an authenticator app (optional). This section specifies MFA strategy, flow, and channel selection.
 
 #### MFA Scope
 
@@ -857,6 +848,13 @@ See **### Email Verification Token Lifecycle** for email token design and lifecy
 - **Mechanism:** SMS sent via email-to-SMS carrier gateway (see **### SMS Verification via Email-to-SMS Gateways**)
 - **User Choice:** If user has both email and verified phone, they select the channel at login time
 
+#### TOTP MFA — Secondary Channel
+
+- **Enrollment:** Requires scanning a QR code (or manually entering a secret) into an authenticator app, then confirming with one generated code
+- **Availability:** Only available once the user has completed and confirmed enrollment
+- **Mechanism:** Standard time-based one-time password, generated locally by the user's authenticator app (see [TOTP-Based Multi-Factor Authentication](#totp-based-multi-factor-authentication-authenticator-app))
+- **User Choice:** If the user has TOTP enrolled alongside email and/or verified phone, they select the channel at login time
+
 #### MFA Login Flow
 
 ```
@@ -866,21 +864,24 @@ See **### Email Verification Token Lifecycle** for email token design and lifecy
    b. Account is not locked out
    c. Account is active and not suspended
 3. If MFA is enabled for this account:
-   a. Server checks: does user have verified phone AND is SMS enabled on preferred phone?
-   b. If YES: prompt user to select channel:
-      [ Send SMS to preferred phone ]  [ Send email instead ]
+   a. Server checks which channels are available: verified+enabled phone (SMS), enrolled TOTP,
+      email (always available as the primary channel)
+   b. If more than one channel is available: prompt user to select channel:
+      [ Use authenticator app ]  [ Send SMS to preferred phone ]  [ Send email instead ]
    c. User selects channel
-   d. Send code to selected channel
+   d. TOTP: no send step — user is prompted directly for their authenticator app's current code
+      SMS/Email: send code to selected channel
    e. Return { status: "MfaChallengeRequired", mfaSessionId: "..." }
 4. Client presents code entry form
 5. User enters code: POST /auth/verify-mfa [MfaSessionId] { code }
 6. Server validates:
-   a. Code matches the sent code
-   b. Code has not expired (5–10 minute window)
-   c. Code has not been used yet (single-use)
-   d. mfaSessionId is valid and not expired
+   a. TOTP: code matches the expected value for the current (or adjacent) time step — see TOTP
+      section's Validation Window rule; SMS/Email: code matches the sent code and has not expired
+      (5–10 minute window)
+   b. Code has not been used yet (single-use)
+   c. mfaSessionId is valid and not expired
 7. On success: Issue access token + refresh token
-8. On failure: Return error; user can resend code or retry
+8. On failure: Return error; user can resend code (SMS/Email) or retry (TOTP)
 ```
 
 #### Code Delivery Rules
@@ -900,14 +901,188 @@ See **### Email Verification Token Lifecycle** for email token design and lifecy
 
 #### Rules
 
-- **MUST** MFA is always channel-optional. A user with both email and phone chooses the channel at each login
+- **MUST** MFA is always channel-optional. A user with email and any additional enrolled channel (SMS, TOTP) chooses the channel at each login
 - **MUST** SMS channel is not available unless the user has at least one verified, enabled phone number
-- **MUST** If a user's only MFA phone becomes unverified or disabled mid-session, email channel is offered as fallback
+- **MUST** TOTP channel is not available until the user has completed enrollment and confirmed it with a valid generated code
+- **MUST** If a user's only non-email MFA channel becomes unavailable mid-session (phone unverified/disabled, TOTP unenrolled), email channel is offered as fallback
 - **MUST** MFA challenge sessions are tied to a `mfaSessionId`. Once verified, the session is consumed and cannot be reused
 - **MUST** MFA challenge sessions expire after 15 minutes of inactivity
-- **MUST** Administrators can disable MFA for an account from the Admin Panel. The user must re-enable it by re-registering their phone or verifying email
-- **SHOULD** Projects should track MFA adoption and engagement metrics (% of users with MFA enabled, SMS vs. email channel preference)
-- **SHOULD** Email MFA codes can be single-use or multi-use (project-specific). SMS codes are always single-use
+- **MUST** Administrators can disable MFA for an account from the Admin Panel. The user must re-enable it by re-registering their phone, re-enrolling TOTP, or verifying email
+- **SHOULD** Projects should track MFA adoption and engagement metrics (% of users with MFA enabled, SMS vs. email vs. TOTP channel preference)
+- **SHOULD** Email MFA codes can be single-use or multi-use (project-specific)
+
+### TOTP-Based Multi-Factor Authentication (Authenticator App)
+
+TOTP (Time-based One-Time Password, RFC 6238) lets a user generate MFA codes locally in an
+authenticator app (Google Authenticator, Microsoft Authenticator, Authy, or any RFC 6238-compliant
+app) instead of receiving a code over SMS or email. No carrier or email dependency, no per-code
+delivery cost, and no SIM-swap exposure — the tradeoff is a device-loss recovery burden the backup
+codes below exist to cover.
+
+#### When to Use This Pattern
+
+Offer TOTP alongside Email and SMS MFA when:
+- Users are technical enough to comfortably install and use an authenticator app
+- SMS delivery cost or carrier reliability is a concern
+- A stronger MFA posture is wanted without adding phone-number PII
+
+TOTP does not replace Email MFA (Email remains the default, always-available channel) — it is an
+additional, optional channel a user may enroll in.
+
+#### How It Works
+
+The server and the authenticator app both hold the same shared secret (established at enrollment).
+Each independently computes an HMAC-based one-time code from that secret and the current 30-second
+time step; because both sides use the same secret and the same clock, the codes match without any
+network round-trip at code-generation time. The server never sends anything to validate a TOTP
+code — it only receives what the user's app already computed.
+
+#### Required Schema
+
+**UserTotpCredential** — one row per user per enrolled authenticator
+
+```sql
+CREATE TABLE [UserTotpCredential] (
+    [UserTotpCredentialId] INT PRIMARY KEY IDENTITY(1,1),
+    [UserTotpCredentialGuid] UNIQUEIDENTIFIER NOT NULL UNIQUE DEFAULT newid(),
+    [UserId] NVARCHAR(128) NOT NULL FOREIGN KEY REFERENCES [AspNetUsers]([Id]),
+    [EncryptedSecret] NVARCHAR(MAX) NOT NULL,   -- shared secret, encrypted at rest (see Rules)
+    [IsVerified] BIT NOT NULL DEFAULT 0,        -- enrollment confirmed with one valid code
+    [VerifiedDateUtc] DATETIME2 NULL,
+    [IsEnabled] BIT NOT NULL DEFAULT 1,         -- user can disable without deleting the enrollment
+    -- CommonColumns (Name, Description, CreatedDate, CreatedUser, LastUpdatedDate,
+    -- LastUpdatedUser, SortOrder, IsDeleted, DeletedDate, DeletedUser)
+    UNIQUE ([UserId])                            -- one TOTP enrollment per user
+);
+```
+
+**UserTotpBackupCode** — one-time recovery codes issued at enrollment, for when the device is lost
+
+```sql
+CREATE TABLE [UserTotpBackupCode] (
+    [UserTotpBackupCodeId] INT PRIMARY KEY IDENTITY(1,1),
+    [UserTotpBackupCodeGuid] UNIQUEIDENTIFIER NOT NULL UNIQUE DEFAULT newid(),
+    [UserId] NVARCHAR(128) NOT NULL FOREIGN KEY REFERENCES [AspNetUsers]([Id]),
+    [CodeHash] NVARCHAR(MAX) NOT NULL,          -- bcrypt(code), cost >= 12 — never store plaintext
+    [IsUsed] BIT NOT NULL DEFAULT 0,
+    [UsedDateUtc] DATETIME2 NULL,
+    -- CommonColumns
+);
+
+CREATE INDEX [IX_UserTotpBackupCode_UserId_IsUsed]
+    ON [UserTotpBackupCode]([UserId], [IsUsed]);
+```
+
+`EncryptedSecret` is encrypted, not hashed — the server must recover the plaintext secret on every
+validation to compute the expected code, unlike a password or backup code which only needs to be
+checked, never re-derived. Use the same master-key-based encryption service that protects other
+server-held secrets (e.g. Chapter 5's JWT signing key storage) — a dedicated column here, not the
+`Furniture` table itself, since that table's schema and rotation lifecycle are specific to
+per-solution signing keys, not per-user TOTP secrets. Backup codes, by contrast, are exactly like
+passwords in access pattern — bcrypt-hash them.
+
+#### Service Implementation Pattern
+
+```csharp
+public interface ITotpService
+{
+    string GenerateSecret();
+    string GenerateQrCodeUri(string secret, string accountEmail, string issuer);
+    bool ValidateCode(string secret, string code);
+    IReadOnlyList<string> GenerateBackupCodes(int count = 10);
+}
+
+public class TotpService : ITotpService
+{
+    // GenerateSecret: cryptographically random Base32 secret (RFC 4648), 160 bits recommended.
+    // GenerateQrCodeUri: builds an otpauth:// URI (issuer, account, secret) for the enrollment
+    //   QR code — the authenticator app scans this to import the secret.
+    // ValidateCode: computes the expected code for the current time step and the adjacent
+    //   step on each side (see Validation Window rule), constant-time-compares against the
+    //   submitted code.
+    // GenerateBackupCodes: cryptographically random codes (e.g. 10 groups of 8 alphanumeric
+    //   characters), returned once in plaintext to the caller for display — never persisted
+    //   in plaintext; the caller bcrypt-hashes each before storing in UserTotpBackupCode.
+}
+```
+
+#### TOTP Enrollment & Verification Flow
+
+**Step 1 — Begin Enrollment**
+
+```
+POST /api/v1/accounts/totp/begin-enroll
+
+Response: { "secret": "...", "qrCodeUri": "otpauth://totp/...", "backupCodes": ["..." x10] }
+```
+
+Server generates a secret and backup codes, stores the secret **encrypted** and the backup codes
+**hashed** with `IsVerified = 0`, and returns the plaintext secret/QR URI/backup codes to the
+client **once**. The client displays the QR code (for scanning) and the backup codes (for the user
+to save securely) — neither is retrievable from the server again after this response.
+
+**Step 2 — Confirm Enrollment**
+
+```
+POST /api/v1/accounts/totp/confirm-enroll
+{ "code": "123456" }
+
+Response: { "isVerified": true }
+```
+
+Server validates the submitted code against the stored (decrypted) secret. On success, sets
+`IsVerified = 1`, `VerifiedDateUtc = GETUTCDATE()`. On failure, enrollment remains unconfirmed;
+the user can retry or restart enrollment (which invalidates the prior secret and backup codes).
+
+**Step 3 — Use for MFA**
+
+Once verified, TOTP becomes an available channel in the MFA Login Flow above. The user is prompted
+for their authenticator app's current code — no code is sent by the server.
+
+**Backup Code Redemption**
+
+A user who has lost access to their authenticator app may submit a backup code in place of a TOTP
+code at the MFA challenge step. The server checks it against `UserTotpBackupCode` (bcrypt-verify,
+`IsUsed = 0`), marks it consumed (`IsUsed = 1`, `UsedDateUtc = GETUTCDATE()`) on success, and treats
+it as a completed MFA challenge. Each backup code is single-use.
+
+#### Validation Window
+
+Clock drift between the server and the user's device is inevitable, so the server validates against
+the current 30-second time step and one step on either side (a 90-second effective window), never
+wider. Widening the window further meaningfully increases the odds of a code being guessed or
+reused within the accepted range.
+
+#### Tradeoffs
+
+**Advantages:**
+- ✅ No per-code delivery cost or carrier dependency (unlike SMS)
+- ✅ Works offline — the app generates codes without network access
+- ✅ No SIM-swap exposure, since there is no phone-number-based delivery
+- ✅ Industry-standard, widely supported by existing authenticator apps
+
+**Disadvantages:**
+- ❌ Requires the user to install and maintain a separate authenticator app
+- ❌ Device loss without saved backup codes means a support-mediated account recovery
+- ❌ Clock drift on either side, beyond the validation window, causes valid-looking codes to fail
+
+#### Rules
+
+- **MUST** The TOTP secret is stored encrypted, never in plaintext, and is never returned by any
+  API response after the initial enrollment step.
+- **MUST** Enrollment is not considered complete, and the channel is not available for MFA, until
+  the user confirms with one valid generated code (`IsVerified = 1`).
+- **MUST** Backup codes are shown to the user exactly once, at enrollment, and are stored only as
+  bcrypt hashes (cost ≥ 12) thereafter.
+- **MUST** Each backup code is single-use; mark it consumed immediately on successful redemption.
+- **MUST** Code validation uses a constant-time comparison and checks only the current time step
+  and one adjacent step on either side (see Validation Window above) — never a wider range.
+- **MUST** Restarting enrollment invalidates the prior secret and all prior backup codes.
+- **SHOULD** Allow the user to regenerate backup codes at any time from account settings, which
+  invalidates all previously issued backup codes.
+- **MUST** Where the user's email address is known, notify the user by email when TOTP is
+  enrolled, disabled, or when backup codes are regenerated, so the legitimate user is aware of the
+  change in the event the account is compromised.
 
 ### Email Verification Token Lifecycle
 
@@ -949,7 +1124,7 @@ The plaintext token is sent in the email URL. Only the bcrypt hash is stored. Va
 - **MUST** Default token expiry is 24 hours. Projects must document any override.
 - **MUST** A resend issues a new token row — it does not invalidate the prior token. If the user clicks an older link it still validates (unless expired or already consumed).
 - **MUST** Nightly cleanup runs to prevent unbounded table growth from abandoned tokens.
-- **SHOULD** Verification failure responses are generic and do not indicate which validation check failed, to prevent token enumeration.
+- **MUST** Verification failure responses are generic and do not indicate which validation check failed, to prevent token enumeration.
 
 ### Security Questions Architecture
 
@@ -1113,7 +1288,7 @@ POST /api/v1/accounts/verify-security-answers
 - **MUST** Do not short-circuit answer verification. Validate all provided answers against the hash before returning success or failure to prevent answer enumeration via timing.
 - **MUST** Each user can set a distinct answer per question. Reusing the same answer across multiple questions is allowed but not recommended in UI guidance.
 - **SHOULD** At registration, require at least 2 security questions (configurable per-solution via `SolutionAccountFieldRequirement`). 2–5 questions is typical.
-- **SHOULD** Security questions are re-verified as a second factor during sensitive operations: email change, password reset completion, or admin actions.
+- **SHOULD** Where a user has security questions configured, answering them correctly is accepted as an alternative to the Reset PIN for re-authentication during sensitive operations: email change, password reset completion, or admin actions. The Reset PIN remains the primary re-authentication factor for these operations.
 - **SHOULD** Users can update their security answers in the account settings panel. The update flow is identical to initial setup (normalize, hash, replace prior answers).
 
 ### Key Rotation Lifecycle
@@ -1157,30 +1332,30 @@ If a private key is suspected compromised:
 
 ### Roles & Authorization
 
-Roles are stored in the app DB (see `## App DB Role Tables` in Chapter 7 — Database Architecture) and stamped into the JWT as `role` claims at login time. Each solution maintains its own role assignments; a user may hold different roles across solutions.
+Roles are stored in the app DB (see `## App DB Role Tables` in Chapter 7 — Database Architecture) and stamped into the JWT as `role` claims at login time, with each role's `RoleCategory` (where set) also stamped as a `roleCategory` claim — see Chapter 7's Role Rules. Each solution maintains its own role assignments; a user may hold different roles across solutions.
 
 #### Standard Roles
 
 The following three roles are seeded by the framework and are present in every solution:
 
-| Role | Default | Purpose |
-|------|---------|--------|
-| `User` | Yes — generic framework default | Standard authenticated user |
-| `Admin` | No | Full solution administration — activates Admin Panel in the UI |
-| `Dev` | No | Internal developer and debug access — activates Dev Toolbar in the UI |
+| Role | RoleCategory | Default | Purpose |
+|------|--------------|---------|--------|
+| `User` | NULL | Yes — generic framework default | Standard authenticated user |
+| `Admin` | `AdminAccess` | No | Full solution administration — activates Admin Panel in the UI |
+| `Dev` | `DeveloperAccess` | No | Internal developer and debug access — activates Dev Toolbar in the UI |
 
-The project documentation defines any additional app-specific roles. The project may also override the registration default (e.g., VegaDrop assigns `Player` instead of `User` as the default role).
+The project documentation defines any additional app-specific roles. The project may also override the registration default (e.g., VegaDrop assigns `Player` instead of `User` as the default role). A project may also rename `Dev` to any title that fits its org (`Developer`, `DevOps`, `Programmer`, etc.) without losing developer-tier access — see Chapter 7's `RoleCategory` mechanism.
 
 #### Role Rules
 
 - **MUST** Role names are `public const string` fields in a static `RoleDefs` class in `{AppName}.Domain` or `{AppName}.Contracts`. Never use magic strings for role names anywhere in application code.
-- **MUST** At JWT generation, query the app DB `UserRole` table for the user's active roles and include them as `role` claims in the token.
+- **MUST** At JWT generation, query the app DB `UserRole` table for the user's active roles, include them as `role` claims, and include each role's non-null `RoleCategory` as a `roleCategory` claim in the token.
 - **MUST** For sensitive or destructive operations, re-validate roles against the app DB at request time — do not rely solely on JWT claims, which reflect roles at token issuance.
 - **MUST** Pages requiring authentication inherit from `SecurePageBase`. Public pages inherit from `PageBase`.
 - **MUST** `app.UseHttpsRedirection()` appears in the pipeline before any auth middleware. iOS ATS and Android NSC reject plain HTTP in production.
 - **MUST** JWT secrets are stored in User Secrets locally and in environment variables or Key Vault in production. Never in `appsettings.json`.
 - **SHOULD** Use policy-based authorization over direct role checks for fine-grained permissions.
-- **SHOULD** A user may hold multiple roles simultaneously. Authorization policies should evaluate the full role set.
+- **MUST** A user may hold multiple roles simultaneously. Authorization policies must evaluate the full role set.
 
 ### Admin Panel
 
@@ -1201,6 +1376,7 @@ When the authenticated user holds the `Admin` role, the UI must expose an Admin 
 | System Announcements | Create, update, or remove global banners or notices displayed to all users in the UI. |
 | Maintenance Mode | Toggle maintenance mode for the solution. While active, non-admin users receive a maintenance page rather than the app. |
 | Feature Flags | Enable or disable named feature flags at runtime. Applied immediately without redeployment. |
+| Data Access Tracking | Log and query who accessed or changed which record, when, and via which stored procedure — see Chapter 8's **Data Access Tracking (DAT)** section for the schema, SP surface, and per-SP logging rule. Required for regulated data (e.g. medical) where "who accessed what, when" must be demonstrable. |
 
 **Project-specific admin features** (e.g., game stats, IAP/purchase history, leaderboard management, content moderation queues) must be defined in the project documentation.
 
@@ -1210,7 +1386,7 @@ When the authenticated user holds the `Admin` role, the UI must expose an Admin 
 - **MUST** All destructive admin actions (deactivate account, revoke role, unlock lockout) require re-validation of the acting admin's `Admin` role against the app DB at request time — do not rely solely on the JWT.
 - **MUST** All admin actions are audit-logged: actor account ID, target account ID (if applicable), action name, timestamp, and before/after values where relevant.
 - **SHOULD** The Admin Panel uses the same auth token as the main application. No separate admin login is required.
-- **SHOULD** Admin list views are paginated server-side. Never load all user records in a single query.
+- **MUST** Admin list views are paginated server-side. Never load all user records in a single query.
 
 ### Required Middleware Order
 
@@ -1233,23 +1409,8 @@ app.MapControllers();            // 7 — execute endpoint
 - **MUST** Reset tokens are single-use. The `jti` claim is recorded in `ConsumedResetTokens` on first use and rejected on any replay attempt.
 - **MUST** Account lockout is tracked per `UserSolutionCredential` row. A lockout on Solution A does not affect the user's access to Solution B.
 - **MUST** The Reset PIN can only be changed by providing the current Reset PIN. It must never be changeable via an email link alone.
-- **SHOULD** The "email sent" confirmation screen always displays regardless of internal PIN validation outcome, to prevent user enumeration via timing differences.
+- **MUST** The "email sent" confirmation screen always displays regardless of internal PIN validation outcome, to prevent user enumeration via timing differences.
 - **SHOULD** Clearly label the Reset PIN in all UI as a distinct credential from solution passwords, with explicit guidance not to reuse a solution password as the Reset PIN.
-
-### CHANGELOG — Chapter 5
-
-| Version | Date | Change | Source |
-|---------|------|--------|--------|
-| 1.11 | 2026-05-19 | Added `### Token Lifetime Defaults` — 15-min access token, 30-day refresh token baselines | Migrated from VegaIdentity RF, Critical Gap 3 |
-| 1.11 | 2026-05-19 | Added `### Account Lockout Baselines` — 5 attempts / 30-min window / 30-min lockout with override support | Migrated from VegaIdentity RF, Critical Gap 2 |
-| 1.11 | 2026-05-19 | Added `### Rate Limiting Architecture` — SlidingWindowRateLimiter, default policies, per-solution override pattern | Migrated from VegaIdentity RF, Critical Gap 5 |
-| 1.11 | 2026-05-19 | Added `### JWKS Endpoint & Key Rotation` — RS256 JWKS endpoint, kid format, 30-day overlap, consumer cache strategy | Migrated from VegaIdentity RF, Critical Gap 4 |
-| 1.11 | 2026-05-19 | Added `### Client-Side Token Storage Strategies` — encrypted localStorage with replay detection | Migrated from VegaIdentity RF, Blocking Decision OQ-7 |
-| 1.11 | 2026-05-19 | Added `### Email Verification Token Lifecycle` — dedicated table, bcrypt hash, 24h expiry, nightly cleanup | Migrated from VegaIdentity RF, Critical Gap 1 |
-| 1.11 | 2026-05-19 | Added `### Key Rotation Lifecycle` — quarterly cadence, emergency rotation checklist, audit log requirements | Migrated from VegaIdentity RF, Critical Gaps 4 + Blocking Decisions OQ-11/OQ-12 |
-| 1.12 | 2026-05-21 | Added `### SMS Verification via Email-to-SMS Gateways` — carrier gateway pattern, schema, service implementation, phone registration flow | Migrated from VegaIdentity Review Findings, Section 2.85 (SMS Integration) |
-| 1.12 | 2026-05-21 | Added `### Multi-Factor Authentication (MFA) Strategy` — email + SMS channels, login flow, code delivery rules, resend strategy | Migrated from VegaIdentity Review Findings, Section 2.85 (SMS Integration) + MFA design decisions |
-| 1.13 | 2026-05-21 | Added `### Security Questions Architecture` — predefined question library, answer normalization + bcrypt hashing, per-solution assignment, verification flow, DevOps dashboard management | User requirements: per-solution demographic fields (birthYear, birthMonth, country, timezone) + security questions for account recovery |
 
 ---
 
@@ -1285,25 +1446,14 @@ builder.Host.UseNLog();
 - **MUST** Never use string interpolation in log calls. It defeats structured log indexing.
 - **MUST** Never log passwords, JWT secrets, connection strings, or refresh token values at any log level.
 - **MUST** Log at `Error` level (not `Warning`) whenever an exception is caught and not re-thrown.
-- **SHOULD** Include a correlation / request trace ID in every entry so that all log lines for a single HTTP request can be grouped.
-- **SHOULD** Log application name, version, and environment at `Information` on startup.
-- **SHOULD** Configure at minimum two targets: rolling file (persistence) and console (development).
+- **MUST** Include a correlation / request trace ID in every entry so that all log lines for a single HTTP request can be grouped.
+- **SHOULD** For any long-running hosted service (API, Website), log application name, version, and environment at `Information` on startup; optional for short-lived tooling/scripts with no meaningful startup lifecycle.
+- **MUST** Configure at minimum two targets: rolling file (persistence) and console (development).
+- **MUST** The rolling file target writes one log file per calendar day, named with an embedded `yyyyMMdd` date segment (e.g. `log-20260724.log`). All entries for that day append to the same file.
+- **MUST** Retention is a configured number of days, never hardcoded. Read it from `appsettings.json` via strongly-typed configuration (see Chapter 14) — e.g. `Logging:RetentionDays`. Files older than the configured window are removed automatically by the provider's own archival mechanism: NLog's `archiveEvery="Day"` + `archiveNumbering="Date"` + `maxArchiveFiles` bound to the config value, or Serilog's `rollingInterval: RollingInterval.Day` + `retainedFileCountLimit` bound to the config value.
+- **SHOULD** Default `RetentionDays` to a conservative value (e.g. `30`) in `appsettings.json`, overridable per environment via `appsettings.{Environment}.json`.
 
 > **⚠️ Never do this:** `_logger.LogDebug($"Connection: {connectionString}")` — connection strings contain credentials.
-
-> **Addition — 2026-07-24 — Log file rotation and retention:**
->
-> - **MUST** The rolling file target writes one log file per calendar day, named with an
->   embedded `yyyyMMdd` date segment (e.g. `log-20260724.log`). All entries for that day append
->   to the same file.
-> - **MUST** Retention is a configured number of days, never hardcoded. Read it from
->   `appsettings.json` via strongly-typed configuration (see Chapter 14) — e.g.
->   `Logging:RetentionDays`. Files older than the configured window are removed automatically by
->   the provider's own archival mechanism: NLog's `archiveEvery="Day"` + `archiveNumbering="Date"`
->   + `maxArchiveFiles` bound to the config value, or Serilog's
->   `rollingInterval: RollingInterval.Day` + `retainedFileCountLimit` bound to the config value.
-> - **SHOULD** Default `RetentionDays` to a conservative value (e.g. `30`) in `appsettings.json`,
->   overridable per environment via `appsettings.{Environment}.json`.
 
 ---
 
@@ -1330,6 +1480,15 @@ Every table in the database follows the same foundational column set. Consistenc
 | `DeletedUser` | NVARCHAR(150) | `string? DeletedUser` | NULL | Username that performed the soft-delete. |
 
 > **ℹ️ ID and GUID columns are not part of `CommonColumns`.** Each entity class declares its own `(TableName)ID` (INT IDENTITY PK) and `(TableName)GUID` (UNIQUEIDENTIFIER DEFAULT newid()) properties individually. The base class provides only the shared audit, lifecycle, and metadata columns. SQL column names and C# property names are identical throughout — no `[Column]` mapping attributes are required.
+
+> **Addition — 2026-09-04 — `newsequentialid()` exception for high-volume insert-only tables:** The
+> GUID default above is `NEWID()` for every table except a high-volume, insert-only log table (e.g.
+> `DataAccessTracking` — see Chapter 8's Data Access Tracking section), which uses
+> `newsequentialid()` instead. `NEWID()` produces fully random GUIDs, which fragment a clustered
+> index under heavy sequential insert load; `newsequentialid()` produces GUIDs that increase
+> monotonically per call on the same machine, avoiding that fragmentation. This is a documented,
+> narrow exception — not a general license to swap defaults — and applies only where insert volume
+> and table shape (append-only, never updated in place) match this profile.
 
 ### CommonColumns Base Class
 
@@ -1434,23 +1593,46 @@ All database object names use PascalCase. Underscores serve only as classificati
 | Stored procedure – update | `spu_` | `spu_Coin_UpdatePrice` |
 | Stored procedure – delete / soft-delete | `spd_` | `spd_Coin_SoftDelete` |
 | Stored procedure – mixed operations | Combined prefix | `spiu_Coin_UpsertHolding`, `spud_Coin_UpdateOrDelete` |
+| Stored procedure – data access tracking | `dat_` | `dat_DataAccessTracking_Record`, `dat_DataAccessTracking_ArchiveData` |
+
+> **Addition — 2026-09-04 — `dat_` scope:** `dat_` procedures are a cross-cutting concern called
+> *from inside* other stored procedures (see Chapter 8's Data Access Tracking section), not
+> single-entity CRUD — that is why they sit outside the `sps_`/`spi_`/`spu_`/`spd_`/`spiu_`/`spud_`
+> scheme rather than being folded into it.
 
 > **ℹ️ Read path:** `sps_` → `v_` → table (or `sps_` → `fn_s_` → `v_` → table). The stored procedure always reads through a view; never directly from a table. Every view must return all `CommonColumns` for its primary table.
 >
 > **Write path:** `spi_` / `spu_` / `spd_` → table (or via `fn_i_` / `fn_u_`). Writes always target the table; views are never write targets.
 
+> **Addition — 2026-09-04 — Active/Deleted filtering lives in the `sps_` procedure, never the view:** The `v_` view stays a complete, unfiltered projection (see "every view must return all `CommonColumns`" above) — it is never where row-level Active/Deleted filtering happens. See the new MUST rule under **Database Rules** below. A predicate hidden in a view is a second, undocumented place a future developer or agent has to know to look; keeping the SP as the sole filtering point keeps that logic discoverable in one place.
+
 ### Database Rules
 
 - **MUST** Every table includes all 13 common columns. No exceptions without written justification.
+- **MUST** Every new column added to an existing table or view goes at the true end — after every existing column, never inserted mid-schema — regardless of where it would read most naturally. Anything relying on column position (BCP exports, position-based mapping, some legacy ORM configurations) breaks silently if a column's ordinal shifts underneath it; appending at the end is the only change that can never break such a consumer.
 - **MUST** Use the GUID — not the integer ID — in all public-facing URLs, API responses, and mobile client references.
 - **MUST** Records are never physically deleted. Use the `IsDeleted` / `DeletedDate` / `DeletedUser` columns.
 - **MUST** `CreatedDate` and the GUID are set by database defaults, never by application code.
 - **MUST** Maintain exactly two *runtime* `DbContext` classes: `AppDbContext` for the application domain and `AppIdentityDbContext` for the identity database. These must point to **separate physical databases** — they are never the same database. A third `DbContext` class for migrations is not required; instead, pass a `--connection` override to `dotnet ef database update` pointing to the elevated migration login. For Vega Discoveries projects the Identity database may be shared across multiple solutions; each solution always maintains its own independent application domain database. **The `Email` column (normalised to lowercase, unique-constrained) is the logical cross-database key linking the identity database to the app database.** Cross-database foreign key constraints are not used; joins across databases are performed on `Email` in services that require them.
 - **MUST** Use at least three SQL logins for each solution: (1) a **migrations login** (`db_owner` on both databases) used only during deployments and never by the running application; (2) a **runtime app login** with no direct table permissions — `EXECUTE` is granted only on individual stored procedures as they are created, channelled through an application database role — see **SQL Login and Database Role Pattern** below; (3) a **runtime identity login** with `db_datareader`, `db_datawriter`, and `EXECUTE` on the identity database. Apply this permission model from the first day of development, not only when deploying to production.
 - **MUST** The running application must never hold or read migration login credentials. Migration connection strings (`ConnectionStrings:MigrationsDb`, `ConnectionStrings:MigrationsIdentityDb`) are stored in User Secrets locally and in CI/CD secrets at deploy time. They must not appear in any runtime configuration path — `appsettings.json`, `appsettings.*.json`, or environment variables injected to a running process.
-- **SHOULD** Apply a global EF Core query filter on `IsDeleted`: `modelBuilder.Entity<T>().HasQueryFilter(e => !e.IsDeleted.GetValueOrDefault())`
-- **SHOULD** Use `DATETIME2` (not `DATETIME`) for all date columns. Store all timestamps in UTC.
-- **SHOULD** Use SQL authentication (username + password) rather than Windows authentication for cross-environment portability.
+
+> **Addition — 2026-09-04 — SP-level Active/Deleted filtering (real-world gap found on another Vega
+> Discoveries solution):** An agent built the SP-only read path correctly, but filtered
+> `IsActive`/`IsDeleted` in the *API layer* after the SP had already returned every row — meaning
+> excluded rows still traveled over the wire before being discarded: a needless bandwidth cost, and
+> a real disclosure risk if intercepted or if that after-the-fact filtering step is ever skipped
+> downstream. The fix moves filtering into the SP itself, where no caller — this API, a different
+> service, a report SP, an ETL job — can bypass it. A related incident on the same project is why
+> filtering does **not** move into the `v_` view instead: raw SQL/LINQ against `DbSet<T>` survived
+> several manual audit passes undetected and only surfaced once production's stricter DB permissions
+> rejected it for lack of grants — a predicate hidden in a view is the same kind of thing, quietly
+> correct until someone reads the wrong layer.
+
+- **MUST** Every `sps_` (read) stored procedure accepts `@IsActive BIT = 1` and `@IsDeleted BIT = 0` parameters and applies them itself — `WHERE IsActive = @IsActive AND IsDeleted = @IsDeleted`, or equivalent — before returning any row. Applies without exception, including composition procedures that read through another `sps_` procedure or a `fn_s_` function. The `v_` view remains an unfiltered full projection; see the **Read path** note above — filtering never lives in the view.
+- **MUST** Active/Deleted filtering is enforced by the stored procedure itself; it is never something the calling application's ORM configuration (e.g., an EF Core query filter) is trusted to apply.
+- **MUST** Use `DATETIME2` (not `DATETIME`) for all date columns. Store all timestamps in UTC.
+- **MUST** Use SQL authentication (username + password) rather than Windows authentication for cross-environment portability.
 
 ---
 
@@ -1495,15 +1677,10 @@ The login now holds no direct object permissions. All access is controlled throu
 
 **Step 3 — Grant EXECUTE to the role at SP creation time:**
 ```sql
--- In the migration or SSDT script that creates the SP:
 GRANT EXECUTE ON [dbo].[sps_User_GetByEmail] TO [Role_VegaAppVegaDrop];
 GRANT EXECUTE ON [dbo].[spi_UserProfile_Create] TO [Role_VegaAppVegaDrop];
 ```
 
-> **Updated 2026-05-23 — `.Database` project changed from SSDT to DbUp:** The comment above (`-- In the migration or SSDT script...`) is superseded. Use `-- In the DbUp migration script that creates the SP:` instead.
-
-~~This step belongs in the same deployment artifact (migration `Up()` or SSDT `.sql` file)
-that creates the SP — not in a separate permissions script applied later.~~
 This step belongs in the same DbUp migration script that creates the SP — not in a separate permissions script applied later.
 
 ### Rules
@@ -1513,7 +1690,7 @@ This step belongs in the same DbUp migration script that creates the SP — not 
 - **MUST** Role names follow the `Role-[processName]` or `Role_[loginName]` convention. No other naming is permitted.
 - **MUST** EXECUTE permissions are added to the role in the same deployment artifact that creates the SP — never deferred to a separate permissions pass.
 - **MUST** This pattern applies only to non-EF Core SP access. EF Core's built-in Identity table operations are out of scope.
-- **SHOULD** Where a process role (`Role-[processName]`) is used, document which logins are members and why the shared role is appropriate rather than per-login roles.
+- **MUST** Where a process role (`Role-[processName]`) is used, document which logins are members and why the shared role is appropriate rather than per-login roles.
 
 ---
 
@@ -1544,7 +1721,7 @@ Beyond the standard identity schema, the `RegisteredSolutions` table includes op
 **Implementation:**
 - Defaults: NULL values use the VDC_Emailer platform default (`fn_EmailProperties()`)
 - Configuration: Set by ops during solution onboarding via admin panel
-- Override: Per-template overrides via `RegisteredSolutionEmailTemplate` table for fine-grained control
+- Override: Per-template overrides via `RegisteredSolutionEmailTemplate` table for fine-grained control (e.g., support@solution for support emails, billing@solution for billing emails)
 
 **Rules:**
 
@@ -1553,7 +1730,6 @@ Beyond the standard identity schema, the `RegisteredSolutions` table includes op
 - **MUST** Each solution-to-template override is stored in `RegisteredSolutionEmailTemplate` (FK to both `RegisteredSolutions` and `EmailTemplate`)
 - **SHOULD** Each solution configures its own sender address at onboarding for branding consistency
 - **SHOULD** Display names follow the pattern: `{SolutionName} Notifications` or similar
-- **SHOULD** Ops can override sender per-email-type using `RegisteredSolutionEmailTemplate` table (e.g., support@solution for support emails, billing@solution for billing emails)
 
 ### Timezone Configuration
 
@@ -1597,8 +1773,7 @@ public class AppTokenValidator
 
 - **MUST** Use IANA timezone database identifiers (e.g., `"America/Chicago"`, `"Europe/London"`, `"Asia/Tokyo"`), never abbreviations (`"CST"`, `"GMT"`)
 - **MUST NOT** rely solely on `UtcOffsetMinutes` as the authoritative source — daylight saving time changes are not reflected; use `TimeZoneIdentifier` for reliable conversions
-- **SHOULD** Populate `TimeZoneIdentifier` for solutions with geographically distributed app instances
-- **SHOULD** Leave NULL if solution is centrally located or timezone awareness is not required
+- **SHOULD** Populate `TimeZoneIdentifier` when instances are geographically distributed; leave NULL otherwise (solution is centrally located or timezone awareness is not required)
 
 ---
 
@@ -1681,7 +1856,7 @@ Execution sequence (within the same request):
 - **MUST** The preview endpoint must be called before the email change form is shown; the returned application names are used to populate the confirmation message.
 - **MUST** The confirmation UI must name every affected application — a generic count alone is not sufficient.
 - **MUST** No email change is executed without explicit user confirmation.
-- **MUST** A Reset PIN re-authentication step is required for this account-level operation.
+- **MUST** A Reset PIN re-authentication step is required for this account-level operation; where the user has security questions configured, answering them correctly is accepted as an alternative to the Reset PIN.
 - **MUST** All database updates (identity + all app DBs) are treated as a distributed saga: any failure triggers compensating rollback across all already-updated stores.
 
 ## App DB Role Tables
@@ -1694,19 +1869,31 @@ Roles and role assignments are stored in the application database, not the ident
 Role
 ├── RoleID               INT IDENTITY(1,1) PK
 ├── RoleGUID             UNIQUEIDENTIFIER NOT NULL   DEFAULT newid()
+├── RoleCategory         NVARCHAR(50) NULL — capability tag (e.g. `DeveloperAccess`, `AdminAccess`);
+│                        NULL for roles that grant no elevated capability. The category, not the
+│                        `Name`, is what capability-gated rules (Dev Toolbar, Admin Panel, etc.) test.
 ├── + CommonColumns      — Name (NVARCHAR 255) holds the role label; SortOrder controls display hierarchy
 UNIQUE constraint on Name
 ```
 
 Generic roles seeded at table creation (present in every solution):
 
-| Name | SortOrder | Purpose |
-|------|-----------|--------|
-| `User` | 10 | Standard authenticated user — baseline role present in every solution |
-| `Admin` | 20 | Full solution administration — activates Admin Panel in the UI for user management, audit, and system configuration. |
-| `Dev` | 30 | Internal developer and debug access. Users with this role see the Dev Toolbar in the UI: raw error details, request/response inspector, JWT inspector, feature flag overrides, session info, log stream, performance alerts, state snapshot, and network latency overlay. |
+| Name | RoleCategory | SortOrder | Purpose |
+|------|--------------|-----------|--------|
+| `User` | NULL | 10 | Standard authenticated user — baseline role present in every solution |
+| `Admin` | `AdminAccess` | 20 | Full solution administration — activates Admin Panel in the UI for user management, audit, and system configuration. |
+| `Dev` | `DeveloperAccess` | 30 | Internal developer and debug access. Users with this role see the Dev Toolbar in the UI: raw error details, request/response inspector, JWT inspector, feature flag overrides, session info, log stream, performance alerts, state snapshot, and network latency overlay. |
 
-These three roles are seeded by the shared framework migration. App-specific roles are defined in the project documentation and seeded in addition to these at application startup. The `IsActive` flag (from `CommonColumns`) disables a role without removing existing assignments.
+These three roles are seeded by the shared framework migration. App-specific roles are defined in the project documentation and seeded in addition to these at application startup. The `IsActive` flag (from `CommonColumns`) disables a role without removing existing assignments. A project may rename `Dev` to whatever title fits its org (`Developer`, `DevOps`, `Programmer`, etc.) — the `Name` is cosmetic; what grants developer-tier capability is `RoleCategory = 'DeveloperAccess'`, not any specific `Name` string.
+
+> **Addition — 2026-09-06 — `RoleCategory` generalizes capability checks beyond a fixed role
+> name:** An earlier draft of this rule gated developer-tier access on the literal role name
+> (`Dev`), then attempted to widen that to an enumerated list (`Dev`, `Developer`, `DevOps`, ...)
+> once real deployments were found to name this role differently. An enumerated name list is never
+> complete and reintroduces the same brittleness it was meant to fix. `RoleCategory` decouples the
+> capability a role grants from what the role happens to be called — a project names the role
+> anything it wants and tags it with the category; every capability-gated rule tests the category,
+> never the name.
 
 ### UserRole Table
 
@@ -1725,10 +1912,11 @@ UNIQUE constraint on (UserID, RoleID)
 - **MUST** Every new `User` row is assigned the project-defined default role in `UserRole` immediately after the `User` insert, within the same registration transaction. The specific default role is defined in the project documentation.
 - **MUST** The project documentation must explicitly list all app-specific roles to be seeded at application startup, their `SortOrder` values, and which role is the registration default.
 - **MUST** Role names in the app DB `Role` table are the single source of truth. The `RoleDefs` constants class (in `{AppName}.Domain` or `{AppName}.Contracts`) must mirror these values exactly — no magic strings anywhere in application code.
-- **MUST** At JWT generation, the server queries the app DB `UserRole` table to retrieve all active roles for the user and stamps them as `role` claims. The identity DB does not hold or manage solution roles.
+- **MUST** At JWT generation, the server queries the app DB `UserRole` table to retrieve all active roles for the user, stamps them as `role` claims, and additionally stamps each held role's non-null `RoleCategory` as a `roleCategory` claim. The identity DB does not hold or manage solution roles.
+- **MUST** Any rule gated on a capability rather than a specific role identity (e.g. Dev Toolbar access) tests the `roleCategory` claim, never the literal `role`/`Name` string — this is what lets a project rename `Dev` to `Developer`, `DevOps`, `Programmer`, or any other title without breaking the rule.
 - **MUST** For sensitive or destructive operations, re-validate the user's roles against the app DB at request time — do not rely solely on the JWT `role` claims, which reflect roles at the time the token was issued.
-- **SHOULD** A user may hold multiple roles simultaneously (e.g., `User` + `Admin`). Authorization policies should evaluate the full role set.
-- **SHOULD** Role assignment and revocation are audit-logged via `CreatedUser` / `LastUpdatedUser` / `IsDeleted` on the `UserRole` row. Removing a role sets `IsDeleted = true` — rows are never physically deleted.
+- **MUST** A user may hold multiple roles simultaneously (e.g., `User` + `Admin`). Authorization policies evaluate the full role set.
+- **MUST** Role assignment and revocation are audit-logged via `CreatedUser` / `LastUpdatedUser` / `IsDeleted` on the `UserRole` row. Removing a role sets `IsDeleted = true` — rows are never physically deleted.
 
 ### Authentication-Critical Index Strategy
 
@@ -1758,8 +1946,8 @@ Authentication tables are on the hot request path — every login, token refresh
 - **MUST** All indexes in the table above are created in the initial database migration for any project using VegaIdentity. None are optional.
 - **MUST** Filtered indexes (WHERE clause) are used where the query always filters on a predictable condition (e.g., `IsConsumed = 0`, `IsActive = 1`). Never index the full table when a filtered index is sufficient.
 - **MUST** Composite indexes are ordered with the highest-selectivity column first (e.g., `UserId` before `IsRevoked`).
-- **SHOULD** Index creation is included in the migration script and verified in a post-migration check, not deferred to a DBA.
-- **SHOULD** New auth tables introduced in later phases follow the same pattern: identify every query on the hot path, ensure each has a supporting index, and document the rationale in the schema notes.
+- **MUST** Index creation is included in the migration script and verified in a post-migration check, not deferred to a DBA.
+- **MUST** New auth tables introduced in later phases follow the same pattern: identify every query on the hot path, ensure each has a supporting index, and document the rationale in the schema notes.
 
 ### Custom Token-Table Patterns
 
@@ -1805,7 +1993,7 @@ Use a custom table when any of the following apply:
 - **MUST** Custom token tables store only hashed or encrypted values — never plaintext tokens.
 - **MUST** All data access on custom token tables goes through stored procedures (SP-only rule). `UserManager<T>` is not used for custom tables.
 - **MUST** The decision (framework table vs. custom table) is documented in the schema notes for each token type.
-- **SHOULD** Custom token tables include an explicit expiry column (`ExpiryDateUtc`) and a nightly cleanup job targeting that column.
+- **MUST** Custom token tables include an explicit expiry column (`ExpiryDateUtc`) and a nightly cleanup job targeting that column.
 
 ### Phone Number Data Management
 
@@ -2006,8 +2194,8 @@ See **### Cleanup and Retention Patterns** for cleanup job design.
 - **MUST** All phone data access goes through stored procedures (SP-only rule); direct table queries are not permitted
 - **MUST** Soft-delete phones via `IsDeleted` flag; never physically delete
 - **SHOULD** Allow users to disable SMS to a specific phone (`IsSmsEnabled = 0`) without losing the phone record
-- **SHOULD** Auto-mark the first verified phone as preferred; clear preferred status if a user deletes their preferred phone
-- **SHOULD** Track metrics: % of users with registered phones, % of phones verified, preferred SMS vs. email MFA adoption
+- **MUST** Auto-mark the first verified phone as preferred; clear preferred status if a user deletes their preferred phone
+- **MUST** For any Admin Dashboard in a solution where MFA is enabled, track metrics: % of users with registered phones, % of phones verified, and % of preferred MFA channel adoption (SMS vs. email vs. TOTP vs. other)
 
 ### Cleanup and Retention Patterns
 
@@ -2029,6 +2217,19 @@ Use **soft delete** when the record has audit value (e.g., a consumed email veri
 Use **hard delete** when the record is purely operational with no audit value after expiry (e.g., an expired unconsumed `ConsumedAccessToken` entry from a token that was never replayed).
 
 Document the choice for each table in the schema notes.
+
+> **Addition — 2026-09-04 — Move-to-archive (write-scale retention):** Neither soft-delete nor
+> hard-delete fits a high-volume, insert-only log table whose write latency matters on the request
+> path — e.g. `DataAccessTracking` (Chapter 8's Data Access Tracking section), where every tracked
+> write pays the log-insert cost inline. Soft-delete leaves rows (and their index weight) in the
+> live table forever; hard-delete destroys audit history the pattern exists to preserve. The third
+> option: periodically move older rows out of the live table into a structurally identical archive
+> table (`DataAccessTrackingArchive`), keeping the live table small — and therefore fast to write to
+> — while the archive preserves every row indefinitely for audit/compliance queries. A read path
+> that needs the full history unions both tables (see `v_DataAccessTracking`) rather than choosing
+> one. Use this pattern specifically when table growth threatens *write* latency on the live table,
+> not merely when a retention policy is needed — soft-delete remains the default when audit value
+> alone is the driver.
 
 #### Cleanup Job Design
 
@@ -2053,7 +2254,7 @@ Document the choice for each table in the schema notes.
 - **MUST** Cleanup jobs target indexed columns — never full table scans.
 - **MUST** Cleanup jobs are monitored. A failing or missing cleanup job must trigger an alert.
 - **SHOULD** Batch delete size is configurable (default 1,000 rows). Adjust based on table growth rate and maintenance window constraints.
-- **SHOULD** Soft-deleted records are excluded from all application queries via `WHERE IsDeleted = 0` in stored procedures. Hard-deleted records do not need this filter.
+- **MUST** Soft-deleted records are excluded from all non-admin application queries via `WHERE IsDeleted = 0` in stored procedures. Soft-deleted records only appear in admin queries where specifically declared. Hard-deleted records do not need this filter.
 
 ### Composite Index Rationale
 
@@ -2090,16 +2291,6 @@ A filtered index is smaller, faster to maintain, and often produces better query
 - **MUST** Every composite index includes a comment in the migration script explaining the column order and the query it supports.
 - **MUST** Composite indexes are verified against the actual query patterns in stored procedures after implementation — not assumed to be correct from the design.
 - **SHOULD** Prefer a filtered index over a full-table composite index when the qualifying condition is a fixed boolean and the qualifying row fraction is small (< 20%).
-
-### CHANGELOG — Chapter 7
-
-| Version | Date | Change | Source |
-|---------|------|--------|--------|
-| 1.11 | 2026-05-19 | Added `### Authentication-Critical Index Strategy` — standard auth index set, filtered indexes, composite indexes | Migrated from VegaIdentity RF, Critical Gap 6 |
-| 1.11 | 2026-05-19 | Added `### Custom Token-Table Patterns` — decision tree for framework vs. custom tables, examples by category | Migrated from VegaIdentity RF, Blocking Decision OQ-8 |
-| 1.11 | 2026-05-19 | Added `### Cleanup and Retention Patterns` — nightly job design, soft vs. hard delete guidance, standard cleanup schedule | Migrated from VegaIdentity RF, Critical Gap 1 + Architecture |
-| 1.11 | 2026-05-19 | Added `### Composite Index Rationale` — column order principle, auth-table examples, filtered index preference guidance | Migrated from VegaIdentity RF, Critical Gap 6 |
-| 1.12 | 2026-05-21 | Added `### Phone Number Data Management` — schema, verification lifecycle, MFA integration, endpoint patterns, index strategy | Migrated from VegaIdentity Review Findings, Section 2.85 (SMS Integration) |
 
 ---
 
@@ -2191,13 +2382,18 @@ public class CoinRepository(AppDbContext dbContext) : ICoinRepository
 - **MUST** Never access `DbContext` directly from a Blazor component or an API controller. Always go through `DataAccess` or a repository.
 - **MUST** On every insert, pass `CreatedUser` and `LastUpdatedUser` to the stored procedure. On every update, pass `LastUpdatedDate` and `LastUpdatedUser`.
 - **MUST** Soft-delete calls the `spd_` procedure passing `IsDeleted = true`, `DeletedDate`, and `DeletedUser`. Never call `dbContext.Remove()` on a domain entity.
-- **SHOULD** Wrap multi-step stored-procedure calls in a single `DbContext` transaction when all steps must succeed or all must fail.
+- **MUST** Wrap multi-step stored-procedure calls in a single `DbContext` transaction when all steps must succeed or all must fail.
 - **MUST** The stored-procedure mandate applies to **all** database tables without exception, including tables managed by third-party frameworks (e.g., ASP.NET Core Identity's `AspNetUsers`, `AspNetRoles`, and related tables). No framework default or convenience API overrides this rule. Any conflict between a framework's built-in data access mechanism and this mandate must be resolved before implementation begins — the resolution must be documented and approved; it cannot be assumed.
 - **MUST** Cross-database stored procedure calls must be proxied through a local wrapper SP in the calling database (naming convention: `_sp_` prefix). Application code and composition SPs in the calling DB invoke the local wrapper — never the remote SP directly by three-part name. This confines knowledge of the remote database's SP signatures to the wrapper layer only, reducing structural exposure across DB boundaries.
 
-## ASP.NET Core Identity Integration Policy
+> **Addition — 2026-09-04:** Every `sps_` procedure's `@IsActive`/`@IsDeleted` filter parameters
+> (Chapter 7 — Database Architecture) carry SQL-side defaults (`= 1` / `= 0`), so this does not
+> change the call signatures shown above — a caller wanting the default active/non-deleted result
+> set omits them entirely, exactly as `EXEC sps_Coin_GetByGuid @CoinGuid` already does.
 
-**Decision recorded: 2026-05-18 (OQ-8). Documented: 2026-05-25 (P10-DOC-04).**
+- **MUST** A caller overrides `@IsActive`/`@IsDeleted` only for a documented reason (e.g., an admin/audit screen that must see inactive or soft-deleted rows), and must never filter Active/Deleted rows itself after the SP returns — the SP is the sole enforcement point, per Chapter 7's rule.
+
+## ASP.NET Core Identity Integration Policy
 
 ### The Conflict
 
@@ -2262,6 +2458,759 @@ Each Identity operation that would normally go through `UserManager` or `SignInM
 | Update email / normalized email | `spu_` | |
 | Soft-delete user | `spd_` | Sets `IsDeleted`, `IsActive = 0`; never hard-delete |
 
+## Data Access Tracking (DAT)
+
+> **Addition — 2026-09-04:** Some industries (medical among them) require demonstrating who
+> accessed what data and when — a requirement the SP-only access model above enables but does not
+> by itself satisfy, since `CreatedUser`/`LastUpdatedUser` account for writes only, not reads. Data
+> Access Tracking (DAT) is the framework pattern that addresses this.
+
+### Schema
+
+`DataAccessTracking` is the live log table. Unlike `ConsentLog` (Chapter 11), it inherits
+`CommonColumns` in full — DAT rows are framework-standard records, not the deliberately-bare
+immutable event shape `ConsentLog` uses.
+
+```sql
+CREATE TABLE [dbo].[DataAccessTracking](
+    [DataAccessTrackingID] [int] IDENTITY(1,1) NOT NULL,
+    [DataAccessTrackingGUID] [uniqueidentifier] NOT NULL,
+    [ProcedureName] [nvarchar](255) NOT NULL,
+    [RecordID] [int] NULL,
+    [RecordGUID] [uniqueidentifier] NULL,
+    [ParameterName1] [nvarchar](255) NULL,
+    [ParameterValue1] [nvarchar](255) NULL,
+    [ParameterName2] [nvarchar](255) NULL,
+    [ParameterValue2] [nvarchar](255) NULL,
+    [ParameterName3] [nvarchar](255) NULL,
+    [ParameterValue3] [nvarchar](255) NULL,
+    [ParameterName4] [nvarchar](255) NULL,
+    [ParameterValue4] [nvarchar](255) NULL,
+    [ParameterName5] [nvarchar](255) NULL,
+    [ParameterValue5] [nvarchar](255) NULL,
+    [Name] [nvarchar](255) NULL,
+    [Description] [nvarchar](2000) NULL,
+    [CreatedDate] [datetime2](7) NOT NULL,
+    [CreatedUser] [nvarchar](150) NULL,
+    [LastUpdatedDate] [datetime2](7) NULL,
+    [LastUpdatedUser] [nvarchar](150) NULL,
+    [IsActive] [bit] NULL,
+    [SortOrder] [int] NULL,
+    [IsDeleted] [bit] NULL,
+    [DeletedDate] [datetime2](7) NULL,
+    [DeletedUser] [nvarchar](150) NULL,
+ CONSTRAINT [PK_DataAccessTracking] PRIMARY KEY CLUSTERED 
+(
+    [DataAccessTrackingID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[DataAccessTracking] ADD  DEFAULT (newsequentialid()) FOR [DataAccessTrackingGUID]
+GO
+
+ALTER TABLE [dbo].[DataAccessTracking] ADD  DEFAULT (getutcdate()) FOR [CreatedDate]
+GO
+
+ALTER TABLE [dbo].[DataAccessTracking] ADD  DEFAULT ((1)) FOR [IsActive]
+GO
+
+ALTER TABLE [dbo].[DataAccessTracking] ADD  DEFAULT ((100)) FOR [SortOrder]
+GO
+
+ALTER TABLE [dbo].[DataAccessTracking] ADD  DEFAULT ((0)) FOR [IsDeleted]
+GO
+```
+
+`RequestingUser` is not a separate column — `CreatedUser` holds it. `ProcedureName` records the
+caller; `RecordID`/`RecordGUID` identify the specific row touched (both `NULL` for a multi-row
+read, e.g. a `GetAll`); the five `ParameterName{n}`/`ParameterValue{n}` pairs are a discretionary
+log of the parameters that materially describe what was accessed or changed — not every SP
+parameter needs to be logged, and an SP with more than five meaningful parameters picks which five
+matter most.
+
+**Write-scale retention — `DataAccessTrackingArchive`:** at multi-million-row volume, keeping every
+DAT row in the live table degrades insert latency on `DataAccessTracking` — and every tracked write
+already pays that latency, since it happens inline inside the write transaction.
+`DataAccessTrackingArchive` is a structurally identical sibling table that periodically absorbs
+older rows so the live table stays small and writes stay fast. See **Retention —
+`dat_DataAccessTracking_ArchiveData`** below, and Chapter 7's Cleanup and Retention Patterns for
+this pattern's place among the framework's other retention strategies.
+
+```sql
+CREATE TABLE [dbo].[DataAccessTrackingArchive](
+    [DataAccessTrackingArchiveID] [int] IDENTITY(1,1) NOT NULL,
+    [DataAccessTrackingArchiveGUID] [uniqueidentifier] NOT NULL,
+    [DataAccessTrackingID] [int] NOT NULL,
+    [DataAccessTrackingGUID] [uniqueidentifier] NOT NULL,
+    [ProcedureName] [nvarchar](255) NOT NULL,
+    [RecordID] [int] NULL,
+    [RecordGUID] [uniqueidentifier] NULL,
+    [ParameterName1] [nvarchar](255) NULL,
+    [ParameterValue1] [nvarchar](255) NULL,
+    [ParameterName2] [nvarchar](255) NULL,
+    [ParameterValue2] [nvarchar](255) NULL,
+    [ParameterName3] [nvarchar](255) NULL,
+    [ParameterValue3] [nvarchar](255) NULL,
+    [ParameterName4] [nvarchar](255) NULL,
+    [ParameterValue4] [nvarchar](255) NULL,
+    [ParameterName5] [nvarchar](255) NULL,
+    [ParameterValue5] [nvarchar](255) NULL,
+    [Name] [nvarchar](255) NULL,
+    [Description] [nvarchar](2000) NULL,
+    [CreatedDate] [datetime2](7) NOT NULL,
+    [CreatedUser] [nvarchar](150) NULL,
+    [LastUpdatedDate] [datetime2](7) NULL,
+    [LastUpdatedUser] [nvarchar](150) NULL,
+    [IsActive] [bit] NULL,
+    [SortOrder] [int] NULL,
+    [IsDeleted] [bit] NULL,
+    [DeletedDate] [datetime2](7) NULL,
+    [DeletedUser] [nvarchar](150) NULL,
+ CONSTRAINT [PK_DataAccessTrackingArchive] PRIMARY KEY CLUSTERED 
+(
+    [DataAccessTrackingArchiveID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON, OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[DataAccessTrackingArchive] ADD  DEFAULT (newsequentialid()) FOR [DataAccessTrackingArchiveGUID]
+GO
+
+ALTER TABLE [dbo].[DataAccessTrackingArchive] ADD  DEFAULT (getutcdate()) FOR [CreatedDate]
+GO
+
+ALTER TABLE [dbo].[DataAccessTrackingArchive] ADD  DEFAULT ((1)) FOR [IsActive]
+GO
+
+ALTER TABLE [dbo].[DataAccessTrackingArchive] ADD  DEFAULT ((100)) FOR [SortOrder]
+GO
+
+ALTER TABLE [dbo].[DataAccessTrackingArchive] ADD  DEFAULT ((0)) FOR [IsDeleted]
+GO
+
+ALTER TABLE [dbo].[DataAccessTrackingArchive]
+    ADD CONSTRAINT [UQ_DataAccessTrackingArchive_DataAccessTrackingID] UNIQUE ([DataAccessTrackingID])
+GO
+```
+
+`DataAccessTrackingArchive` preserves the original `DataAccessTrackingID`/`DataAccessTrackingGUID`
+alongside its own identity — every column and value from the source row is carried over on
+archive, not a subset, so the combined view (below) is a true, gapless history rather than a
+partial one.
+
+### View — `v_DataAccessTracking`
+
+The read path (Chapter 7) always goes through a view; DAT is no exception, and here the view also
+does real work: it `UNION ALL`s the live and archived tables into one gapless timeline, and resolves
+`CreatedUser` (the requesting user's identity-DB `Id`) to a display-friendly name and the end
+user's local time zone.
+
+```sql
+-- ============================================================
+-- Alter view: v_DataAccessTracking
+-- CreatedDate is the UTC instant the tracked action occurred, performed by
+-- the end user identified in CreatedUser/RequestingUserName. The end user
+-- and the ops admin viewing this data may be in different time zones, so
+-- neither UTC nor the viewing admin's own local time answers "what time
+-- was it for the end user." Adds EndUserTimezoneIana: CreatedUser ->
+-- AspNetUsers.Id -> UserDemographics.StoredTimezoneId ->
+-- StoredTimezones.IanaTimezoneId, via LEFT JOINs at every hop so a user
+-- with no UserDemographics row, or a StoredTimezoneId not set, or a
+-- non-user CreatedUser value (SYSTEM/ANONYMOUS/etc.) all resolve to NULL
+-- rather than being dropped or defaulted — the API/UI leave the "end user
+-- local time" column blank in that case, per design. Appended at the true
+-- end, after every existing column, per the ordinal-safety rule.
+-- ============================================================
+
+CREATE VIEW [dbo].[v_DataAccessTracking]
+AS
+SELECT
+    [DataAccessTracking].[DataAccessTrackingID],
+    [DataAccessTracking].[DataAccessTrackingGUID],
+    [DataAccessTracking].[ProcedureName],
+    [DataAccessTracking].[RecordID],
+    [DataAccessTracking].[RecordGUID],
+    [DataAccessTracking].[ParameterName1], [DataAccessTracking].[ParameterValue1],
+    [DataAccessTracking].[ParameterName2], [DataAccessTracking].[ParameterValue2],
+    [DataAccessTracking].[ParameterName3], [DataAccessTracking].[ParameterValue3],
+    [DataAccessTracking].[ParameterName4], [DataAccessTracking].[ParameterValue4],
+    [DataAccessTracking].[ParameterName5], [DataAccessTracking].[ParameterValue5],
+    [DataAccessTracking].[CreatedDate],
+    [DataAccessTracking].[CreatedUser],
+    [DataAccessTracking].[LastUpdatedDate],
+    [DataAccessTracking].[LastUpdatedUser],
+    [DataAccessTracking].[Name],
+    [DataAccessTracking].[Description],
+    [DataAccessTracking].[IsActive],
+    [DataAccessTracking].[SortOrder],
+    [DataAccessTracking].[IsDeleted],
+    [DataAccessTracking].[DeletedDate],
+    [DataAccessTracking].[DeletedUser],
+    CAST(NULL AS INT)              AS [DataAccessTrackingArchiveID],
+    CAST(NULL AS UNIQUEIDENTIFIER) AS [DataAccessTrackingArchiveGUID],
+    COALESCE(au1.[UserName], [DataAccessTracking].[CreatedUser]) AS [RequestingUserName],
+    st1.[IanaTimezoneId] AS [EndUserTimezoneIana]
+FROM [dbo].[DataAccessTracking]
+LEFT JOIN [dbo].[AspNetUsers] AS au1 ON au1.[Id] = [DataAccessTracking].[CreatedUser]
+LEFT JOIN [dbo].[UserDemographics] AS ud1 ON ud1.[UserId] = au1.[Id]
+LEFT JOIN [dbo].[StoredTimezones] AS st1 ON st1.[StoredTimezoneId] = ud1.[StoredTimezoneId]
+UNION ALL
+SELECT
+    [DataAccessTrackingArchive].[DataAccessTrackingID],
+    [DataAccessTrackingArchive].[DataAccessTrackingGUID],
+    [DataAccessTrackingArchive].[ProcedureName],
+    [DataAccessTrackingArchive].[RecordID],
+    [DataAccessTrackingArchive].[RecordGUID],
+    [DataAccessTrackingArchive].[ParameterName1], [DataAccessTrackingArchive].[ParameterValue1],
+    [DataAccessTrackingArchive].[ParameterName2], [DataAccessTrackingArchive].[ParameterValue2],
+    [DataAccessTrackingArchive].[ParameterName3], [DataAccessTrackingArchive].[ParameterValue3],
+    [DataAccessTrackingArchive].[ParameterName4], [DataAccessTrackingArchive].[ParameterValue4],
+    [DataAccessTrackingArchive].[ParameterName5], [DataAccessTrackingArchive].[ParameterValue5],
+    [DataAccessTrackingArchive].[CreatedDate],
+    [DataAccessTrackingArchive].[CreatedUser],
+    [DataAccessTrackingArchive].[LastUpdatedDate],
+    [DataAccessTrackingArchive].[LastUpdatedUser],
+    [DataAccessTrackingArchive].[Name],
+    [DataAccessTrackingArchive].[Description],
+    [DataAccessTrackingArchive].[IsActive],
+    [DataAccessTrackingArchive].[SortOrder],
+    [DataAccessTrackingArchive].[IsDeleted],
+    [DataAccessTrackingArchive].[DeletedDate],
+    [DataAccessTrackingArchive].[DeletedUser],
+    [DataAccessTrackingArchive].[DataAccessTrackingArchiveID],
+    [DataAccessTrackingArchive].[DataAccessTrackingArchiveGUID],
+    COALESCE(au2.[UserName], [DataAccessTrackingArchive].[CreatedUser]) AS [RequestingUserName],
+    st2.[IanaTimezoneId] AS [EndUserTimezoneIana]
+FROM [dbo].[DataAccessTrackingArchive]
+LEFT JOIN [dbo].[AspNetUsers] AS au2 ON au2.[Id] = [DataAccessTrackingArchive].[CreatedUser]
+LEFT JOIN [dbo].[UserDemographics] AS ud2 ON ud2.[UserId] = au2.[Id]
+LEFT JOIN [dbo].[StoredTimezones] AS st2 ON st2.[StoredTimezoneId] = ud2.[StoredTimezoneId]
+GO
+```
+
+> **⚠️ Solution-specific dependency:** `UserDemographics` and `StoredTimezones` are not part of the
+> baseline GPG schema — they exist to resolve the end user's local time zone for display purposes.
+> A consuming solution without those tables adapts this view accordingly: drop the
+> `EndUserTimezoneIana` column and its two `LEFT JOIN`s (to `UserDemographics` and
+> `StoredTimezones`) rather than deploying a view that references tables the solution doesn't have.
+> `AspNetUsers` and the `RequestingUserName` resolution are baseline (every GPG solution has
+> Identity) and are not part of this exception.
+
+### Stored Procedures
+
+Naming: the `dat_` prefix (Chapter 7's naming table) is reserved for this pattern — DAT procedures
+serve a cross-cutting concern invoked *from inside* other SPs, not single-entity CRUD, so they sit
+outside the `sps_`/`spi_`/`spu_`/`spd_`/`spiu_` scheme.
+
+**`dat_DataAccessTracking_Record`** is the only write entry point. Every tracked SP calls it —
+directly, never through another wrapper — with the caller's identity and what was touched:
+
+```sql
+-- =============================================
+-- Description: Record a data-access event. Adapted from VirtualCoinFolio's
+-- dat_DataAccessTracking_Validate — drops the SecurityLevel gate and allow/deny
+-- return (authorization already happened via [Authorize]/policy before this SP is
+-- ever called); every caller just logs and proceeds. Mirrors the source's inline
+-- archive trigger: checks the oldest active row's age on every call and archives
+-- once the 1-hour threshold is passed.
+--
+-- How to use (called once per distinct action branch of a mutating SP, matching the
+-- source's pattern — see spiu_PersonEmail in VirtualCoinFolio for the model):
+--
+--  EXEC dat_DataAccessTracking_Record
+--      @RequestingUser = @RequestingUser,
+--      @ProcedureName  = 'spiu_ExampleTable',
+--      @RecordID       = @ExampleTableID,
+--      @RecordGUID     = @GUIDTemp,
+--      @ParameterName1 = '@SomeParam', @ParameterValue1 = @SomeParam
+-- =============================================
+CREATE PROCEDURE [dbo].[dat_DataAccessTracking_Record]
+    @RequestingUser   NVARCHAR(450),
+    @ProcedureName    NVARCHAR(255),
+    @RecordID         INT              = NULL,
+    @RecordGUID       UNIQUEIDENTIFIER = NULL,
+    @ParameterName1   NVARCHAR(255)    = NULL, @ParameterValue1 NVARCHAR(255) = NULL,
+    @ParameterName2   NVARCHAR(255)    = NULL, @ParameterValue2 NVARCHAR(255) = NULL,
+    @ParameterName3   NVARCHAR(255)    = NULL, @ParameterValue3 NVARCHAR(255) = NULL,
+    @ParameterName4   NVARCHAR(255)    = NULL, @ParameterValue4 NVARCHAR(255) = NULL,
+    @ParameterName5   NVARCHAR(255)    = NULL, @ParameterValue5 NVARCHAR(255) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO [DataAccessTracking]
+        ([ProcedureName], [RecordID], [RecordGUID],
+         [ParameterName1], [ParameterValue1], [ParameterName2], [ParameterValue2],
+         [ParameterName3], [ParameterValue3], [ParameterName4], [ParameterValue4],
+         [ParameterName5], [ParameterValue5], [CreatedUser])
+    VALUES
+        (@ProcedureName, @RecordID, @RecordGUID,
+         @ParameterName1, @ParameterValue1, @ParameterName2, @ParameterValue2,
+         @ParameterName3, @ParameterValue3, @ParameterName4, @ParameterValue4,
+         @ParameterName5, @ParameterValue5, @RequestingUser);
+
+    DECLARE @OldestDate DATETIME2;
+    SELECT @OldestDate = MIN([CreatedDate]) FROM [DataAccessTracking];
+    IF @OldestDate IS NOT NULL AND DATEDIFF(HOUR, @OldestDate, GETUTCDATE()) > 1
+    BEGIN
+        EXEC [dbo].[dat_DataAccessTracking_ArchiveData];
+    END
+END
+GO
+```
+
+**Retention — `dat_DataAccessTracking_ArchiveData`.** Called inline from `Record` above (not a
+nightly job like Chapter 7's other cleanup patterns) — every insert checks the oldest live row's
+age and archives once it exceeds one hour. This is a framework default baseline; a solution may
+tighten or relax the threshold, documenting the override in the project documentation, the same as
+Chapter 5's token-lifetime and lockout baselines.
+
+```sql
+-- =============================================
+-- Description: Alter dat_DataAccessTracking_ArchiveData to also copy
+-- DataAccessTrackingGUID — every column and data value from
+-- the source row must be carried over on archive, not just DataAccessTrackingID, so
+-- v_DataAccessTracking's union of active + archive is a true single subset rather
+-- than a partial one.
+-- =============================================
+CREATE PROCEDURE [dbo].[dat_DataAccessTracking_ArchiveData]
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    BEGIN TRANSACTION;
+
+    DECLARE @LockResult INT;
+    EXEC @LockResult = sp_getapplock
+        @Resource    = 'dat_DataAccessTracking_ArchiveData',
+        @LockMode    = 'Exclusive',
+        @LockOwner   = 'Transaction',
+        @LockTimeout = 0;
+
+    IF @LockResult >= 0
+    BEGIN
+        DECLARE @ArchiveThroughID INT;
+        SELECT @ArchiveThroughID = MAX([DataAccessTrackingID]) FROM [DataAccessTracking];
+
+        IF @ArchiveThroughID IS NOT NULL
+        BEGIN
+            INSERT INTO [DataAccessTrackingArchive]
+                ([DataAccessTrackingID], [DataAccessTrackingGUID], [ProcedureName], [RecordID], [RecordGUID],
+                 [ParameterName1], [ParameterValue1], [ParameterName2], [ParameterValue2],
+                 [ParameterName3], [ParameterValue3], [ParameterName4], [ParameterValue4],
+                 [ParameterName5], [ParameterValue5],
+                 [CreatedDate], [CreatedUser], [LastUpdatedDate], [LastUpdatedUser],
+                 [IsActive], [SortOrder], [IsDeleted], [DeletedDate], [DeletedUser])
+            SELECT
+                [DataAccessTrackingID], [DataAccessTrackingGUID], [ProcedureName], [RecordID], [RecordGUID],
+                [ParameterName1], [ParameterValue1], [ParameterName2], [ParameterValue2],
+                [ParameterName3], [ParameterValue3], [ParameterName4], [ParameterValue4],
+                [ParameterName5], [ParameterValue5],
+                [CreatedDate], [CreatedUser], [LastUpdatedDate], [LastUpdatedUser],
+                [IsActive], [SortOrder], [IsDeleted], [DeletedDate], [DeletedUser]
+            FROM [DataAccessTracking]
+            WHERE [DataAccessTrackingID] > (SELECT COALESCE(MAX([DataAccessTrackingID]), 0) FROM [DataAccessTrackingArchive])
+              AND [DataAccessTrackingID] <= @ArchiveThroughID;
+
+            DELETE FROM [DataAccessTracking]
+            WHERE [DataAccessTrackingID] <= @ArchiveThroughID;
+        END
+    END
+    -- @LockResult < 0 (timeout or deadlock victim): another session is already
+    -- archiving this cycle — skip rather than block the caller's own write.
+
+    COMMIT TRANSACTION;
+END
+GO
+```
+
+**Query surface — admin viewer support.** These read `v_DataAccessTracking` (live + archive as one
+set) and back the Data Access Tracking admin page (Chapter 5's Admin Panel). They do **not** take
+`@IsActive`/`@IsDeleted` filter parameters — DAT rows are an append-only event log, never
+soft-deleted or deactivated in normal operation, so Chapter 7's Active/Deleted filtering rule does
+not apply to them.
+
+```sql
+-- =============================================
+-- Description: Look up data-access log entries by procedure name, searching across
+-- both the active table and the archive (v_DataAccessTracking is a UNION of both) —
+-- a deliberate improvement over the source system, whose equivalent read procedure
+-- only ever saw the active table. Drops the source's self-referential SecurityLevel
+-- read-check; that access control now lives at the API layer ([Authorize] on whichever
+-- endpoint exposes this).
+-- =============================================
+CREATE PROCEDURE [dbo].[dat_DataAccessTracking_GetDataByProcedureName]
+    @ProcedureName NVARCHAR(255)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT *
+    FROM [v_DataAccessTracking]
+    WHERE [ProcedureName] = @ProcedureName
+    ORDER BY [CreatedDate] DESC;
+END
+GO
+
+
+-- =============================================
+-- Description: Look up data-access log entries by requesting user, searching across
+-- both the active table and the archive. Renamed from the source's
+-- dat_DataAccessTracking_GetDataByUserName to match VegaIdentity's own @RequestingUser
+-- terminology (CreatedUser holds the requesting user on this table — see
+-- dat_DataAccessTracking_Record).
+-- =============================================
+CREATE PROCEDURE [dbo].[dat_DataAccessTracking_GetDataByRequestingUser]
+    @RequestingUser NVARCHAR(450)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT *
+    FROM [v_DataAccessTracking]
+    WHERE [CreatedUser] = @RequestingUser
+    ORDER BY [CreatedDate] DESC;
+END
+GO
+
+
+-- =============================================
+-- Description: Distinct list of procedure names present in the data-access log,
+-- across both the active table and the archive (for building an admin filter list).
+-- =============================================
+CREATE PROCEDURE [dbo].[dat_DataAccessTracking_ProcedureNameList]
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT [ProcedureName]
+    FROM [v_DataAccessTracking]
+    WHERE [ProcedureName] IS NOT NULL
+    GROUP BY [ProcedureName]
+    ORDER BY [ProcedureName];
+END
+GO
+
+
+-- =============================================
+-- Description: Distinct list of RecordID values present in the data-access
+-- log, across both the active table and the archive (for building an admin
+-- filter dropdown). Sibling to dat_DataAccessTracking_ProcedureNameList/
+-- RequestingUserList.
+-- =============================================
+CREATE PROCEDURE [dbo].[dat_DataAccessTracking_RecordIDList]
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT [RecordID]
+    FROM [v_DataAccessTracking]
+    WHERE [RecordID] IS NOT NULL
+    GROUP BY [RecordID]
+    ORDER BY [RecordID];
+END
+GO
+
+
+-- =============================================
+-- Description: v_DataAccessTracking now exposes RequestingUserName,
+-- resolving CreatedUser to the matching AspNetUsers.UserName (falling back
+-- to the raw CreatedUser value for SYSTEM/ANONYMOUS/unmatched rows). This
+-- lookup switches from the raw CreatedUser value to the resolved name so
+-- the Data Access Tracking page's Requesting User filter dropdown (built
+-- from this list) offers the same values the grid actually displays.
+-- =============================================
+CREATE PROCEDURE [dbo].[dat_DataAccessTracking_RequestingUserList]
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT [RequestingUserName] AS [RequestingUser]
+    FROM [v_DataAccessTracking]
+    WHERE [RequestingUserName] IS NOT NULL
+    GROUP BY [RequestingUserName]
+    ORDER BY [RequestingUserName];
+END
+GO
+```
+
+### Calling Convention — Every SP Logs Its Caller
+
+The DAT gap this section closes was that `RequestingUser` was not applied consistently. The rule
+going forward:
+
+- **MUST** Every `sps_`, `spi_`, `spu_`, `spd_`, and `spiu_`/`spud_` procedure accepts a parameter
+  identifying the requesting user and passes its value to `dat_DataAccessTracking_Record`'s
+  `@RequestingUser`. The parameter is canonically named `@RequestingUser`; a business-appropriate
+  alternate name is acceptable (e.g. `spu_ContactInquiry_MarkRead`'s `@ReadByUser` below) provided
+  its value is what gets passed through. This applies without exception, including procedures
+  against ASP.NET Identity tables (Chapter 8's "No Exemptions" policy above).
+- **MUST** A mutating SP (`spi_`/`spu_`/`spd_`/`spiu_`) calls `dat_DataAccessTracking_Record` once
+  per distinct action branch actually taken (insert, update, soft-delete are separate calls) — and
+  only when that branch actually affected a row (guard on `@@ROWCOUNT`/`SELECT COUNT(*)` first for
+  update/delete branches; an insert branch that reached `dat_DataAccessTracking_Record` at all has,
+  by definition, just inserted, so no guard is needed there).
+- **MUST** A read SP (`sps_`) calls `dat_DataAccessTracking_Record` once per invocation, before
+  returning its result set. `@RecordID`/`@RecordGUID` are the specific row identified when the SP
+  reads a single record; both are `NULL` for a multi-row read (e.g. `GetAll`).
+- **MUST** `dat_` procedures themselves never call `dat_DataAccessTracking_Record` — logging DAT's
+  own reads/writes would recurse and add pure noise, not signal.
+- **MUST** A procedure that may legitimately run without an authenticated caller (a background
+  job, a migration, a public/anonymous read) defaults `@RequestingUser` to `NULL` and substitutes a
+  sentinel before logging: `DECLARE @ActualRequestingUser NVARCHAR(450) = ISNULL(@RequestingUser, 'SYSTEM')`.
+  A procedure only ever invoked within an authenticated request context gives `@RequestingUser` no
+  default — the caller must supply a real value.
+- **MUST** Via the `dat_DataAccessTracking_Record` call, log the `ParameterName{n}`/`ParameterValue{n}`
+  pairs that materially describe what was accessed or changed, not necessarily every parameter the
+  SP takes.
+
+### Worked Examples
+
+**Read (`sps_`), multi-row, system-tolerant default:**
+
+```sql
+CREATE PROCEDURE [dbo].[sps_State_GetAll]
+    @RequestingUser NVARCHAR(450) = NULL,
+    @IsActive       BIT = 1,
+    @IsDeleted      BIT = 0
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @ActualRequestingUser NVARCHAR(450) = ISNULL(@RequestingUser, 'SYSTEM');
+
+    EXEC [dbo].[dat_DataAccessTracking_Record]
+        @RequestingUser  = @ActualRequestingUser,
+        @ProcedureName   = 'sps_State_GetAll',
+        @RecordID        = NULL,
+        @RecordGUID      = NULL;
+
+    SELECT  [StateProvinceAbbrev],
+            [StateProvince],
+            [CountryID],
+            [CountryName]
+    FROM    [dbo].[v_State]
+    WHERE   [IsActive]  = @IsActive
+      AND   [IsDeleted] = @IsDeleted
+    ORDER BY [CountryName], [StateProvince];
+END
+GO
+```
+
+**Update (`spu_`), single branch, idempotent, alternate parameter name:**
+
+```sql
+CREATE PROCEDURE [dbo].[spu_ContactInquiry_MarkRead]
+    @InquiryGUID uniqueidentifier,
+    @ReadByUser  nvarchar(150)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Idempotent: only set ReadDate when currently unread
+    UPDATE [ContactInquiries]
+    SET    [ReadDate]        = GETUTCDATE(),
+           [ReadByUser]      = @ReadByUser,
+           [LastUpdatedDate] = GETUTCDATE(),
+           [LastUpdatedUser] = @ReadByUser
+    WHERE  [InquiryGUID] = @InquiryGUID
+      AND  [ReadDate]    IS NULL
+      AND  [IsDeleted]   = 0;
+
+    DECLARE @RowsAffected INT = @@ROWCOUNT;
+
+    IF @RowsAffected > 0
+    BEGIN
+        DECLARE @RecordID INT;
+
+        SELECT @RecordID = [InquiryID]
+        FROM   [ContactInquiries]
+        WHERE  [InquiryGUID] = @InquiryGUID;
+
+        EXEC [dbo].[dat_DataAccessTracking_Record]
+            @RequestingUser = @ReadByUser,
+            @ProcedureName  = 'spu_ContactInquiry_MarkRead',
+            @RecordID       = @RecordID,
+            @RecordGUID     = @InquiryGUID;
+    END
+END
+GO
+```
+
+**Insert/Update/Soft-delete (`spiu_`), three branches, one call per branch:**
+
+```sql
+CREATE PROCEDURE [dbo].[spiu_UserAddress]
+    @UserAddressID INT = -1,
+    @UserId NVARCHAR(450) = '',
+    @AddressID INT = -1,
+    @IsActive BIT = 1,
+    @Deleted BIT = 0,
+    @RequestingUser NVARCHAR(450)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @rowcount INT
+    IF @UserAddressID > -1
+        SELECT @rowcount = COUNT(*) FROM [UserAddress] WHERE UserAddressID = @UserAddressID
+    ELSE
+        SELECT @rowcount = 0
+
+    IF @rowcount = 0
+    BEGIN
+        -- INSERT
+        INSERT INTO [UserAddress]
+            (UserId, AddressID, IsActive, IsDeleted, CreatedUser)
+        VALUES
+            (@UserId, @AddressID, @IsActive, @Deleted, @RequestingUser)
+
+        DECLARE @newid INT = @@IDENTITY
+        DECLARE @newguid UNIQUEIDENTIFIER = (SELECT [UserAddressGUID] FROM [UserAddress] WHERE [UserAddressID] = @newid)
+
+        EXEC [dbo].[dat_DataAccessTracking_Record]
+            @RequestingUser = @RequestingUser,
+            @ProcedureName  = 'spiu_UserAddress',
+            @RecordID       = @newid,
+            @RecordGUID     = @newguid,
+            @ParameterName1 = 'UserAddressID', @ParameterValue1 = @UserAddressID,
+            @ParameterName2 = 'UserID', @ParameterValue2 = @UserId,
+            @ParameterName3 = 'AddressID', @ParameterValue3 = @AddressID,
+            @ParameterName4 = 'IsActive', @ParameterValue4 = @IsActive,
+            @ParameterName5 = 'Deleted', @ParameterValue5 = @Deleted;
+
+        SELECT * FROM v_UserAddress WHERE UserAddressID = @newid AND IsDeleted = 0
+    END
+    ELSE
+    BEGIN
+        IF @Deleted = 1
+        BEGIN
+            -- SOFT DELETE
+            UPDATE [UserAddress]
+            SET IsActive = 0,
+                IsDeleted = 1,
+                DeletedDate = GETUTCDATE(),
+                DeletedUser = @RequestingUser,
+                LastUpdatedDate = GETUTCDATE(),
+                LastUpdatedUser = @RequestingUser
+            WHERE UserAddressID = @UserAddressID
+
+            DECLARE @DeleteRowsAffected INT = @@ROWCOUNT
+            IF @DeleteRowsAffected > 0
+            BEGIN
+                EXEC [dbo].[dat_DataAccessTracking_Record]
+                    @RequestingUser = @RequestingUser,
+                    @ProcedureName  = 'spiu_UserAddress',
+                    @RecordID       = @UserAddressID,
+                    @RecordGUID     = NULL,
+                    @ParameterName1 = 'UserAddressID', @ParameterValue1 = @UserAddressID,
+                    @ParameterName2 = 'UserID', @ParameterValue2 = @UserId,
+                    @ParameterName3 = 'AddressID', @ParameterValue3 = @AddressID,
+                    @ParameterName4 = 'IsActive', @ParameterValue4 = @IsActive,
+                    @ParameterName5 = 'Deleted', @ParameterValue5 = @Deleted;
+            END
+        END
+        ELSE
+        BEGIN
+            -- UPDATE
+            UPDATE [UserAddress]
+            SET UserId = @UserId,
+                AddressID = @AddressID,
+                IsActive = @IsActive,
+                IsDeleted = @Deleted,
+                LastUpdatedDate = GETUTCDATE(),
+                LastUpdatedUser = @RequestingUser
+            WHERE UserAddressID = @UserAddressID
+
+            DECLARE @UpdateRowsAffected INT = @@ROWCOUNT
+            IF @UpdateRowsAffected > 0
+            BEGIN
+                EXEC [dbo].[dat_DataAccessTracking_Record]
+                    @RequestingUser = @RequestingUser,
+                    @ProcedureName  = 'spiu_UserAddress',
+                    @RecordID       = @UserAddressID,
+                    @RecordGUID     = NULL,
+                    @ParameterName1 = 'UserAddressID', @ParameterValue1 = @UserAddressID,
+                    @ParameterName2 = 'UserID', @ParameterValue2 = @UserId,
+                    @ParameterName3 = 'AddressID', @ParameterValue3 = @AddressID,
+                    @ParameterName4 = 'IsActive', @ParameterValue4 = @IsActive,
+                    @ParameterName5 = 'Deleted', @ParameterValue5 = @Deleted;
+            END
+        END
+
+        SELECT * FROM v_UserAddress WHERE UserAddressID = @UserAddressID AND IsDeleted = 0
+    END
+END
+GO
+```
+
+**Soft-delete only (`spd_`), single branch:**
+
+```sql
+CREATE PROCEDURE [dbo].[spd_SolutionContact_Delete]
+    @SolutionContactID INT,
+    @RequestingUser    NVARCHAR(150) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    UPDATE [SolutionContacts]
+    SET    [IsDeleted]       = 1,
+           [IsActive]        = 0,
+           [DeletedDate]     = GETUTCDATE(),
+           [DeletedUser]     = @RequestingUser,
+           [LastUpdatedDate] = GETUTCDATE(),
+           [LastUpdatedUser] = @RequestingUser
+    WHERE  [SolutionContactID] = @SolutionContactID;
+
+    DECLARE @RowsAffected INT = @@ROWCOUNT;
+
+    IF @RowsAffected > 0
+    BEGIN
+        EXEC [dbo].[dat_DataAccessTracking_Record]
+            @RequestingUser = @RequestingUser,
+            @ProcedureName  = 'spd_SolutionContact_Delete',
+            @RecordID       = @SolutionContactID;
+    END
+END;
+GO
+```
+
+**Insert only (`spi_`):**
+
+```sql
+CREATE PROCEDURE [dbo].[spi_HelpItemTarget_Add]
+    @HelpItemID       INT,
+    @TargetKey        NVARCHAR(200),
+    @TargetType       NVARCHAR(50),
+    @RequestingUser   NVARCHAR(450)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO [dbo].[HelpItemTarget]
+        (HelpItemID, TargetKey, TargetType, CreatedUser)
+    VALUES
+        (@HelpItemID, @TargetKey, @TargetType, @RequestingUser)
+
+    DECLARE @newid INT = @@IDENTITY
+    DECLARE @newguid UNIQUEIDENTIFIER
+    SELECT @newguid = [HelpItemTargetGUID] FROM [dbo].[HelpItemTarget] WHERE [HelpItemTargetID] = @newid
+
+    EXEC [dbo].[dat_DataAccessTracking_Record]
+        @RequestingUser = @RequestingUser,
+        @ProcedureName  = 'spi_HelpItemTarget_Add',
+        @RecordID       = @newid,
+        @RecordGUID     = @newguid,
+        @ParameterName1 = 'HelpItemID', @ParameterValue1 = @HelpItemID,
+        @ParameterName2 = 'TargetKey', @ParameterValue2 = @TargetKey,
+        @ParameterName3 = 'TargetType', @ParameterValue3 = @TargetType;
+
+    SELECT * FROM [dbo].[v_HelpItemTarget] WHERE [HelpItemTargetID] = @newid AND [IsDeleted] = 0
+END
+GO
+```
+
 ---
 
 ## Chapter 9 — DTO & Contract Library
@@ -2284,8 +3233,8 @@ The `{AppName}.Contracts` library is the formal boundary between the API and all
 - **MUST** Request DTOs carry all validation attributes so validation can be applied identically on the API server and in a MAUI client.
 - **MUST** DTOs never contain EF Core attributes, navigation properties, or `DbContext` references.
 - **SHOULD** Name patterns: `Create{Entity}RequestDto`, `Update{Entity}RequestDto`, `{Entity}ResponseDto`, `{Entity}SummaryDto` (for list items).
-- **SHOULD** Flatten nested data into response DTOs rather than nesting DTOs. Simplifies mobile data binding.
-- **MAY** Use a generic `PagedResultDto<T>` wrapper for paginated list endpoints: `{ Items, TotalCount, PageNumber, PageSize }`.
+- **SHOULD** Flatten nested data into response DTOs rather than nesting DTOs by default; nest only when the data's real shape is hierarchical (a tree or parent-child structure) and flattening would destroy or obscure that structure. Flattening simplifies mobile data binding.
+- **MUST** Use a generic `PagedResultDto<T>` wrapper for paginated list endpoints: `{ Items, TotalCount, PageNumber, PageSize }`.
 
 ### Example DTO Pair
 
@@ -2618,9 +3567,9 @@ The following table specifies the exact HTTP codes for all identity and account 
 - **MUST** Route parameters use the GUID: `/api/v1/coins/{coinGuid}`. Never expose integer IDs in routes or in `RequestKeys`.
 - **MUST** Never return the domain entity directly. Always map to a response DTO, then wrap in the envelope.
 - **MUST** Service and repository methods that return role-restricted data must evaluate the caller's application role internally. When access is denied at the data level, they must surface this so the controller calls `ApiResponseFactory.Unauthorized`. The data layer must never assume the calling application pre-checked roles — this is a required defence-in-depth guard.
-- **SHOULD** For paginated list endpoints, wrap results in `PagedResultDto<T>`.
-- **SHOULD** Mark public endpoints with `[AllowAnonymous]` explicitly rather than relying on the absence of `[Authorize]`.
-- **SHOULD** Enable CORS explicitly with named origins. Never use wildcard (`*`) origins in production.
+- **MUST** For paginated list endpoints, wrap results in `PagedResultDto<T>`.
+- **MUST** Mark public endpoints with `[AllowAnonymous]` explicitly rather than relying on the absence of `[Authorize]`.
+- **MUST** Enable CORS explicitly with named origins. Never use wildcard (`*`) origins in production.
 - **SHOULD** Include the endpoint string constant (e.g., `private const string EndpointGetCoin = "GET /api/v1/coins/{coinGuid}"`) as a `private const` at the top of each controller class to avoid magic strings in every action method.
 
 ---
@@ -2656,14 +3605,10 @@ public class SecurePageBase : ComponentBase
 - **MUST** Role names are referenced via `RoleDefs` constants. No inline role string literals.
 - **MUST** Never place data access logic directly in a `.razor` file. Use the `DataAccess` class or an injected service.
 - **SHOULD** If a component's `@code` block exceeds ~60 lines, extract a code-behind `.razor.cs` partial class.
-- **SHOULD** Use `StringExtensions` and `SessionExtensions` from `Support/Extensions/` rather than duplicating logic inline.
-- **SHOULD** Group pages by access level: `Pages/Public/` and `Pages/Secure/`.
+- **SHOULD** Where an existing method in `StringExtensions` or `SessionExtensions` (`Support/Extensions/`) already covers the case, use it rather than duplicating the logic inline; this does not restrict writing new logic (inline or as a new extension) where no existing extension covers the case.
+- **MUST** Group pages by access level: `Pages/Public/` and `Pages/Secure/`.
 
 ### Responsive Layout
-
-> **Addition — 2026-08-11:** Added after a review of an existing SDP-built site found no
-> requirement anywhere in this document that customer-facing pages render correctly across
-> device sizes.
 
 Every customer-facing page — public marketing/portfolio pages as much as authenticated app
 pages — must render correctly across desktop, tablet, and phone viewports.
@@ -2678,20 +3623,20 @@ pages — must render correctly across desktop, tablet, and phone viewports.
   reflow below desktop width are not acceptable for customer-facing pages.
 - **MUST** Primary navigation collapses to a mobile-appropriate pattern (hamburger/off-canvas
   menu or equivalent) below the tablet breakpoint rather than truncating or overflowing.
-- **SHOULD** Verify each new or changed customer-facing page at three reference widths — phone
+- **MUST** Verify each new or changed customer-facing page at three reference widths — phone
   (~375px), tablet (~768px), desktop (~1440px) — before marking the task complete; for
   `[VERIFY DURING IMPLEMENTATION]`-flagged UI tasks, note the widths checked in the Completed
   blockquote.
-- **SHOULD** Prefer CSS-only responsive behavior (media queries, container queries) over
-  JavaScript-driven layout switching, to keep behavior predictable and testable.
+- **MUST** Prefer CSS-only responsive behavior (media queries, container queries) over
+  JavaScript-driven layout switching, to keep behavior predictable and testable, unless using a
+  component library's built-in responsive grid per the MAY rule below.
 - **MAY** Use a component library's built-in responsive grid (e.g. Bootstrap, MudBlazor) in
   place of hand-rolled Flexbox/Grid, provided its breakpoints are not overridden in a way that
   defeats the MUST rules above.
 
 ### Dynamic Content Collections
 
-> **Addition — 2026-08-13:** Concrete Website instantiation of Chapter 13's "Data-Driven Content —
-> Preferred Default" rule. Added after a real incident where a version-history page's milestone
+> **Addition — 2026-08-13:** Added after a real incident where a version-history page's milestone
 > list had no data source separate from the page markup rendering it.
 
 Any structured, repeating content collection rendered on a page — version-history/changelog
@@ -2731,6 +3676,204 @@ public class ContentService(IWebHostEnvironment env)
 - **MAY** Cache a loaded content file's deserialized result for the process lifetime when the
   backing page is read frequently and the file only changes on deploy.
 
+### Cookie Consent
+
+> **Addition — 2026-08-23:** Concrete Website (Blazor) instantiation of Chapter 13's "Cookie /
+> Tracking Consent — Required for Any Web-Rendering Project Type" rule. No GPG chapter previously
+> addressed cookie/tracking consent at all. Designed to the GDPR/ePrivacy baseline (the strictest
+> single regime), with explicit reconciliation of CCPA/CPRA, PIPEDA/Quebec Law 25, and LGPD's
+> distinct requirements rather than assuming GDPR alone covers every regime.
+
+Every customer-facing page that sets or reads non-essential cookies (or equivalent client-side
+storage — see the `Necessary` category note below) presents a consent banner before any such
+storage is set or any non-essential script executes. "Optional" means any category other than
+`Necessary`.
+
+#### Category Model
+
+- **MUST** Cookie categories are `Necessary` (always on, non-toggleable — exempt from consent
+  under ePrivacy Art. 5(3) as strictly technical/functional storage), `Functional`, `Analytics`,
+  and `Marketing` (all three optional, default OFF, individually toggleable). Sourced from
+  `Content/cookie-categories.json` via the existing content-loading service (see Dynamic Content
+  Collections above) — category data, not markup.
+- **MUST** The encrypted-`localStorage` access-token mechanism Chapter 5 already governs (see
+  Client-Side Token Storage Strategies) falls under `Necessary` as strictly-necessary technical
+  storage — cross-reference Chapter 5 for its own security handling here; do not re-derive it in
+  this subsection.
+
+```csharp
+// Content/CookieCategory.cs
+public record CookieCategory(string Key, string Label, string Description, bool Required);
+```
+
+```json
+// Content/cookie-categories.json
+[
+  { "key": "necessary",  "label": "Necessary",  "description": "...", "required": true  },
+  { "key": "functional", "label": "Functional", "description": "...", "required": false },
+  { "key": "analytics",  "label": "Analytics",  "description": "...", "required": false },
+  { "key": "marketing",  "label": "Marketing",  "description": "...", "required": false }
+]
+```
+
+#### Banner and Consent Component
+
+- **MUST** The banner presents **Accept All** and **Reject All** at equal visual weight — same
+  size, same prominence, same click count. A **Manage Preferences** control opens a per-category
+  panel; no optional category is pre-ticked.
+- **MUST** Non-essential scripts are emitted neutralized (`type="text/plain"
+  data-cookie-category="{category}"`) and reactivated by a JS module only after that category's
+  consent is granted — hiding the banner is not sufficient; the script must not execute
+  pre-consent.
+- **MUST** A persistent "Manage Cookie Preferences" control, reachable from every page (typically
+  the footer), reopens the panel at any time — withdrawal must be exactly as easy as consent.
+- **MUST** A prior consent record is discarded and the banner re-shown when the record is 12
+  months old or older, OR the site's policy version / category set has changed since that record
+  was written — whichever triggers first.
+- **MUST** The banner links to the project's Privacy Policy page if one exists. This subsection
+  does not itself require creating a Privacy Policy page — that is a separate content deliverable
+  outside a coding-standards chapter's scope.
+
+```razor
+@* Components/CookieConsent.razor — extends Microsoft's official ITrackingConsentFeature pattern
+   (learn.microsoft.com/aspnet/core/blazor/security/gdpr, which is Accept-only as shipped) with
+   categories, Reject, and block-before-consent script gating. *@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject ConsentAuditService ConsentAudit
+
+@if (showBanner)
+{
+    <div id="cookieConsent" class="cookie-consent" role="dialog" aria-label="Cookie preferences">
+        <p>@BannerCopy</p>
+        <button @onclick="AcceptAll" class="cookie-consent__accept">Accept All</button>
+        <button @onclick="RejectAll" class="cookie-consent__reject">Reject All</button>
+        <button @onclick="() => showPanel = true">Manage Preferences</button>
+    </div>
+}
+@if (showPanel)
+{
+    @foreach (var category in Categories)
+    {
+        <label>
+            <input type="checkbox" checked="@IsAccepted(category.Key)" disabled="@category.Required"
+                   @onchange="e => SetCategory(category.Key, (bool)e.Value!)" />
+            @category.Label — @category.Description
+        </label>
+    }
+    <button @onclick="SavePreferences">Save Preferences</button>
+}
+
+@code {
+    // OnInitialized: load the stored consent value, apply the 12-month/policy-version expiry
+    // rule above, and set showBanner accordingly.
+    // AcceptAll/RejectAll/SavePreferences: update the client-side gating value, invoke the JS
+    // module to reactivate neutralized scripts for accepted categories, then write through to
+    // ConsentAuditService (below) — always both, never only one.
+}
+```
+
+```js
+// Components/CookieConsent.razor.js
+export function reactivateScripts(category) {
+  document.querySelectorAll(`script[data-cookie-category="${category}"]`).forEach(old => {
+    const script = document.createElement('script');
+    for (const attr of old.attributes) {
+      if (attr.name !== 'type') script.setAttribute(attr.name, attr.value);
+    }
+    script.text = old.text;
+    old.replaceWith(script);
+  });
+}
+```
+
+#### Consent Audit Log
+
+- **MUST** Every Accept/Reject/category-change event is written to a durable, append-only
+  consent-audit record — the client-side gating value alone (cookie/`localStorage`, clearable by
+  the visitor) does not satisfy GDPR Art. 7(1)'s requirement that the controller be able to
+  demonstrate consent was given.
+- **MUST** Storage tier is verified with the user during Phase 4 (Architecture) — never
+  auto-detected and applied silently (see the bootstrap doc's Phase 4 Mechanics). If the solution
+  already has a database project of any type, that project is named and confirmed as the target.
+  If not, the storage method is confirmed with the user directly (the flat-file fallback below, or
+  another mechanism the user names).
+- **MUST** (LGPD) The audit record includes a `JurisdictionDetected` field and is retained for at
+  least 18 months.
+
+```csharp
+// {AppName}.Domain/ConsentLog.cs — deliberately NOT built on CommonColumns (see Chapter 7): a
+// consent-audit row is an immutable event record, never updated or soft-deleted after insert, so
+// CommonColumns' mutable-entity fields (IsActive, SortOrder, LastUpdated*, IsDeleted) do not
+// apply. This is the "table that omits common columns" case Chapter 7 requires written
+// justification for — this comment is that justification.
+public class ConsentLog
+{
+    public int Id { get; set; }                       // ConsentLogID
+    public Guid Guid { get; set; }                     // ConsentLogGUID
+    public Guid VisitorId { get; set; }                // client-generated; stored with the gating value
+    public string CategoriesAccepted { get; set; } = string.Empty;   // comma-separated category keys
+    public string CategoriesRejected { get; set; } = string.Empty;
+    public string PolicyVersion { get; set; } = string.Empty;
+    public string ConsentMethod { get; set; } = string.Empty;        // "AcceptAll" | "RejectAll" | "ManagePreferences"
+    public string JurisdictionDetected { get; set; } = string.Empty; // LGPD requirement — see 2c
+    public DateTime CreatedDate { get; set; }          // event timestamp — GETUTCDATE() default
+}
+
+// Contracts/Requests/Consent/RecordConsentRequestDto.cs — per Chapter 9's DTO rules
+public class RecordConsentRequestDto
+{
+    [Required] public Guid VisitorId { get; set; }
+    [Required] public List<string> CategoriesAccepted { get; set; } = [];
+    [Required] public List<string> CategoriesRejected { get; set; } = [];
+    [Required] public string PolicyVersion { get; set; } = string.Empty;
+    [Required] public string ConsentMethod { get; set; } = string.Empty;
+    [Required] public string JurisdictionDetected { get; set; } = string.Empty;
+}
+```
+
+The endpoint (`POST /api/v1/consent-events`) returns Chapter 10's standard `ApiResponse<T>`
+envelope like every other endpoint — no special-casing for this feature.
+
+- **MUST** If the solution has no database project, an append-only JSON/XML log file is an
+  acceptable fallback, but this has real limits: no concurrent-write safety under real traffic, no
+  query path for a data-subject "right to access" request. Escalate to a lightweight embedded DB
+  (e.g. SQLite) once traffic or DSAR volume exceeds what a flat file can safely handle — that
+  escalation is a new dependency subject to ordinary Material Decision Escalation (Phase 4 in the
+  bootstrap doc), not a special case.
+
+#### Multi-Jurisdiction Reconciliation
+
+- **MUST** (CCPA/CPRA) A conspicuous "Do Not Sell or Share My Personal Information" link (or the
+  CPRA-permitted "Your Privacy Choices" toggle) appears on the homepage/footer, leading to the
+  Manage Preferences panel — always on, regardless of whether `Marketing` is currently enabled.
+- **MUST** (CCPA/CPRA) The Global Privacy Control (`navigator.globalPrivacyControl`) browser
+  signal is recognized; when present, the site auto-applies a reject-optional outcome and visibly
+  confirms it (e.g. "Opt-Out Preference Signal Honored").
+- PIPEDA, Quebec Law 25, and LGPD's opt-in requirements are satisfied by the GDPR-strict opt-in
+  baseline above by construction — no separate rule is added for these three.
+
+#### Google Consent Mode v2 (Conditional)
+
+- **MUST** If the project integrates Google Analytics or Google Ads (confirmed via the Phase 4
+  Architecture question — see the bootstrap doc), the four Consent Mode v2 signals map onto the
+  category model: `analytics_storage` ← `Analytics`; `ad_storage`/`ad_user_data`/
+  `ad_personalization` ← `Marketing`.
+
+```js
+// Sent on every consent decision, before GA/Ads scripts reactivate:
+gtag('consent', 'update', {
+  'analytics_storage': categories.includes('analytics') ? 'granted' : 'denied',
+  'ad_storage': categories.includes('marketing') ? 'granted' : 'denied',
+  'ad_user_data': categories.includes('marketing') ? 'granted' : 'denied',
+  'ad_personalization': categories.includes('marketing') ? 'granted' : 'denied'
+});
+```
+
+- **MAY** Escalate to a certified CMP (Cookiebot/OneTrust/Osano) instead of the in-house
+  component only when a confirmed IAB TCF or programmatic-ad requirement exists — subject to
+  Material Decision Escalation like any other new external dependency.
+
 ---
 
 ## Chapter 12 — Mobile Readiness
@@ -2766,14 +3909,10 @@ var storedRefreshToken = await SecureStorage.Default.GetAsync("refresh_token");
 
 - **MUST** Never store JWT tokens in `Preferences` or plain text files. Use `SecureStorage` exclusively.
 - **MUST** MAUI references only `{AppName}.Contracts`. Never `Domain` or `API`.
-- **SHOULD** Handle `401 Unauthorized` globally in the HTTP client by attempting a silent token refresh before showing a login prompt.
-- **SHOULD** Test localization using device locale settings on both iOS Simulator and Android Virtual Device before release.
+- **SHOULD** Handle `401 Unauthorized` globally in the HTTP client by attempting a silent token refresh before showing a login prompt, unless the solution's security posture requires forcing an explicit re-login instead (e.g. banking-grade re-auth requirements, or a deliberately short-lived/absent refresh token).
+- **SHOULD** Where the app supports multiple cultures/locales (Chapter 5's culture routing), test localization using device locale settings on both iOS Simulator and Android Virtual Device before release.
 
 ### Adaptive Layout (MAUI UI)
-
-> **Addition — 2026-08-11:** The rest of this chapter prepares the API/contracts layer for a
-> future MAUI app; it does not address whether the MAUI app's own UI adapts across phone,
-> tablet, and orientation. This subsection closes that gap.
 
 Every MAUI page must render correctly on phone and tablet form factors, in both portrait and
 landscape.
@@ -2785,18 +3924,18 @@ landscape.
   screen profile, in both portrait and landscape, before marking the task complete; for
   `[VERIFY DURING IMPLEMENTATION]`-flagged UI tasks, note the profiles checked in the Completed
   blockquote.
-- **SHOULD** Prefer declarative XAML sizing (Grid ratios, `HorizontalOptions="FillAndExpand"`,
-  etc.) over manual `OnSizeAllocated`/pixel-math layout logic.
-- **SHOULD** Verify orientation-change behavior doesn't clip or truncate content.
+- **MUST** Prefer declarative XAML sizing (Grid ratios, `HorizontalOptions="FillAndExpand"`,
+  etc.) over manual `OnSizeAllocated`/pixel-math layout logic, unless declarative sizing cannot
+  express the required behavior (e.g. a custom-drawn surface such as a canvas/game view or a
+  custom renderer).
+- **MUST** Verify orientation-change behavior doesn't clip or truncate content.
 - **MAY** Use a UI toolkit's adaptive-layout component (e.g. .NET MAUI Community Toolkit,
   Syncfusion, Telerik) in place of hand-rolled adaptive layout, provided it doesn't override
   the platform's own size-class behavior in a way that defeats the MUST rules above.
 
 ### Dynamic Content Delivery
 
-> **Addition — 2026-08-13:** Concrete MAUI instantiation of Chapter 13's "Data-Driven Content —
-> Preferred Default" rule, split by target — mobile and desktop do not share one delivery model
-> for content that changes independently of app releases.
+Concrete MAUI instantiation of Chapter 13's "Data-Driven Content — Preferred Default" rule.
 
 **Mobile (`Platforms/iOS/`, `Platforms/Android/`):** structured, independently-changing content
 (version-history/changelog entries, announcements, and similar) is fetched through a dedicated
@@ -2818,7 +3957,7 @@ that is genuinely desktop-specific.
 - **MUST** Mobile targets source independently-changing structured content through the API —
   never a bundled local file — except content that shares the app's own release cadence
   (Chapter 13).
-- **SHOULD** Desktop targets source the same centrally-authored content through an API-synced
+- **MUST** Desktop targets source the same centrally-authored content through an API-synced
   local cache rather than a bundled-at-install file, to keep desktop and mobile reading from one
   source of truth.
 - **MAY** Desktop targets use a purely bundled local file for content that is genuinely
@@ -2864,13 +4003,13 @@ bool coinWasFound = requestedCoin is not null;
 - **MUST** Every I/O-bound operation is `async`/`await` across all project tiers. Never use `.Result`, `.Wait()`, or `.GetAwaiter().GetResult()`.
 - **MUST** Every `async` method name ends with `Async`.
 - **MUST** Return `Task`, never `void`, from `async` methods. `async void` is permitted only for Blazor event handlers.
-- **SHOULD** Pass `CancellationToken` through the full call stack for long-running or HTTP-triggered operations.
+- **SHOULD** Pass `CancellationToken` through the full call stack for long-running or HTTP-triggered operations, unless the operation must complete independent of caller cancellation (e.g. audit/compliance logging such as Chapter 8's DAT writes, payment/transaction finalization, or any write already committed that must not be left half-applied).
 
 ### Comments & Documentation
 
 - **MUST** Do not add comments that restate what the code already says. `// increment the counter` above `counter++` adds no value.
 - **MUST** Use `// TODO: description` (Visual Studio Task List) for known incomplete work. Never leave `// REMEMBER!!!` style comments in committed code.
-- **SHOULD** Add XML doc comments to all public API controller actions, service interface members, and all `Contracts` library members.
+- **MUST** Add XML doc comments to all public API controller actions, service interface members, and all `Contracts` library members.
 - **SHOULD** Comment genuinely complex logic: business rules, state machines, and cryptographic operations.
 
 ### General Code Style
@@ -2888,14 +4027,7 @@ All user-facing strings must be stored in `.resx` resource files. Embedding stri
 
 **Rationale:** Literal strings scattered across service and controller code cannot be audited, are duplicated silently, and make future localization a full-codebase rewrite. Resource files give one authoritative location per message and generate a strongly-typed accessor class at build time.
 
-> **Addition — 2026-07-23 — Code vs. data-file distinction:** The distinction drawn above
-> generalizes beyond resource files: a file is evaluated as *code* or *data* by whether it
-> contains executable logic, not by its physical location in the project or its role in the
-> build. A `.resx` file participates in compilation (it generates a `*.Designer.cs` accessor) and
-> is still a data file, because it contains no executable logic. The same test applies to
-> `appsettings.json`/`appsettings.*.json` and any other JSON, XML, or YAML configuration file. See
-> Chapter 4 (Versioning Strategy) and Chapter 14 (Configuration & Secrets) for two rules this
-> distinction resolves directly.
+**Code vs. data-file distinction:** This distinction generalizes beyond resource files: a file is evaluated as *code* or *data* by whether it contains executable logic, not by its physical location in the project or its role in the build. A `.resx` file participates in compilation (it generates a `*.Designer.cs` accessor) and is still a data file, because it contains no executable logic. The same test applies to `appsettings.json`/`appsettings.*.json` and any other JSON, XML, or YAML configuration file. See Chapter 4 (Versioning Strategy) and Chapter 14 (Configuration & Secrets) for two rules this distinction resolves directly.
 
 #### File Location and Naming
 
@@ -2940,17 +4072,11 @@ throw new AuthException("UNDERAGE", "You must be at least 16 years old to regist
 - **MUST** Every string that appears in an API response body, exception message, or UI label originates from a resource file. No exceptions for "simple" or "temporary" messages.
 - **MUST** Never define a `private const string` or `static readonly string` that duplicates a resource key. The resource file is the constant.
 - **MUST** The `Resources/` folder is committed. The generated `*.Designer.cs` file is committed alongside its `.resx` source.
-- **SHOULD** Group related messages under a common prefix key rather than creating a new resource file for a single additional message.
-- **SHOULD** Write resource values in full, grammatical sentences with correct punctuation — these may be displayed directly to end users.
+- **MUST** Group related messages under a common prefix key (e.g. `Common_`, `[PageName]_`, `[ContainerName]_`, etc.) rather than creating a new resource file for a single additional message.
+- **MUST** Write resource values in full, grammatical sentences with correct punctuation — these are displayed directly to end users.
 - **MAY** Define a `Common_` prefix group for error strings shared across multiple service classes within the same project.
 
 ### Data-Driven Content — Preferred Default
-
-> **Addition — 2026-08-13:** Elevates the "Code vs. data-file distinction" Addition above from a
-> single blockquote into a first-class, named rule other chapters can cross-reference. Prompted by
-> a real incident: a version-history page's content list had no data source separate from the
-> markup rendering it, so adding an entry required editing the page itself. See Chapter 11 and
-> Chapter 12 for this rule's concrete, per-project-type instantiations.
 
 Whenever content values change independently of the logic that renders them, source those values
 from a data file — or, for a distributed client, the API — rather than embedding them in code.
@@ -2965,11 +4091,11 @@ string-externalization case above.
 - **MUST** For a distributed client's mobile targets (`{AppName}.MAUI`, `Platforms/iOS/` and
   `Platforms/Android/`), content that changes independently of app releases is sourced through the
   API, never bundled as a local file in the app package — see Chapter 12.
-- **SHOULD** For a distributed client's desktop targets (`{AppName}.MAUI`, `Platforms/Windows/`
+- **MUST** For a distributed client's desktop targets (`{AppName}.MAUI`, `Platforms/Windows/`
   and `Platforms/MacCatalyst/`), prefer a local content file the app syncs from the API at
   runtime over a purely bundled-at-install file, for content whose source of truth is shared with
   other clients — see Chapter 12.
-- **SHOULD** Escalate to a database-backed content table (Chapter 17 seed-data pattern) only on a
+- **MUST** Escalate to a database-backed content table (Chapter 17 seed-data pattern) only on a
   confirmed requirement for live, non-developer editing — do not build admin-editable content
   storage speculatively.
 - **MUST** Escalate to a headless CMS or other external content service only through Material
@@ -2978,6 +4104,32 @@ string-externalization case above.
   releases (fixed onboarding copy, bundled legal text for offline access) in a bundled data file
   even on a mobile target — the MUST rules above target content whose value is *independent*
   update cadence, not literally all content.
+
+### Cookie / Tracking Consent — Required for Any Web-Rendering Project Type
+
+> **Addition — 2026-08-23:** Stated here framework-neutral (not only in Chapter 11) so a future
+> non-Blazor web project type inherits this requirement automatically. Chapter 11 holds the
+> concrete, current instantiation for this stack's Blazor Web App.
+
+Whenever a project renders pages to an end user's browser, and any part of that rendering sets or
+reads non-essential cookies or equivalent client-side tracking storage (`localStorage`,
+`IndexedDB`, or similar used for the same purpose) — regardless of frontend framework — that
+project implements cookie/tracking consent to the GDPR/ePrivacy baseline (opt-in, equal-prominence
+Accept/Reject, granular categories, block-before-consent, a durable consent audit record, and the
+CCPA/PIPEDA/LGPD reconciliation items) before any non-essential storage or script executes.
+
+- **MUST** Every web-rendering project type governed by GPG implements this requirement.
+  "Website — Blazor" (Chapter 11) is the current stack's only such project type, but the rule is
+  stated here, not there, precisely so a future non-Blazor web project type added to GPG inherits
+  it automatically rather than depending on someone remembering to copy it over.
+- **MUST** See Chapter 11 for this rule's concrete, current instantiation (component pattern,
+  category model, consent audit log, multi-jurisdiction reconciliation, Consent Mode v2 mapping).
+  A future non-Blazor web project type added to GPG gets its own concrete instantiation
+  chapter/subsection, cross-referenced from here — mirroring how Chapter 12 (MAUI) sits alongside
+  Chapter 11 for the Data-Driven Content rule above.
+- **MUST** This requirement is included by default in Phase 4 (Architecture) whenever a web
+  project type — of any frontend framework — is identified in the solution, per the bootstrap
+  doc's Phase 4 Mechanics addition. The user may explicitly opt out per project.
 
 ---
 
@@ -2989,7 +4141,7 @@ Configuration is layered: base `appsettings.json` holds non-sensitive defaults; 
 
 | File | Committed? | Contains |
 |------|------------|----------|
-| `appsettings.json` | Yes | Log levels, feature flags, pagination defaults, app name/version, supported cultures |
+| `appsettings.json` | Yes | Log levels, log retention (`Logging:RetentionDays`), feature flags, pagination defaults, app name/version, supported cultures |
 | `appsettings.Development.json` | Yes | Developer-friendly overrides: verbose logging, exception pages |
 | `appsettings.Production.json` | Yes | Production non-sensitive overrides. No credentials. |
 | User Secrets | Never | Runtime connection strings (`AppDb`, `IdentityDb`), migration connection strings (`MigrationsDb`, `MigrationsIdentityDb`), JWT secret, email credentials |
@@ -3012,12 +4164,8 @@ public class AuthService(IOptions<JwtConfig> jwtOptions) { ... }
 - **MUST** Connection strings, JWT secrets, and API keys are never in any committed file.
 - **MUST** Both `.gitignore` and `.copilotignore` list all credential-containing files.
 - **MUST** Use `env.IsDevelopment()` for debug-mode toggles. Never use a hardcoded `static bool DebugMode = true` field.
-- **SHOULD** Validate required config on startup: `services.AddOptions<T>().ValidateDataAnnotations().ValidateOnStart()` so missing secrets fail immediately at launch.
+- **MUST** Validate required config on startup: `services.AddOptions<T>().ValidateDataAnnotations().ValidateOnStart()` so missing secrets fail immediately at launch.
 - **MUST** Maintain four named connection strings: `ConnectionStrings:AppDb` and `ConnectionStrings:IdentityDb` (runtime, minimal permissions) and `ConnectionStrings:MigrationsDb` and `ConnectionStrings:MigrationsIdentityDb` (elevated, deploy-time only, never read by the running application). All four live in User Secrets locally; `AppDb` and `IdentityDb` are injected as environment variables in production; `MigrationsDb` and `MigrationsIdentityDb` are injected only in the CI/CD pipeline migration step and are absent from the running application's environment.
-
-> **Addition — 2026-07-24 — Log retention setting:** The `appsettings.json` row's "Log levels"
-> content extends to log retention: `Logging:RetentionDays` (or equivalent key) is a non-sensitive
-> default belonging in `appsettings.json`, per Chapter 6's log rotation/retention rule.
 
 ---
 
@@ -3078,8 +4226,8 @@ public class DomainValidationException(string message)
 - **MUST** Never return raw exception messages or stack traces to clients in any environment. Return a generic message with a `TraceId`. **Exception:** users holding the `Dev` role may view raw error details through the Dev Toolbar — see below.
 - **MUST** `ShowStackTrace` is controlled by configuration (Chapter 14). It is always `false` outside of Development.
 - **MUST** Log the full exception at `Error` level before returning a sanitized response.
-- **SHOULD** Map custom exception types to specific HTTP status codes in the global middleware.
-- **SHOULD** Wrap independent Blazor page sections in `<ErrorBoundary>` so one component failure does not blank the entire page.
+- **SHOULD** Map custom exception types representing genuine infrastructure failures — not business-rule exceptions, which route through `ApiResponseFactory.ValidationFailed`/`Failure` instead per Chapter 10's response envelope — to specific HTTP status codes in the global middleware.
+- **MUST** Wrap independent Blazor page sections in `<ErrorBoundary>` so one component failure does not blank the entire page.
 
 ### Dev Toolbar
 
@@ -3094,17 +4242,17 @@ When the authenticated user holds the `Dev` role, the UI must render a persisten
 | 3 | JWT Inspector | Decoded view of the current access token: all claims, issued-at timestamp, expiry time, and a live countdown to expiry. |
 | 4 | Feature Flag Override | Toggle any named feature flag on or off for this session only. Overrides do not affect other users and reset on logout. |
 | 5 | Session Info | Current user ID, GUID, active roles from JWT, refresh token expiry, and solution context identifier. |
-| 6 | Log Stream Viewer | Tail of recent structured server-side log entries at `Warning` level and above, filtered to TraceIds associated with this user’s requests. Requires the API to expose a scoped log query endpoint gated to the `Dev` role. |
+| 6 | Log Stream Viewer | Tail of recent structured server-side log entries at `Warning` level and above, filtered to TraceIds associated with this user’s requests. Requires the API to expose a scoped log query endpoint gated to `roleCategory = DeveloperAccess`. |
 | 7 | Performance Alerts | Highlights any API response that exceeded a configurable latency threshold (default 500 ms). Shows endpoint, duration, and timestamp. |
 | 8 | State Snapshot | Dumps the current client-side application state (store / context / signal graph) to a readable, collapsible panel. Useful for diagnosing stale or unexpected UI state. |
 | 9 | Network Latency Overlay | Per-request timing badge rendered on-screen for all in-flight and recently completed API calls, showing endpoint name and round-trip time. |
 
 **Rules:**
 
-- **MUST** The Dev Toolbar is only rendered when the JWT `role` claims include `Dev`. Never infer Dev access from any other signal.
+- **MUST** The Dev Toolbar is only rendered when the JWT `roleCategory` claims include `DeveloperAccess`. Never infer Dev access from any other signal.
 - **MUST** The raw error detail panel must not replace the standard error message — it is additive. Non-dev users still see the sanitized message.
 - **MUST** Raw error data is never written to the DOM in a way that is accessible to non-dev users (no hidden fields, no HTML comments).
-- **SHOULD** The API may optionally include an extended error payload when the `X-Dev-Request: true` header is present and the token carries the `Dev` role — this avoids a second round-trip to retrieve raw details.
+- **MUST** When the API returns an error response, it includes an extended error payload if the `X-Dev-Request: true` header is present or the caller's token carries a `roleCategory` claim of `DeveloperAccess` — this avoids a second round-trip to retrieve raw details.
 
 ---
 
@@ -3134,8 +4282,7 @@ Source control discipline makes it possible to trace why a change was made, roll
 ```
 {type}({scope}): {short description in present tense, under 72 chars}
 
-Body: explain WHY the change was made, not what was changed.
-The diff already shows what changed.
+Body: explain WHY the change was made; briefly note what changed if it adds context beyond the diff.
 
 Refs: #{issue-number}
 
@@ -3146,20 +4293,19 @@ Types: feat | fix | refactor | docs | test | chore
 
 - **MUST** Credentials and secrets are never committed. Period.
 - **MUST** Every commit must build cleanly and pass all existing tests.
-- **MUST** Commit messages describe *why* the change was made, not what changed.
+- **MUST** Commit messages describe *why* the change was made as well as what changed.
 - **SHOULD** Commit at logical stopping points: a completed feature, a passing test, a fixed bug. Avoid mixing unrelated changes in one commit.
-- **SHOULD** Commit at least once every 4 active working days on a feature branch to reduce merge conflict risk.
-- **SHOULD** Tag releases on the main branch: `git tag -a v1.3.0 -m "Release 1.3.0"`
+- **MUST** Perform a commit no less than once every 4 active working days on a feature branch, to reduce merge conflict risk.
+- **SHOULD** Where the project maintains semantic version releases, tag them on the main branch: `git tag -a v1.3.0 -m "Release 1.3.0"`
 
-> **✅ Note:** Add a `.copilotignore` file in the solution root that mirrors `.gitignore` entries for all files containing credentials, to prevent GitHub Copilot from reading or suggesting edits to those files.
+> **✅ Note:** Add a `.copilotignore` file in the solution root that mirrors `.gitignore` entries for all files containing credentials, to prevent any external tool from reading or suggesting edits to those files.
 
 ---
 
 ## Chapter 17 — Database Seed Data Patterns
 
 **Target Audience:** DBAs, backend developers, DevOps, infrastructure leads  
-~~**Applicability:** Any Vega Discoveries solution with a database (SSDT `.sqlproj`)~~  
-**Applicability:** Any Vega Discoveries solution with a database (`.Database` DbUp class library)  
+**Applicability:** Any Vega Discoveries solution with a database (e.g., the `.Database` DbUp class library)  
 **Context:** Reference data, configuration seeds, and migration sequences for all solutions
 
 ---
@@ -3247,7 +4393,6 @@ Organize seeds into logical categories:
 
 #### Seed Data Storage in Migrations
 
-~~In SSDT projects, seed data lives in **post-deployment scripts** (not EF Core migrations).~~
 In the `.Database` DbUp class library, seed data scripts are placed in the `PostDeployment/` folder and executed via `NullJournal` (always-run, idempotent).
 
 **File location:** `VegaIdentity.Database/PostDeployment/`
@@ -3497,7 +4642,7 @@ END
    - Example assertion: `Assert.Equal(3, context.EmailTypes.Where(x => !x.IsDeleted).Count())`
 
 3. **Staging/Production Deployment**
-   - DACPAC published via automated pipeline
+   - DbUp migration runner executed via automated pipeline
    - Post-deployment scripts run (idempotent)
    - Ops team runs validation queries post-deployment
    - Alerts fire if seed count is wrong (config drift detection)

@@ -1,6 +1,6 @@
 # SDP Core Invariants
 
-These seven invariants govern every SDP session (COORDINATOR, WORKER, REVIEWER, and any
+These eight invariants govern every SDP session (COORDINATOR, WORKER, REVIEWER, and any
 orchestrating/loop session) regardless of how long the session runs or how many times it
 compacts. They are extracts of `SDP_Sapient-Driven-Principles_v1.1.1.md` — that document is
 authoritative; this file exists so these specific rules survive session compaction, which the
@@ -57,12 +57,28 @@ Discipline section for the full rule.
 
 ## 6. Loop-Owned Field Discipline
 
-`eval_cycle_attempts` in a phase state file is owned exclusively by `sdp-project-state-loop`. A dispatch
+`eval_cycle_attempts` in a project-level phase state file is owned exclusively by
+`sdp-project-state-loop`. On a solution-phase (1-7) task's state-file entry, the same field is
+owned exclusively by `sdp-solution-phase-state-loop` instead — a second, distinct owner scoped to
+that pipeline, not a shared write path. A dispatch
 file (`session-NNN.md` or `sdp-docs/00_prompt.txt`) must never instruct WORKER or REVIEWER to
 set, seed, or increment this field. The sentinel `role` field in `sdp-docs/00_prompt.txt` is
 mandatory on every write — omitting it prevents `sdp-project-state-loop` from distinguishing a REVIEWER
 fire from a COORDINATOR dispatch-of-REVIEWER fire, silently corrupting stuck-loop attempt
 accounting.
+
+`pros_cons_gaps.cycle_models` in a phase state file is owned exclusively by
+`sdp-solution-phase-coordinator`'s own model-diversity rotation step. WORKER
+and REVIEWER must never write this field — only the coordinator's own model-diversity rotation
+step appends to it. `SDP-Config.json`'s `prosConsGapsModelDiversity.enabled` is loop-owned by
+policy: no skill, in any role, may write it; changing it requires a human editing
+`SDP-Config.json` directly, outside any dispatched session — same rule as
+`materialDecisionEscalation.enabled`.
+
+`phase_loop_mechanical_resolution` in `.sdp-solution-workflow/state.json` is owned exclusively by
+`sdp-solution-phase-state-loop` — its own private mechanical-fix-cycle bookkeeping (phase, task,
+dispatch session, classified items, attempt count, status). No other skill, in any role, may read
+it as a dispatch signal or write to it.
 
 ## 7. Outcome Detection Via State File Only
 

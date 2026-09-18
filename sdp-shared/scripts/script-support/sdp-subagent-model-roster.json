@@ -1,0 +1,103 @@
+{
+  "schema_version": "1.0",
+  "notes": "The current subagent model roster: task-shape-to-tier taxonomy (each tier's `use_when` field) plus the model currently assigned to each tier and its verified capability data. Tiers are named generically (least_capable/standard/most_capable/frontier_escalation) so this file is the only thing that needs editing when the model lineup changes -- add or retire a model here without touching any skill or script that reads it. Update `last_verified`/`source` whenever this file changes.",
+  "last_verified": "2026-09-15",
+  "source": "https://platform.claude.com/docs/en/models/overview (fetched live this session; per this user's standing instruction, Claude-model facts must trace to platform.claude.com/docs, not training-data recall)",
+  "tiers": [
+    {
+      "tier": "least_capable",
+      "use_when": "Complete-spec transcription: the dispatching prompt already contains the exact text/code to write, 1-2 files, no design judgment required."
+    },
+    {
+      "tier": "standard",
+      "use_when": "Moderate integration: multi-file coordination, a large-but-fully-specified file, or a spec good enough to follow without inventing design. Default floor for any implementer working from prose (not a fully literal spec) and for review of small/mechanical diffs."
+    },
+    {
+      "tier": "most_capable",
+      "use_when": "Architecture/design judgment tasks, and review of stateful/multi-step/control-flow logic where a false 'looks good' would ship silently with no downstream check to catch it."
+    },
+    {
+      "tier": "frontier_escalation",
+      "use_when": "Reserved for escalation only, not a default choice for any task shape: when most_capable has already been tried (e.g. a most_capable review round still missed something, or a most_capable implementer is stuck after repeated fix rounds, per subagent-driven-development's own fix-loop escalation) and the task needs to go one tier higher still. Anthropic's own model-selection guidance positions this tier explicitly for cases where evals on the most_capable tier at its highest effort setting still fall short."
+    }
+  ],
+  "models": [
+    {
+      "id": "haiku",
+      "api_id": "claude-haiku-4-5-20251001",
+      "api_alias": "claude-haiku-4-5",
+      "display_name": "Claude Haiku 4.5",
+      "tier": "least_capable",
+      "vendor_description": "The fastest model with near-frontier intelligence",
+      "pricing_usd_per_mtok": { "input": 1, "output": 5 },
+      "comparative_latency": "fastest",
+      "context_window_tokens": 200000,
+      "max_output_tokens": 64000,
+      "thinking_mode": "extended (manual budget, not adaptive)",
+      "reliable_knowledge_cutoff": "2025-02",
+      "recommended_for": [
+        "single/few-file mechanical edits with a complete spec",
+        "small-diff review (doc edits, config keys, short skill-text changes)"
+      ]
+    },
+    {
+      "id": "sonnet",
+      "api_id": "claude-sonnet-5",
+      "api_alias": "claude-sonnet-5",
+      "display_name": "Claude Sonnet 5",
+      "tier": "standard",
+      "vendor_description": "The best combination of speed and intelligence",
+      "pricing_usd_per_mtok": { "input": 2, "output": 10 },
+      "comparative_latency": "fast",
+      "context_window_tokens": 1000000,
+      "max_output_tokens": 128000,
+      "thinking_mode": "adaptive",
+      "reliable_knowledge_cutoff": "2026-01",
+      "recommended_for": [
+        "multi-file implementation from a detailed but not fully-literal brief",
+        "review of moderate-complexity diffs",
+        "default floor when in doubt between least_capable and most_capable"
+      ]
+    },
+    {
+      "id": "opus",
+      "api_id": "claude-opus-5",
+      "api_alias": "claude-opus-5",
+      "display_name": "Claude Opus 5",
+      "tier": "most_capable",
+      "vendor_description": "For complex agentic coding and enterprise work",
+      "pricing_usd_per_mtok": { "input": 5, "output": 25 },
+      "comparative_latency": "moderate",
+      "context_window_tokens": 1000000,
+      "max_output_tokens": 128000,
+      "thinking_mode": "adaptive",
+      "reliable_knowledge_cutoff": "2026-05",
+      "recommended_for": [
+        "architecture/design-judgment tasks",
+        "review of stateful, multi-step, or control-flow logic",
+        "the default 'most capable available model' this session used for every Task 4 review pass"
+      ]
+    },
+    {
+      "id": "fable",
+      "api_id": "claude-fable-5-1",
+      "api_alias": "claude-fable-5-1",
+      "display_name": "Claude Fable 5.1",
+      "tier": "frontier_escalation",
+      "vendor_description": "For demanding reasoning and long-horizon agentic work",
+      "pricing_usd_per_mtok": { "input": 10, "output": 50 },
+      "comparative_latency": "slower",
+      "context_window_tokens": 1000000,
+      "max_output_tokens": 128000,
+      "thinking_mode": "adaptive (always on)",
+      "reliable_knowledge_cutoff": "2026-06",
+      "recommended_for": [
+        "escalation only: a most_capable-tier pass at high effort still fell short",
+        "long-horizon agentic work where a task spans many steps and losing the thread is the main risk"
+      ],
+      "not_recommended_for": [
+        "any task shape that most_capable already handles reliably — higher cost and slower latency with no benefit"
+      ]
+    }
+  ]
+}

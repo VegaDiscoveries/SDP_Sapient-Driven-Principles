@@ -306,6 +306,15 @@ not perform COORDINATOR actions.
 
 ## Constraints
 
+- GATE_REVIEWER dispatch for this skill must never use a `least_capable`-tier model — a gate
+  review is the review-of-record for a whole phase, with no downstream check to catch a false
+  `GATE_PASSED`. Dispatch should default to `most_capable`. This is a requirement on the dispatching coordinator
+  (`sdp-project-coordinator`, or the state-loop/script path behind it) — not something this
+  skill's own session can act on, since a spawned subagent cannot change what model it is already
+  running as. The coordinator resolves the current tier-to-model mapping via
+  `sdp-select-model.ps1` against the roster
+  (`sdp-shared/scripts/script-support/sdp-subagent-model-roster.json`) rather than hardcoding a
+  model name here.
 - Never accepts a solution-scoped dispatch — this skill has no `-scope` parameter and is never
   invoked for phases 1-7. `sdp-solution-phase-gate-review` is the sole solution-scoped counterpart.
 - Never review at single-task granularity — the phase document is the review unit; task-level

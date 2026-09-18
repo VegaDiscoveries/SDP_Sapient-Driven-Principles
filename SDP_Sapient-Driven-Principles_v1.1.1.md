@@ -139,9 +139,11 @@ Three distinct roles operate in this workflow. A single session must never perfo
 - Reads `state.json` and the work item registry
 - Determines the next valid action (dispatch WORKER, dispatch REVIEWER, block on rejection)
 - Never touches implementation files, source code, or section files in `[doc_name]_Sections/`
-  or `[doc_name]_Phases/`. Writing to early-phase docs (`sdp-solution-docs/01_concept.md`,
+  or `[doc_name]_Phases/`. Writing to early-phase docs (~~`sdp-solution-docs/01_concept.md`~~,
   ~~`sdp-solution-docs/02_expanded_concept.md`~~ [2026-07-21: stale filename — see Correction
-  below] `sdp-solution-docs/03_expanded_concept.md`) and their corresponding section files when
+  below] ~~`sdp-solution-docs/03_expanded_concept.md`~~) — this cycle's Concept and Expanded Concept
+  phase documents (per `registry.md`'s Phase File column — see
+  `sdp-solution-new-concept-intake/SKILL.md` Step 4) — and their corresponding section files when
   executing a `/brainstorming` capture session is permitted and does not constitute an
   implementation file edit. See "Phase 1 / Phase 3 — Interactive Capture Mechanics" below for how
   this capture actually happens in the solution-scoped phases-1-7 pipeline.
@@ -151,6 +153,15 @@ Three distinct roles operate in this workflow. A single session must never perfo
   > to Phase 3. Every other bootstrap-doc reference to this file already reads
   > `03_expanded_concept.md`; this was the one instance the renumbering task missed (found while
   > closing the related Phase 1/3 interactive-capture gap below).
+
+  > **Correction — 2026-09-10:** The literal `sdp-solution-docs/01_concept.md` /
+  > `sdp-solution-docs/03_expanded_concept.md` filenames above described the OLD flat,
+  > un-foldered solution-docs convention. Every phase-1-7 cycle (including a solution's very
+  > first/only cycle) now lives in its own `sdp-solution-docs/[CycleNNN]-[CycleName]/` folder with
+  > 3-digit-zero-padded phase files (`001_concept.md` … `007_phase_readiness.md`) — see
+  > `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3, the authoritative source for this
+  > convention. Rephrased to reference the phase document by role rather than a literal path so
+  > this bullet stays correct regardless of which cycle is in play.
 - May run as a persistent orchestration loop or be invoked on demand by the user
 - Writes dispatch instructions to `sessions/session-NNN.md` before handing off
 
@@ -291,18 +302,35 @@ only** — WORKER and REVIEWER are both "Role mismatch." The mechanism now match
    > `sdp-solution-` prefix convention (see `project-scope-skill-naming-design.md`).
 1b. **[2026-07-21 addition, same day follow-up]** COORDINATOR states what it read, by name — the
    tracked source file's actual path (or "no tracked source document for this cycle" if 1a's field
-   was absent), `01_concept.md`, and (Phase 3) `02_research_findings.md` — before opening the
+   was absent), ~~`01_concept.md`, and (Phase 3) `02_research_findings.md`~~ and this cycle's
+   Concept phase document, and (Phase 3) this cycle's Research phase document — the actual file
+   paths per `registry.md`'s Phase File column — before opening the
    brainstorming conversation. A summary that only gestures at "the tracked source" without naming
    the file is insufficient: the user has no way to tell from that phrasing alone whether 1a
    actually resolved and read a file, or silently found nothing to read. Discovered when a user
    testing SDP received exactly this kind of vague confirmation and could not tell which case it
    was without inspecting raw tool-call history.
+
+   > **Correction — 2026-09-10:** The struck-through `01_concept.md`/`02_research_findings.md`
+   > filenames assumed the OLD flat, un-foldered `sdp-solution-docs/` convention. Every phase-1-7
+   > cycle lives in its own `sdp-solution-docs/[CycleNNN]-[CycleName]/` folder with 3-digit
+   > zero-padded phase files — see `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3,
+   > the authoritative source. COORDINATOR states the actual resolved path (e.g.
+   > `009-GPGDocEval/001_concept.md`) for this cycle, not a literal doc-name assumed fixed across
+   > every cycle.
 2. Every decision, constraint, and design choice the brainstorming session surfaces is transcribed
-   into the phase document (`sdp-solution-docs/01_concept.md` or `03_expanded_concept.md`) —
+   into ~~the phase document (`sdp-solution-docs/01_concept.md` or `03_expanded_concept.md`)~~
+   this cycle's Concept or Expanded Concept phase document (per `registry.md`'s Phase File
+   column — see `sdp-solution-new-concept-intake/SKILL.md` Step 4) —
    append-only, same as any other phase content — before the COORDINATOR session closes. This
    satisfies the capture rule's existing "must be transcribed... before the session closes"
    requirement; it was never actually enforceable before because no session ever ran
    `/brainstorming` in the first place.
+
+   > **Correction — 2026-09-10:** The struck-through literal paths assumed the OLD flat,
+   > un-foldered `sdp-solution-docs/` convention. See `sdp-solution-new-concept-intake/SKILL.md`
+   > Step 4 items 1-3 for the authoritative cycle-folder convention; rephrased by phase role so
+   > this step stays correct for any cycle.
 3. COORDINATOR then dispatches WORKER as normal. WORKER's job for this task is to finish and
    formalize the phase document to the task's full specification **from the material COORDINATOR
    already captured** — WORKER does not originate Phase 1/3 content from nothing, but it still
@@ -315,9 +343,17 @@ the Phase 3 Mechanics entry below.~~
 
 > **Correction — 2026-07-21 (same day, follow-up):** the line above omitted the tracked source
 > document — item 1a now covers that for both phases. Restated: for Phase 3 specifically,
-> COORDINATOR's brainstorming session brings `01_concept.md`, `02_research_findings.md`, and (per
+> COORDINATOR's brainstorming session brings ~~`01_concept.md`, `02_research_findings.md`~~ this
+> cycle's Concept and Research phase documents, and (per
 > item 1a, when one exists for this cycle) the tracked source document into the conversation as
 > the material being expanded and merged — see the Phase 3 Mechanics entry below.
+>
+> **Correction — 2026-09-10:** The struck-through `01_concept.md`/`02_research_findings.md`
+> filenames in the 2026-07-21 restatement above assumed the OLD flat, un-foldered
+> `sdp-solution-docs/` convention. Every phase-1-7 cycle (including a solution's very first/only
+> cycle) lives in its own `sdp-solution-docs/[CycleNNN]-[CycleName]/` folder — see
+> `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3, the authoritative source. Rephrased
+> by phase role rather than a literal filename so this restatement stays correct for any cycle.
 
 **WORKER TDD and debugging:** These are the only Superpowers features added as standing
 instructions to WORKER sessions. They are execution aids that stay entirely within the WORKER
@@ -461,6 +497,16 @@ Phase 7: Phase Readiness
 > continues to operate per-project, completely unchanged — that machinery only ever begins after
 > Phase 7's gate passes.
 
+> **Addition — 2026-09-17 — optional loop-orchestrated mode for phases 1-7.** Manual/agent
+> invocation of `sdp-solution-phase-coordinator` (directly, or via a REPAIR-branch invocation)
+> remains fully valid and is the default. An optional recurring loop also exists:
+> `sdp-solution-phase-auto` starts `sdp-solution-phase-state-loop`, which triages any existing
+> halt/block or newly-discovered non-blocking item as mechanical (bounded auto-fix-and-verify) or
+> judgment (stops, same as any other halt) before evaluating the phases-1-7 dispatch sentinel and
+> dispatching the next WORKER/REVIEWER/GATE_REVIEWER step. See the Dispatch and Halt Contracts
+> section's Loop-orchestrated dispatch path for the full mechanism and how it differs from the
+> project-level and post-Phase-7 loops.
+
 > ~~**Addition — 2026-07-13 — Phase 5 sizing signal:** Phase 5's job is not limited to writing
 > acceptance criteria for a single Refined Implementation Plan document — it is also where the
 > project's remaining scope is decomposed into the actual build phases (Phase 6 onward) that the
@@ -501,15 +547,27 @@ Phase 7: Phase Readiness
 >    into Phase 1 rather than starting from a blank concept doc." This is a deliberate onboarding
 >    moment for new users who wouldn't otherwise know document-driven intake exists.
 >    - If yes: tell them where to place files (`sdp-solution-docs/user-design-docs/`) and invoke
->      ~~`/sdp-new-concept-intake`~~ `/sdp-solution-new-concept-intake` to process them before drafting `sdp-solution-docs/01_concept.md`.
+>      ~~`/sdp-new-concept-intake`~~ `/sdp-solution-new-concept-intake` to process them before
+>      drafting ~~`sdp-solution-docs/01_concept.md`~~ this cycle's Concept phase document.
 >    - If no: ~~proceed with conversational intake as today — no source doc, no behavior
 >      change.~~ [2026-07-20: superseded — see Correction below]
 > 3. **If files already exist in `processed/`:** intake already happened — skip the prompt, draft
->    `sdp-solution-docs/01_concept.md` from the tracked source as today.
+>    ~~`sdp-solution-docs/01_concept.md`~~ this cycle's Concept phase document from the tracked
+>    source as today.
 > 4. ~~`sdp-source-coverage-check`~~ `sdp-solution-source-coverage-check` runs immediately after Phase 1 and Phase 3 (Concept and
 >    Expanded Concept, under this version's numbering) are drafted, comparing the tracked source
->    doc against `sdp-solution-docs/01_concept.md`/`sdp-solution-docs/03_expanded_concept.md` for
+>    doc against ~~`sdp-solution-docs/01_concept.md`/`sdp-solution-docs/03_expanded_concept.md`~~
+>    this cycle's Concept and Expanded Concept phase documents for
 >    coverage — mandatory, not optional.
+>
+> **Correction — 2026-09-10:** Items 2-4 above named literal flat filenames
+> (`sdp-solution-docs/01_concept.md`, `sdp-solution-docs/03_expanded_concept.md`) — stale
+> language from before every phase-1-7 cycle (including a solution's very first/only cycle) was
+> formalized to live in its own `sdp-solution-docs/[CycleNNN]-[CycleName]/` folder with 3-digit
+> zero-padded phase files. See `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3 for
+> the authoritative convention. Rephrased by phase role — "this cycle's Concept phase document"
+> etc. — resolved via `registry.md`'s Phase File column, so this procedure stays correct
+> regardless of which cycle is active.
 >
 > **Correction — 2026-07-20:** The struck-through "if no" branch collapsed two materially
 > different situations into one — "I'll describe it live and skip document creation entirely"
@@ -534,20 +592,31 @@ passes.
 
 **Mechanics:**
 
-1. WORKER reads `sdp-solution-docs/01_concept.md` and derives research angles — however many are
+1. WORKER reads ~~`sdp-solution-docs/01_concept.md`~~ this cycle's Concept phase document and
+   derives research angles — however many are
    genuinely distinct (agent judgment; no fixed floor or ceiling).
 2. WORKER populates a research-dispatch prompt (same file-based handoff pattern as
    `sdp-solution-docs/00_solution_prompt.txt`, scoped to this fan-out) specifying: the angle list,
    ~2–4 searches per angle as a starting guideline, the deliverable path
-   (`sdp-solution-docs/02_research_findings.md`), and required structure (one section per angle).
+   (~~`sdp-solution-docs/02_research_findings.md`~~ this cycle's Research phase document), and
+   required structure (one section per angle).
 3. WORKER spawns exactly one child subagent per angle via the Agent tool — no batching multiple
    angles into one child — each performing web search/fetch against its angle only, blind to
    the other angles' findings.
-4. WORKER (parent) synthesizes child findings into `sdp-solution-docs/02_research_findings.md`,
+4. WORKER (parent) synthesizes child findings into ~~`sdp-solution-docs/02_research_findings.md`~~
+   this cycle's Research phase document,
    structured per angle, every material claim carrying a source URL and retrieval date.
 5. WORKER appends the Completed blockquote and sets phase state to `WORK_COMPLETE` as normal —
    the existing WORKER session contract (steps 11–15 of the Implementation Loop) applies
    unchanged.
+
+> **Correction — 2026-09-10:** Steps 1, 2, and 4 above named literal flat filenames
+> (`sdp-solution-docs/01_concept.md`, `sdp-solution-docs/02_research_findings.md`) — stale
+> language from before every phase-1-7 cycle was formalized to live in its own
+> `sdp-solution-docs/[CycleNNN]-[CycleName]/` folder. See
+> `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3 for the authoritative convention.
+> Rephrased by phase role, resolved via `registry.md`'s Phase File column, so these mechanics
+> stay correct for any cycle.
 
 **Gate — Research review (REVIEWER session):**
 
@@ -578,16 +647,20 @@ gate passes.
 **Mechanics:**
 
 1. Per "Phase 1 / Phase 3 — Interactive Capture Mechanics" above, COORDINATOR reads
-   `sdp-solution-docs/01_concept.md`, `sdp-solution-docs/02_research_findings.md`, and — if this
+   ~~`sdp-solution-docs/01_concept.md`, `sdp-solution-docs/02_research_findings.md`~~ this
+   cycle's Concept and Research phase documents, and — if this
    cycle has a tracked source document (this cycle's Concept phase state file's `source_document`
    field, absent for conversational intake) — the original source file(s) under
    `sdp-solution-docs/user-design-docs/processed/`. It then runs `/brainstorming` interactively
    with the user before dispatching WORKER, bringing all of that material into the session as the
    input being expanded and merged. Every decision surfaced is transcribed into
-   `sdp-solution-docs/03_expanded_concept.md` before the COORDINATOR session closes.
-2. WORKER reads `01_concept.md`, `02_research_findings.md`, the tracked source document if one
+   ~~`sdp-solution-docs/03_expanded_concept.md`~~ this cycle's Expanded Concept phase document
+   before the COORDINATOR session closes.
+2. WORKER reads ~~`01_concept.md`, `02_research_findings.md`~~ this cycle's Concept and Research
+   phase documents, the tracked source document if one
    exists for this cycle, and the COORDINATOR-captured material already present in
-   `03_expanded_concept.md`, then finishes drafting the expanded concept — every research angle
+   ~~`03_expanded_concept.md`~~ this cycle's Expanded Concept phase document, then finishes
+   drafting the expanded concept — every research angle
    from Phase 2 is addressed somewhere in the expanded concept (cited by angle, not merely
    summarized), every constraint from the brainstorming capture is reflected, and no detail
    present in the original tracked source (when one exists) is silently dropped by Phase 1's
@@ -595,10 +668,21 @@ gate passes.
 3. WORKER appends the Completed blockquote and sets phase state to `WORK_COMPLETE` as normal —
    the existing WORKER session contract applies unchanged.
 
+> **Correction — 2026-09-10:** Steps 1-2 above named literal flat filenames
+> (`sdp-solution-docs/01_concept.md`, `02_research_findings.md`, `03_expanded_concept.md`) —
+> stale language from before every phase-1-7 cycle was formalized to live in its own
+> `sdp-solution-docs/[CycleNNN]-[CycleName]/` folder. See
+> `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3 for the authoritative convention.
+> Rephrased by phase role, resolved via `registry.md`'s Phase File column, so these mechanics
+> stay correct for any cycle.
+
 **Gate — Expanded concept review (REVIEWER session):**
 
-- **Research incorporation:** every angle in `02_research_findings.md` is addressed in
-  `03_expanded_concept.md`, cited by angle — not silently dropped.
+- **Research incorporation:** every angle in ~~`02_research_findings.md`~~ this cycle's Research
+  phase document is addressed in
+  ~~`03_expanded_concept.md`~~ this cycle's Expanded Concept phase document, cited by angle — not
+  silently dropped. *(2026-09-10: rephrased from literal flat filenames — see
+  `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3.)*
 - **Capture fidelity:** every decision transcribed from the COORDINATOR brainstorming session
   appears in the expanded concept, unmodified in substance.
 - **Source coverage:** when a tracked source doc exists (Phase 1 — Source-Doc Intake Ownership),
@@ -625,9 +709,10 @@ gate passes.
 
 **Mechanics:**
 
-1. WORKER runs the Pros-Cons-Gaps cycle (see that section below) against `01_concept.md`,
-   `02_research_findings.md`, and `03_expanded_concept.md`, drafting
-   `sdp-solution-docs/04_architecture.md`.
+1. WORKER runs the Pros-Cons-Gaps cycle (see that section below) against ~~`01_concept.md`,
+   `02_research_findings.md`, and `03_expanded_concept.md`~~ this cycle's Concept, Research, and
+   Expanded Concept phase documents, drafting
+   ~~`sdp-solution-docs/04_architecture.md`~~ this cycle's Architecture phase document.
 2. Any gap whose resolution would introduce an external dependency (language, runtime, framework,
    library/package, IDE/tool/plugin, database/data-platform engine, cloud/hosting provider,
    third-party API/service, or anything similar) not already named in `.speq`, or an architectural
@@ -635,10 +720,52 @@ gate passes.
    Contracts section) — it cannot be closed via Deferred or declared-out-of-scope alone.
 3. WORKER appends the Completed blockquote and sets phase state to `WORK_COMPLETE` as normal.
 
+> **Correction — 2026-09-10:** Step 1 above named literal flat filenames
+> (`01_concept.md`, `02_research_findings.md`, `03_expanded_concept.md`,
+> `sdp-solution-docs/04_architecture.md`) — stale language from before every phase-1-7 cycle was
+> formalized to live in its own `sdp-solution-docs/[CycleNNN]-[CycleName]/` folder. See
+> `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3 for the authoritative convention.
+> Rephrased by phase role, resolved via `registry.md`'s Phase File column, so this step stays
+> correct for any cycle.
+
+> **Addition — 2026-08-23 — Cookie Consent default-inclusion notice.** Added following
+> `~SDP-Maintenance/~docs/cookie-consent-compliance-proposal.md` (design doc; deleted once this
+> was verified, per that folder's scratch convention). This is a GPG-standards default-inclusion
+> notice with user override, **not** a new gate criterion — the Architecture gate below is
+> unaffected by this addition.
+>
+> When Phase 4 identifies a web project type in the solution, before WORKER drafts
+> ~~`04_architecture.md`~~ this cycle's Architecture phase document, the acting session asks the
+> user the following three questions as one
+> batch, and records all three answers as a dated decision entry in
+> ~~`04_architecture.md`~~ this cycle's Architecture phase document:
+>
+> **Correction — 2026-09-10:** The struck-through `04_architecture.md` filenames above assumed
+> the OLD flat, un-foldered `sdp-solution-docs/` convention. See
+> `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3 for the authoritative
+> cycle-folder convention.
+>
+> 1. **Cookie-consent default-inclusion notice:** state that cookie-consent handling (GPG Chapter
+>    11, "Cookie Consent") is included in the architecture by default, unless the user explicitly
+>    opts out for this project.
+> 2. **Google Consent Mode v2 question:** *"Are you 100% certain Google Analytics and Google Ads
+>    will never be used on this website? If not certain, Consent Mode v2 integration will be
+>    included by default. Do you approve?"*
+> 3. **Consent-audit-log storage-tier verification:** if the solution already has a database
+>    project of any type, name it and confirm it as the target for the consent audit log. If not,
+>    ask which storage method to use (a flat-file fallback, or another mechanism the user names) —
+>    never auto-detect and apply a storage tier silently.
+>
+> If the user opts out of cookie-consent handling entirely for this project (question 1), that
+> override is recorded the same way, and GPG Chapter 11's Cookie Consent subsection is treated as
+> not-applicable for this project — same precedent as any other GPG `MUST` rule being explicitly
+> waived by the user.
+
 **Gate — Architecture review (REVIEWER session):**
 
 - **External Dependency Completeness:** every dependency or component surfaced during Architecture
-  is either detailed and settled in `01_concept.md`/`03_expanded_concept.md`/a prior resolved
+  is either detailed and settled in ~~`01_concept.md`/`03_expanded_concept.md`~~ this cycle's
+  Concept/Expanded Concept phase documents, or a prior resolved
   Material Decision Escalation record (no `.speq` exists yet at this phase — see the Material
   Decision Escalation section), or explicitly deferred with recorded user approval and a named
   target phase/task. GATE_BLOCKED if any such item is unresolved — this is the direct backstop
@@ -649,6 +776,12 @@ gate passes.
   GPG-silence trigger above.
 - **Actionability:** the architecture document is structured so Phase 5 (Implementation Overview)
   can build directly on it without re-deriving decisions already made here.
+
+> **Correction — 2026-09-10:** The External Dependency Completeness criterion above named literal
+> flat filenames (`01_concept.md`, `03_expanded_concept.md`) — stale language from before every
+> phase-1-7 cycle was formalized to live in its own `sdp-solution-docs/[CycleNNN]-[CycleName]/`
+> folder. See `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3 for the authoritative
+> convention. Rephrased by phase role so this criterion stays correct for any cycle.
 
 ### Phase 6 — Refined Implementation Plan (Trimmed Scope)
 
@@ -675,22 +808,35 @@ valid; the Phase 7 gate criterion below checks the field is *present*, not neces
 > Build-phase decomposition also populates that project's `.speq.md` and `[PROJECT]-Context.md`
 > — created as empty stubs at Add-Project time (`sdp-workspace-setup`), never populated by any
 > step until now — with the real, settled tech stack/naming/structure/product-shape decisions
-> already recorded in `04_architecture.md`/`05_implementation_overview.md`. See
+> already recorded in ~~`04_architecture.md`/`05_implementation_overview.md`~~ this cycle's
+> Architecture and Implementation Overview phase documents. See
 > `sdp-solution-phase-coordinator/SKILL.md` Step 2b item 0 for the procedure, and the `.speq`
 > Contract / Project Context Document sections above for the matching trigger-point correction.
 > Added after a real first-WORKER-dispatch halt found neither file existed for a project that had
 > already passed Phase 7 — no step in the solution-scoped pipeline owned creating or populating
 > them until this addition.
+>
+> **Correction — 2026-09-10:** The struck-through `04_architecture.md`/`05_implementation_overview.md`
+> filenames above assumed the OLD flat, un-foldered `sdp-solution-docs/` convention. See
+> `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3 for the authoritative cycle-folder
+> convention.
 
 **B. Full-lifecycle coverage audit:** GATE_REVIEWER reads back across every prior deliverable
 and traces every feature/rule/design element forward to confirm it landed somewhere in the final
 plan and decomposed registry.
 
 - **If a tracked source doc exists** (`user-design-docs/processed/[file]`): the audit traces
-  from that **original source doc**, not from `sdp-solution-docs/01_concept.md`. Every element in
+  from that **original source doc**, not from ~~`sdp-solution-docs/01_concept.md`~~ this cycle's
+  Concept phase document. Every element in
   the user's original material must be traceable all the way to the final plan/registry.
 - **If no source doc exists** (pure conversational intake): the audit starting point is
-  `sdp-solution-docs/01_concept.md`.
+  ~~`sdp-solution-docs/01_concept.md`~~ this cycle's Concept phase document.
+
+> **Correction — 2026-09-10:** The struck-through `sdp-solution-docs/01_concept.md` filenames
+> above assumed the OLD flat, un-foldered convention. See
+> `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3 for the authoritative cycle-folder
+> convention — this cycle's Concept phase document resolves via `registry.md`'s Phase File
+> column.
 
 Additional gate criteria, alongside the traceability check:
 
@@ -713,7 +859,8 @@ Additional gate criteria, alongside the traceability check:
 
 **When the audit finds a gap or misalignment (Phase Readiness Regression Procedure):**
 
-1. GATE_REVIEWER appends a `GATE_BLOCKED` verdict to `sdp-solution-docs/07_phase_readiness.md`
+1. GATE_REVIEWER appends a `GATE_BLOCKED` verdict to ~~`sdp-solution-docs/07_phase_readiness.md`~~
+   this cycle's Phase Readiness phase document
    identifying the earliest phase where the gap originates, with justification, and up to 3 remediation
    proposals spanning full re-phase rework to a small targeted edit. Each proposal names an
    explicit **`Target Phase:`** field — the exact `.sdp-solution-workflow/registry.md` Phase
@@ -728,6 +875,12 @@ Additional gate criteria, alongside the traceability check:
    `.sdp-solution-workflow/registry.md` row order) gets a genuinely fresh WORKER → REVIEWER →
    gate cycle — real re-execution, not a spot-check — before Phase Readiness re-attempts its own
    gate. No intermediate phase is skipped.
+
+> **Correction — 2026-09-10:** Step 1 above named the literal flat filename
+> `sdp-solution-docs/07_phase_readiness.md` — stale language from before every phase-1-7 cycle
+> was formalized to live in its own `sdp-solution-docs/[CycleNNN]-[CycleName]/` folder. See
+> `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3 for the authoritative convention.
+> Rephrased by phase role so this step stays correct for any cycle.
 
 > **Addition — 2026-07-24:** Items 3-4 above left an undocumented mechanical gap: nothing said how
 > COORDINATOR (or `sdp-solution-phase-coordinator`) transitions a regressed phase from the
@@ -752,13 +905,23 @@ Additional gate criteria, alongside the traceability check:
 > `>= 1` means a real verdict exists, proceed as already documented) — this counter is a reliable
 > signal because a real GATE_BLOCKED verdict always leaves it `>= 1`, while only the regression
 > procedure itself ever resets it to `0` against a `"blocked"` status. The solution-level mirror
-> additionally now resolves the current phase's own document (`sdp-solution-docs/[NN_phase_name].md`)
+> additionally now resolves the current phase's own document
+> (~~`sdp-solution-docs/[NN_phase_name].md`~~ `sdp-solution-docs/[phase_file]`, resolved from
+> `registry.md`'s Phase File column for the phase's current cycle)
 > instead of a hardcoded path. See `sdp-project-coordinator/SKILL.md` Step 4 sub-step 5 and
 > `sdp-solution-phase-coordinator/SKILL.md` Step 2e item 0.
+>
+> **Correction — 2026-09-10:** The struck-through `[NN_phase_name].md` placeholder above assumed
+> the OLD flat, 2-digit, un-foldered `sdp-solution-docs/` convention. Every phase-1-7 cycle lives
+> in its own `sdp-solution-docs/[CycleNNN]-[CycleName]/` folder with 3-digit zero-padded phase
+> files — see `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3 for the authoritative
+> convention, and `sdp-solution-phase-worker/SKILL.md`'s `[phase_file]` shorthand (Step 1) for the
+> established notation this correction adopts.
 
 **Solution-scoped since 2026-07-20:** every step above operates on the solution's own
 `.sdp-solution-workflow/state.json` / `.sdp-solution-workflow/registry.md` /
-`sdp-solution-docs/07_phase_readiness.md` — never a project's. This mirrors the project-level
+~~`sdp-solution-docs/07_phase_readiness.md`~~ this cycle's Phase Readiness phase document —
+never a project's. This mirrors the project-level
 mechanism exactly, just relocated: ~~`sdp-gate-review` (dispatched with `-scope solution`) uses
 the~~ [2026-07-21: superseded — see Correction below] `sdp-solution-phase-gate-review` (a dedicated
 solution-scoped skill, not a `-scope` flag on the project-level ~~`sdp-gate-review`~~
@@ -815,6 +978,13 @@ design doc's Section 11).
 > four times (all instances struck through above) — renamed to `sdp-project-gate-review` as part
 > of the same `sdp-project-*` scope-prefix rename (see `project-scope-skill-naming-design.md`).
 
+> **Correction — 2026-09-10:** The "Solution-scoped since 2026-07-20" paragraph's opening
+> sentence named the literal flat filename `sdp-solution-docs/07_phase_readiness.md` — stale
+> language from before every phase-1-7 cycle was formalized to live in its own
+> `sdp-solution-docs/[CycleNNN]-[CycleName]/` folder. See
+> `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3 for the authoritative convention.
+> Rephrased by phase role so the sentence stays correct for any cycle.
+
 This is a genuine backward state transition — the first one in SDP's phase lifecycle, which
 otherwise only ever advances or repeats a gate cycle in place. It reuses the existing gate
 machinery (`phase_gate.status`, `GATE_BLOCKED`/`GATE_PASSED`) — the new part is that
@@ -835,6 +1005,8 @@ format this extends):
 >    description of this remediation's scope, from full re-phase rework to a small targeted edit]
 > 2. **Target Phase:** [exact .sdp-solution-workflow/registry.md Phase column value] — [description]
 > 3. **Target Phase:** [exact .sdp-solution-workflow/registry.md Phase column value] — [description]
+>
+> **Recommended:** [N] — [one-line reasoning]
 ```
 
 Pros-cons-gaps cycles happen within the architecture and overview phases. Each cycle:
@@ -983,7 +1155,15 @@ Dispatched By: [human | coordinator-session-NNN]
 [Appended by dispatched agent when session concludes]
 Status transition: [FROM] → [TO]
 Notes: [any notes relevant to next session]
+Issues: [optional — present only when the dispatching session's own instructions asked for it.
+  One bullet per discovered item that does not rise to a blocking condition: what was found,
+  where, why it doesn't block. Omit the line entirely when there is nothing to report.]
 ```
+
+`Issues:` is populated only when the dispatching session's instructions asked for it — most
+dispatches do not. It exists so a loop-orchestrated session can capture non-blocking discoveries
+in a durable file instead of only in chat, without requiring every dispatch to carry the extra
+instruction.
 
 ---
 
@@ -1627,8 +1807,14 @@ with a clean attempt counter.
 > `regression_count` is a fast-access total, incremented once per regression (not per gate
 > attempt). `regressions[]` is the actual diagnostic record — which phase(s) recur, informing
 > the human's next remediation choice. **`state.json` is a mirror, not the primary record** —
-> each regression event is appended to `sdp-solution-docs/07_phase_readiness.md` first
+> each regression event is appended to ~~`sdp-solution-docs/07_phase_readiness.md`~~ this
+> cycle's Phase Readiness phase document first
 > (append-only); the `state.json` block is a derived, fast-access copy.
+>
+> **Correction — 2026-09-10:** The struck-through `sdp-solution-docs/07_phase_readiness.md`
+> filename above assumed the OLD flat, un-foldered `sdp-solution-docs/` convention. See
+> `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3 for the authoritative cycle-folder
+> convention.
 
 ### Pre-Work Verification Protocol
 
@@ -1997,6 +2183,8 @@ replace the original gap text.
 | **A** | [description] | [pros] | [cons] |
 | **B** | [description] | [pros] | [cons] |
 
+**Recommended:** [Option X] — [one-line reasoning]
+
 **Impact:**
 - [What cannot be built or decided without resolving this gap]
 
@@ -2112,6 +2300,14 @@ Four viable approaches. Choose based on project complexity and team size.
 > scope-prefix rename (see `project-scope-skill-naming-design.md`).
 
 Start with **human-gated**. Promote to script-gated once the workflow is stable.
+
+> **Addition — 2026-09-17 — solution-scoped phases 1-7 have their own, separate loop option.**
+> The four modes above are the project-level Implementation Loop's own `orchestration_mode`
+> values — phases 1-7 (Concept through Phase Readiness) never read or branch on this field at all
+> (see the "phases 1–7 are solution-scoped" correction under Document Lifecycle and Phase Gates).
+> Phases 1-7 gained their own optional recurring loop instead: `sdp-solution-phase-auto` /
+> `sdp-solution-phase-state-loop`. See the Dispatch and Halt Contracts section's Loop-orchestrated
+> dispatch path for the full mechanism this mirrors, and where it differs.
 
 > **Addition — 2026-07-27 — recommended Claude Code permission mode:** For agent-orchestrated and
 > loop-orchestrated dispatch, run the driving Claude Code session under the CLI's official `auto`
@@ -2337,6 +2533,45 @@ after each subagent returns. Do not parse subagent text output for the outcome.
 > above both still named `sdp-state-loop` — renamed to `sdp-project-state-loop` as part of the
 > `sdp-project-*` scope-prefix rename (see `project-scope-skill-naming-design.md`).
 
+> **Addition — 2026-09-17 — a second, structurally distinct loop exists for phases 1-7.** Every
+> step above governs `sdp-project-state-loop` (project-level `orchestration_mode:
+> "loop-orchestrated"`) only. Solution-scoped phases 1-7 (Concept through Phase Readiness) are
+> dispatched by `sdp-solution-phase-coordinator` unconditionally — they never read or branch on
+> `orchestration_mode` (see the "phases 1–7 are solution-scoped" correction under Document
+> Lifecycle and Phase Gates). Phases 1-7 have their own, separate loop option instead:
+> `sdp-solution-phase-auto` starts a recurring `sdp-solution-phase-state-loop`. Each fire adds a
+> start-of-cycle mechanical-vs-judgment triage step ahead of ordinary dispatch — an existing halt
+> or a newly-discovered non-blocking item is classified mechanical (bounded fix-and-verify attempt,
+> capped by this section's own `autoResolveHalt.evalCycleAttemptThreshold`) or judgment (a real
+> halt, same as any other — no auto-resolution attempted), gated by
+> `SDP-Config.json`'s `solutionPhaseLoop.autoResolveMechanicalFindings.enabled` kill switch — before
+> evaluating the phases-1-7 dispatch sentinel (`sdp-solution-docs/00_solution_prompt.txt`) exactly
+> the way this section's Steps 3-4 evaluate `sdp-docs/00_prompt.txt`. This loop never handles
+> post-Phase-7 dispatch (`sdp-solution-state-loop`'s exclusive job) or project-level dispatch
+> (`sdp-project-state-loop`'s exclusive job). `sdp-cancel-auto` recognizes and stops whichever of
+> the three loops is actually running.
+
+> **Addition — 2026-09-17 — all three state-loops self-cancel on a STOP or halt.** Observed
+> incident: a `sdp-solution-phase-state-loop` fired every 5 minutes against a Concept-phase task
+> that structurally requires a live `/brainstorming` session (see "Phase 1 / Phase 3 — Interactive
+> Capture Mechanics" above) — the interactive-checkpoint defer correctly STOPped each fire without
+> dispatching anything, but nothing ever stopped the recurring cron job itself, so the identical
+> STOP repeated indefinitely until a human noticed and ran `/sdp-cancel-auto` manually. All three
+> state-loops (`sdp-project-state-loop`, `sdp-solution-state-loop`, `sdp-solution-phase-state-loop`)
+> now invoke `/sdp-cancel-auto` themselves, as the first sub-step of their own Record-the-Fire
+> procedure, whenever a fire's outcome is `STOP` or a halt — this covers every condition that
+> cannot change without a human or a live session acting outside the loop (an interactive-
+> checkpoint defer, a judgment halt, a configuration error, or an unreadable state file), not only
+> `workflow_status: "halted"`. `/sdp-cancel-auto` remains the sole place `CronList`/`CronDelete`
+> logic lives — no state-loop duplicates that mechanism. This supersedes the "Restarting after a
+> STOP" paragraph's parenthetical above only in emphasis, not in substance: "user ran
+> `/sdp-cancel-auto`" and "the loop cancelled itself via `/sdp-cancel-auto` on a STOP" are now both
+> live paths to the same state, and the restart step is unchanged — resolve the condition, then
+> run `/sdp-solution-phase-auto` (phases 1-7) or `/sdp-auto`/`/sdp-state-loop-start` (post-Phase-7)
+> to resume. See `sdp-project-state-loop/SKILL.md` Step 6 sub-step 0,
+> `sdp-solution-state-loop/SKILL.md` Step 5 sub-step 0, and
+> `sdp-solution-phase-state-loop/SKILL.md` Step 8 sub-step 0.
+
 ---
 
 ### Halt Behavior Contract
@@ -2446,16 +2681,22 @@ mechanically checkable against `.speq` and the existing GPG Reference convention
 
 **Exemption:** anything already explicitly declared in `.speq` (project-scoped, available from
 Phase 7 onward) — or, for solution-scoped phases 1-6 where no `.speq` yet exists, already
-explicitly settled in `01_concept.md`, `03_expanded_concept.md`, or a prior resolved Material
+explicitly settled in ~~`01_concept.md`, `03_expanded_concept.md`~~ this cycle's Concept or
+Expanded Concept phase documents, or a prior resolved Material
 Decision Escalation record for this solution — is pre-approved and proceeds normally. This is why
 Phase 1/3's brainstorming capture, and the routine parts of Phase 4/5's Pros-Cons-Gaps cycle, do
 not trigger on every ordinary decision — only on ones not already settled.
+
+> **Correction — 2026-09-10:** The struck-through `01_concept.md`/`03_expanded_concept.md`
+> filenames above assumed the OLD flat, un-foldered `sdp-solution-docs/` convention. See
+> `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3 for the authoritative cycle-folder
+> convention. Rephrased by phase role so the exemption stays correct for any cycle.
 
 **On trigger:** the agent does not choose. It halts per the Halt Behavior Contract above
 (`workflow_status: "halted"`) — this is what makes it interrupt ~~`sdp-state-loop`~~ `sdp-project-state-loop` automatically, no
 new state machine required. `halt_reason` names the decision under consideration; the agent
 appends a 2–4 option table in the same shape as the Gap Resolution Format / Phase 7 Remediation
-Proposals (option, trade-offs, no forced pick). For a credentials/account case, the halt explicitly
+Proposals (option, trade-offs, a recommended option per that format's `**Recommended:**` line, no forced pick). For a credentials/account case, the halt explicitly
 asks the user to supply or confirm how to obtain them — key-name references only, never literal
 secret values, mirroring the existing ⚡ Deploy annotation convention. COORDINATOR surfaces the
 halt to the user as normal. The resolution is appended to `.speq` (dependency decisions) or the
@@ -2554,9 +2795,15 @@ session start.
 > under the solution-scoped model. An empty stub is created at Add-Project time
 > (`sdp-workspace-setup`); it is populated with real, settled product-shape/architecture content
 > at Phase 7 decomposition (`sdp-solution-phase-coordinator` Step 2b item 0), from
-> `04_architecture.md`/`05_implementation_overview.md` — still before the project's first WORKER
+> ~~`04_architecture.md`/`05_implementation_overview.md`~~ this cycle's Architecture and
+> Implementation Overview phase documents — before the project's first WORKER
 > session. See the `.speq` Contract section's matching correction and
 > `SDP-Workspace-Setup.md`'s Add-Project Steps.
+>
+> **Correction — 2026-09-10:** The struck-through `04_architecture.md`/`05_implementation_overview.md`
+> filenames in the 2026-07-26 correction above assumed the OLD flat, un-foldered
+> `sdp-solution-docs/` convention. See `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3
+> for the authoritative cycle-folder convention.
 
 ### What to Include
 
@@ -2605,10 +2852,16 @@ these from surrounding code will drift across sessions.~~
 > Steps — costs nothing, keeps `SDP-Document-List.json` ordering correct from day one); it is
 > populated with the actual settled tech stack, naming, and structure decisions at Phase 7
 > decomposition (`sdp-solution-phase-coordinator` Step 2b item 0), from the already-settled
-> content in `04_architecture.md`/`05_implementation_overview.md` — still strictly before that
+> content in ~~`04_architecture.md`/`05_implementation_overview.md`~~ this cycle's Architecture
+> and Implementation Overview phase documents — strictly before that
 > project's first WORKER session, just anchored to the trigger point that actually exists in the
 > current pipeline instead of a phase number projects no longer have. See
 > `SDP-Workspace-Setup.md`'s Add-Project Steps for the full split procedure.
+>
+> **Correction — 2026-09-10:** The struck-through `04_architecture.md`/`05_implementation_overview.md`
+> filenames in the 2026-07-26 correction above assumed the OLD flat, un-foldered
+> `sdp-solution-docs/` convention. See `sdp-solution-new-concept-intake/SKILL.md` Step 4 items 1-3
+> for the authoritative cycle-folder convention.
 
 Tech stack and naming must be declared before implementation begins — an agent that infers
 these from surrounding code will drift across sessions.

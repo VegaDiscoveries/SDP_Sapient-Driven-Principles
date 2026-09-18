@@ -1,8 +1,8 @@
 ﻿# Chapter 3 — Folder & File Organization
 
-> *Section file for `GenericProjectGuidlines_V1.10_20260323.md`*
+> *Section file for `GenericProjectGuidlines_V1.11_20260904.md`*
 >
-> **⚠️ Sync rule — agent instruction:** This is a section file. Any change made here **must be mirrored in the corresponding chapter** of `GenericProjectGuidlines_V1.10_20260323.md`. Any change made in the parent document's corresponding chapter must be mirrored back here. Both files must remain identical in content for their shared sections.
+> **⚠️ Sync rule — agent instruction:** This is a section file. Any change made here **must be mirrored in the corresponding chapter** of `GenericProjectGuidlines_V1.11_20260904.md`. Any change made in the parent document's corresponding chapter must be mirrored back here. Both files must remain identical in content for their shared sections.
 >
 > **TOC Maintenance:** If this section is renamed or deleted, update both the parent document's Contents list AND the `GenericProjectGuidlines_TOC.md` file. See the TOC file for detailed maintenance instructions.
 
@@ -112,5 +112,5 @@ A consistent folder structure across all projects reduces the time needed to nav
 - **MUST** Controller files end with `Controller`. Service files end with `Service`. DbContext files end with `DbContext`.
 - **MUST** Namespaces mirror the folder path from the project root. File at `{AppName}.API/Controllers/V1/AuthController.cs` → namespace `{AppName}.API.Controllers.V1`.
 - **SHOULD** Use file-scoped namespace declarations (`namespace Foo.Bar;`) to reduce indentation depth.
-- **SHOULD** Extension method files end with `Extensions`. Example: `StringExtensions.cs`, `SessionExtensions.cs`.
+- **MUST** Extension method files end with `Extensions`. Example: `StringExtensions.cs`, `SessionExtensions.cs`.
 - **MAY** Group tightly related small classes (e.g., a set of custom exception types) in a single file when each class is under 30 lines.

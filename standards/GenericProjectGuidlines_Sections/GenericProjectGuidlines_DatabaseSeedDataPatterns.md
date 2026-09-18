@@ -1,11 +1,18 @@
 # Chapter 17 — Database Seed Data Patterns
 
-**Target Audience:** DBAs, backend developers, DevOps, infrastructure leads  
-~~**Applicability:** Any Vega Discoveries solution with a database (SSDT `.sqlproj`)~~  
-**Applicability:** Any Vega Discoveries solution with a database (`.Database` DbUp class library)  
-**Context:** Reference data, configuration seeds, and migration sequences for all solutions
-
+> *Section file for `GenericProjectGuidlines_V1.11_20260904.md`*
+>
+> **⚠️ Sync rule — agent instruction:** This is a section file. Any change made here **must be mirrored in the corresponding chapter** of `GenericProjectGuidlines_V1.11_20260904.md`. Any change made in the parent document's corresponding chapter must be mirrored back here. Both files must remain identical in content for their shared sections.
+>
+> **TOC Maintenance:** If this section is renamed or deleted, update both the parent document's Contents list AND the `GenericProjectGuidlines_TOC.md` file. See the TOC file for detailed maintenance instructions.
+>
 > **⚠️ Append-only — agent instruction:** This document is an append-only architecture record. Do not delete or reword existing content. New or revised guidance must be added below the content it supersedes. Strikethrough (`~~text~~`) is a valid edit technique — it visually marks content as superseded while retaining it for audit purposes. Use strikethrough to mark the old text, then place the replacement immediately after on a new line.
+
+---
+
+**Target Audience:** DBAs, backend developers, DevOps, infrastructure leads  
+**Applicability:** Any Vega Discoveries solution with a database (e.g., the `.Database` DbUp class library)  
+**Context:** Reference data, configuration seeds, and migration sequences for all solutions
 
 ---
 
@@ -92,7 +99,6 @@ Organize seeds into logical categories:
 
 ### Seed Data Storage in Migrations
 
-~~In SSDT projects, seed data lives in **post-deployment scripts** (not EF Core migrations).~~
 In the `.Database` DbUp class library, seed data scripts are placed in the `PostDeployment/` folder and executed via `NullJournal` (always-run, idempotent).
 
 **File location:** `VegaIdentity.Database/PostDeployment/`
@@ -342,7 +348,7 @@ END
    - Example assertion: `Assert.Equal(3, context.EmailTypes.Where(x => !x.IsDeleted).Count())`
 
 3. **Staging/Production Deployment**
-   - DACPAC published via automated pipeline
+   - DbUp migration runner executed via automated pipeline
    - Post-deployment scripts run (idempotent)
    - Ops team runs validation queries post-deployment
    - Alerts fire if seed count is wrong (config drift detection)

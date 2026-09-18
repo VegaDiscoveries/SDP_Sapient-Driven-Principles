@@ -1,8 +1,8 @@
 ﻿# Chapter 5 — Authentication & Security
 
-> *Section file for `GenericProjectGuidlines_V1.10_20260323.md`*
+> *Section file for `GenericProjectGuidlines_V1.11_20260904.md`*
 >
-> **⚠️ Sync rule — agent instruction:** This is a section file. Any change made here **must be mirrored in the corresponding chapter** of `GenericProjectGuidlines_V1.10_20260323.md`. Any change made in the parent document's corresponding chapter must be mirrored back here. Both files must remain identical in content for their shared sections.
+> **⚠️ Sync rule — agent instruction:** This is a section file. Any change made here **must be mirrored in the corresponding chapter** of `GenericProjectGuidlines_V1.11_20260904.md`. Any change made in the parent document's corresponding chapter must be mirrored back here. Both files must remain identical in content for their shared sections.
 >
 > **TOC Maintenance:** If this section is renamed or deleted, update both the parent document's Contents list AND the `GenericProjectGuidlines_TOC.md` file. See the TOC file for detailed maintenance instructions.
 
@@ -12,22 +12,55 @@ Authentication is implemented once, in the API, using JWT bearer tokens. This si
 
 ## JWT Bearer Tokens
 
+**Signing Algorithm:** RS256 (asymmetric, RSA-based). VegaIdentity.API is the sole issuer and holds the private key; all consumer APIs validate tokens using the public key via the JWKS endpoint. See [JWKS Endpoint & Key Rotation](#jwks-endpoint--key-rotation) for key management, discovery, and rotation strategy.
+
+#### Token Validation Example
+
 ```csharp
-// Program.cs — token validation (correct for all client types)
+// Program.cs — token validation with RS256 public keys (consumer API pattern)
+// All active public keys are fetched from the issuer's JWKS endpoint and cached locally.
+// IssuerSigningKeys (plural) accepts all keys in the JWKS set; the JWT middleware selects
+// the correct key by matching the token's `kid` header claim. During a rotation's 30-day
+// overlap window both the old and new keys are present in the JWKS — tokens signed by
+// either key validate without any code change or restart.
+var jwksJson = /* serialized JWKS JSON fetched from /.well-known/jwks.json */;
+var signingKeys = new JsonWebKeySet(jwksJson).Keys;
 var tokenValidationParameters = new TokenValidationParameters
 {
     ValidateIssuerSigningKey = true,
-    IssuerSigningKey         = new SymmetricSecurityKey(Encoding.ASCII.GetBytes(jwtSecret)),
-    ValidateIssuer           = false,
+    IssuerSigningKeys        = signingKeys,  // plural — supports rotation overlap window
+    ValidateIssuer           = true,
+    ValidIssuer              = "https://identity.vegadiscoveries.com",
     ValidateAudience         = true,
-    ValidAudience            = jwtConfig.Audience,  // solution-specific audience identifier
+    ValidAudience            = "vegadiscoveries.solutionname",  // solution-specific audience identifier
     ValidateLifetime         = true,
     RequireExpirationTime    = true,
     ClockSkew                = TimeSpan.Zero  // no grace period on expiry
 };
 ```
 
+#### Private Key Generation & Storage (Issuer)
+
+1. **Generate RSA Key Pair:** Use OpenSSL or equivalent tooling to generate a 2048-bit or 4096-bit RSA key pair.
+   ```bash
+   openssl genrsa -out private_key.pem 2048
+   openssl rsa -in private_key.pem -pubout -out public_key.pem
+   ```
+
+2. **Store Private Key:** Encrypt the private key using a master key and store in a secure vault (e.g., Azure Key Vault, AWS Secrets Manager, or environment-backed encrypted storage). **Private keys must never be committed to source control or stored in plaintext.**
+
+3. **Key Vault Secret Naming:** For VegaIdentity.API, use a naming convention like:
+   - Secret name: `vega-identity-jwt-key-{keyId}`
+   - Example: `vega-identity-jwt-key-rsa_2026_q2`
+   - Store both the private key (PEM format) and the key ID for reference
+
+4. **Application Startup:** Load the private key from the secure vault at startup. The application initializes the JWT signing service with the current private key (marked `IsCurrent = 1` in the `API_SigningKey` table).
+
+#### Token Validation Strategy
+
 Every solution validates tokens against its own `AudienceIdentifier`, ensuring a token issued for one Vega Discoveries solution is rejected by all others and that an explicit login is required per solution.
+
+All consumer APIs validate using the **public key only**. The issuer (VegaIdentity.API) holds and guards the private key. See [Key Rotation Lifecycle](#key-rotation-lifecycle) for quarterly rotation and emergency rotation procedures.
 
 ## Shared Identity Database & Solution Registry
 
@@ -97,8 +130,10 @@ Password resets use a short-lived **signed JWT reset token** embedded in the res
 ```
 1.  User requests password reset for Solution A
 
-2.  User is challenged for their Reset PIN
-    2a. PIN valid:
+2.  User is challenged for their Reset PIN. If the user has security questions configured, they
+    may answer those instead — either challenge type satisfies this step; the Reset PIN remains
+    the primary factor and security questions are the alternative for users who set them up.
+    2a. Challenge passed (PIN valid, or all configured security question answers correct):
         — Server generates a signed JWT reset token:
               { "sub":          "<userId>",
                 "resetPinHash": "<current AspNetUsers.PasswordHash>",
@@ -106,14 +141,17 @@ Password resets use a short-lived **signed JWT reset token** embedded in the res
                 "purpose":      "password-reset",
                 "jti":          "<unique token id>",
                 "exp":          <now + 20 minutes> }
-              Signed with the server JWT secret
+              Signed with the server JWT secret. `resetPinHash` is captured regardless of which
+              challenge type was used — it exists solely to detect a Reset PIN change between
+              token issuance and redemption (see step 4), not to record which factor was used.
         — Token embedded in the reset URL
         — Reset link sent to the user's registered email address
         — User shown confirmation screen with options:
               [ Resend Email ]  [ Contact Support ]  [ Back to Login ]
 
-    2b. PIN invalid:
-        — User notified that the Reset PIN was not recognised
+    2b. Challenge failed:
+        — User notified that the challenge was not recognised (no distinction disclosed between
+          "wrong PIN" and "wrong security question answers", to prevent enumeration)
         — Prompted to contact support
         — No email sent
 
@@ -156,7 +194,7 @@ Framework-level baselines for all solutions. Solutions may tighten (shorten) the
 - **MUST** `ClockSkew = TimeSpan.Zero` on all `TokenValidationParameters` — no grace period is applied on top of the configured lifetime.
 - **SHOULD** Access token lifetime is chosen to minimize the stolen-token exposure window without forcing excessive refresh requests.
 - **SHOULD** Refresh token lifetime balances session usability against the risk window of a long-lived stolen token.
-- **SHOULD** Where regulatory compliance mandates shorter lifetimes, the stricter value always takes precedence and must be documented.
+- **MUST** Where regulatory compliance mandates shorter lifetimes, the stricter value always takes precedence and must be documented.
 
 ## Account Lockout Baselines
 
@@ -177,7 +215,8 @@ Framework-level defaults for brute-force protection. Solutions may tighten these
 - **MUST** On successful login: reset `FailedLoginAttempts = 0` and `LockoutEndDateUtc = NULL`.
 - **MUST** The locked-out user receives a generic message: "Account is temporarily locked due to multiple failed login attempts. Please try again later." No threshold values are disclosed to the caller.
 - **MUST** Manual lockout unlock via the Admin Panel clears `LockoutEndDateUtc` and `FailedLoginAttempts` for the specific user/solution pair.
-- **SHOULD** Alert on more than 10 lockout events for the same account within 24 hours — this pattern indicates a credential-stuffing attack.
+- **MUST** Have an alerting mechanism for an account experiencing an anomalous volume of lockout events, since this pattern indicates a credential-stuffing attack.
+- **SHOULD** Use more than 10 lockout events for the same account within 24 hours as the default alerting threshold.
 
 ## Rate Limiting Architecture
 
@@ -209,8 +248,9 @@ This enables ops to tighten or adjust limits per-solution without code changes o
 
 - **MUST** Rate-limited responses return `429 Too Many Requests` with a `Retry-After` header. Never return `200 OK` for a rate-limited request.
 - **MUST** All rate limit policies are stored in `API_RateLimitPolicy` and loaded via the cache. Hard-coded limits in middleware are not permitted.
-- **SHOULD** Alert on more than 100 rate-limit hits from a single IP within 1 hour — this pattern indicates credential-stuffing or DDoS.
-- **SHOULD** Correlate rate-limit hit events with account lockout events in security monitoring.
+- **MUST** Have an alerting mechanism for a single IP generating an anomalous volume of rate-limit hits, since this pattern indicates credential-stuffing or DDoS.
+- **SHOULD** Use more than 100 rate-limit hits from a single IP within 1 hour as the default alerting threshold.
+- **MUST** Where a security-monitoring platform capable of cross-event correlation exists, correlate rate-limit hit events with account lockout events in it.
 
 ## JWKS Endpoint & Key Rotation
 
@@ -249,7 +289,6 @@ The `kid` claim is stamped into every JWT header and matched against the JWKS at
 - **MUST** Every issued JWT includes a `kid` header claim matching the signing key's `KeyId`.
 - **MUST** Consumer APIs use the `kid` claim to select the correct key from the cached JWKS — never iterate-and-try-all.
 - **MUST** Alert if `API_SigningKey` has no row with `IsCurrent = 1` — this indicates a failed rotation that must be resolved immediately.
-- **SHOULD** Rotate signing keys at least quarterly. Document rotation events in the audit log.
 
 ## Client-Side Token Storage Strategies
 
@@ -291,7 +330,7 @@ MAUI and other mobile clients use secure OS storage (Keychain on iOS, Keystore o
 - **MUST** Each encrypted token is single-use. Server marks it consumed on first validation; any subsequent use is a replay and is rejected.
 - **MUST** Replay attempts are logged and trigger a security alert.
 - **MUST NOT** Store plaintext JWTs in `localStorage` or `sessionStorage`.
-- **SHOULD** On replay detection, revoke the user's active refresh tokens and force re-authentication.
+- **MUST** On replay detection, revoke the user's active refresh tokens and force re-authentication.
 
 ## SMS Verification via Email-to-SMS Gateways
 
@@ -448,12 +487,12 @@ On login, if MFA is enabled and the user has a verified phone, they are prompted
 - **MUST** Code lifetime is 5–10 minutes (project-specific, documented in project guidelines).
 - **MUST** Codes are single-use; a second attempt generates a new code and re-sends it.
 - **MUST** If SMS delivery fails (invalid phone, carrier gateway down, etc.), offer email fallback immediately.
-- **SHOULD** Start with US, CA, AU carriers; extend via the extensible `SmsCarrier` seed table for other countries.
+- **MUST** Start with US, CA, AU carriers; extend via the extensible `SmsCarrier` seed table for other countries.
 - **SHOULD** A user can disable SMS to a specific phone without deleting the record (`IsSmsEnabled = 0`).
 
 ## Multi-Factor Authentication (MFA) Strategy
 
-MFA adds a second verification factor for sensitive operations. Two channels are supported: email (primary) and SMS (optional). This section specifies MFA strategy, flow, and channel selection.
+MFA adds a second verification factor for sensitive operations. Three channels are supported: email (primary), SMS (optional), and TOTP via an authenticator app (optional). This section specifies MFA strategy, flow, and channel selection.
 
 ### MFA Scope
 
@@ -480,6 +519,13 @@ See **## Email Verification Token Lifecycle** for email token design and lifecyc
 - **Mechanism:** SMS sent via email-to-SMS carrier gateway (see **## SMS Verification via Email-to-SMS Gateways**)
 - **User Choice:** If user has both email and verified phone, they select the channel at login time
 
+### TOTP MFA — Secondary Channel
+
+- **Enrollment:** Requires scanning a QR code (or manually entering a secret) into an authenticator app, then confirming with one generated code
+- **Availability:** Only available once the user has completed and confirmed enrollment
+- **Mechanism:** Standard time-based one-time password, generated locally by the user's authenticator app (see **## TOTP-Based Multi-Factor Authentication (Authenticator App)**)
+- **User Choice:** If the user has TOTP enrolled alongside email and/or verified phone, they select the channel at login time
+
 ### MFA Login Flow
 
 ```
@@ -489,21 +535,24 @@ See **## Email Verification Token Lifecycle** for email token design and lifecyc
    b. Account is not locked out
    c. Account is active and not suspended
 3. If MFA is enabled for this account:
-   a. Server checks: does user have verified phone AND is SMS enabled on preferred phone?
-   b. If YES: prompt user to select channel:
-      [ Send SMS to preferred phone ]  [ Send email instead ]
+   a. Server checks which channels are available: verified+enabled phone (SMS), enrolled TOTP,
+      email (always available as the primary channel)
+   b. If more than one channel is available: prompt user to select channel:
+      [ Use authenticator app ]  [ Send SMS to preferred phone ]  [ Send email instead ]
    c. User selects channel
-   d. Send code to selected channel
+   d. TOTP: no send step — user is prompted directly for their authenticator app's current code
+      SMS/Email: send code to selected channel
    e. Return { status: "MfaChallengeRequired", mfaSessionId: "..." }
 4. Client presents code entry form
 5. User enters code: POST /auth/verify-mfa [MfaSessionId] { code }
 6. Server validates:
-   a. Code matches the sent code
-   b. Code has not expired (5–10 minute window)
-   c. Code has not been used yet (single-use)
-   d. mfaSessionId is valid and not expired
+   a. TOTP: code matches the expected value for the current (or adjacent) time step — see TOTP
+      section's Validation Window rule; SMS/Email: code matches the sent code and has not expired
+      (5–10 minute window)
+   b. Code has not been used yet (single-use)
+   c. mfaSessionId is valid and not expired
 7. On success: Issue access token + refresh token
-8. On failure: Return error; user can resend code or retry
+8. On failure: Return error; user can resend code (SMS/Email) or retry (TOTP)
 ```
 
 ### Code Delivery Rules
@@ -523,14 +572,188 @@ See **## Email Verification Token Lifecycle** for email token design and lifecyc
 
 ### Rules
 
-- **MUST** MFA is always channel-optional. A user with both email and phone chooses the channel at each login
+- **MUST** MFA is always channel-optional. A user with email and any additional enrolled channel (SMS, TOTP) chooses the channel at each login
 - **MUST** SMS channel is not available unless the user has at least one verified, enabled phone number
-- **MUST** If a user's only MFA phone becomes unverified or disabled mid-session, email channel is offered as fallback
+- **MUST** TOTP channel is not available until the user has completed enrollment and confirmed it with a valid generated code
+- **MUST** If a user's only non-email MFA channel becomes unavailable mid-session (phone unverified/disabled, TOTP unenrolled), email channel is offered as fallback
 - **MUST** MFA challenge sessions are tied to a `mfaSessionId`. Once verified, the session is consumed and cannot be reused
 - **MUST** MFA challenge sessions expire after 15 minutes of inactivity
-- **MUST** Administrators can disable MFA for an account from the Admin Panel. The user must re-enable it by re-registering their phone or verifying email
-- **SHOULD** Projects should track MFA adoption and engagement metrics (% of users with MFA enabled, SMS vs. email channel preference)
-- **SHOULD** Email MFA codes can be single-use or multi-use (project-specific). SMS codes are always single-use
+- **MUST** Administrators can disable MFA for an account from the Admin Panel. The user must re-enable it by re-registering their phone, re-enrolling TOTP, or verifying email
+- **SHOULD** Projects should track MFA adoption and engagement metrics (% of users with MFA enabled, SMS vs. email vs. TOTP channel preference)
+- **SHOULD** Email MFA codes can be single-use or multi-use (project-specific)
+
+## TOTP-Based Multi-Factor Authentication (Authenticator App)
+
+TOTP (Time-based One-Time Password, RFC 6238) lets a user generate MFA codes locally in an
+authenticator app (Google Authenticator, Microsoft Authenticator, Authy, or any RFC 6238-compliant
+app) instead of receiving a code over SMS or email. No carrier or email dependency, no per-code
+delivery cost, and no SIM-swap exposure — the tradeoff is a device-loss recovery burden the backup
+codes below exist to cover.
+
+### When to Use This Pattern
+
+Offer TOTP alongside Email and SMS MFA when:
+- Users are technical enough to comfortably install and use an authenticator app
+- SMS delivery cost or carrier reliability is a concern
+- A stronger MFA posture is wanted without adding phone-number PII
+
+TOTP does not replace Email MFA (Email remains the default, always-available channel) — it is an
+additional, optional channel a user may enroll in.
+
+### How It Works
+
+The server and the authenticator app both hold the same shared secret (established at enrollment).
+Each independently computes an HMAC-based one-time code from that secret and the current 30-second
+time step; because both sides use the same secret and the same clock, the codes match without any
+network round-trip at code-generation time. The server never sends anything to validate a TOTP
+code — it only receives what the user's app already computed.
+
+### Required Schema
+
+**UserTotpCredential** — one row per user per enrolled authenticator
+
+```sql
+CREATE TABLE [UserTotpCredential] (
+    [UserTotpCredentialId] INT PRIMARY KEY IDENTITY(1,1),
+    [UserTotpCredentialGuid] UNIQUEIDENTIFIER NOT NULL UNIQUE DEFAULT newid(),
+    [UserId] NVARCHAR(128) NOT NULL FOREIGN KEY REFERENCES [AspNetUsers]([Id]),
+    [EncryptedSecret] NVARCHAR(MAX) NOT NULL,   -- shared secret, encrypted at rest (see Rules)
+    [IsVerified] BIT NOT NULL DEFAULT 0,        -- enrollment confirmed with one valid code
+    [VerifiedDateUtc] DATETIME2 NULL,
+    [IsEnabled] BIT NOT NULL DEFAULT 1,         -- user can disable without deleting the enrollment
+    -- CommonColumns (Name, Description, CreatedDate, CreatedUser, LastUpdatedDate,
+    -- LastUpdatedUser, SortOrder, IsDeleted, DeletedDate, DeletedUser)
+    UNIQUE ([UserId])                            -- one TOTP enrollment per user
+);
+```
+
+**UserTotpBackupCode** — one-time recovery codes issued at enrollment, for when the device is lost
+
+```sql
+CREATE TABLE [UserTotpBackupCode] (
+    [UserTotpBackupCodeId] INT PRIMARY KEY IDENTITY(1,1),
+    [UserTotpBackupCodeGuid] UNIQUEIDENTIFIER NOT NULL UNIQUE DEFAULT newid(),
+    [UserId] NVARCHAR(128) NOT NULL FOREIGN KEY REFERENCES [AspNetUsers]([Id]),
+    [CodeHash] NVARCHAR(MAX) NOT NULL,          -- bcrypt(code), cost >= 12 — never store plaintext
+    [IsUsed] BIT NOT NULL DEFAULT 0,
+    [UsedDateUtc] DATETIME2 NULL,
+    -- CommonColumns
+);
+
+CREATE INDEX [IX_UserTotpBackupCode_UserId_IsUsed]
+    ON [UserTotpBackupCode]([UserId], [IsUsed]);
+```
+
+`EncryptedSecret` is encrypted, not hashed — the server must recover the plaintext secret on every
+validation to compute the expected code, unlike a password or backup code which only needs to be
+checked, never re-derived. Use the same master-key-based encryption service that protects other
+server-held secrets (e.g. Chapter 5's JWT signing key storage) — a dedicated column here, not the
+`Furniture` table itself, since that table's schema and rotation lifecycle are specific to
+per-solution signing keys, not per-user TOTP secrets. Backup codes, by contrast, are exactly like
+passwords in access pattern — bcrypt-hash them.
+
+### Service Implementation Pattern
+
+```csharp
+public interface ITotpService
+{
+    string GenerateSecret();
+    string GenerateQrCodeUri(string secret, string accountEmail, string issuer);
+    bool ValidateCode(string secret, string code);
+    IReadOnlyList<string> GenerateBackupCodes(int count = 10);
+}
+
+public class TotpService : ITotpService
+{
+    // GenerateSecret: cryptographically random Base32 secret (RFC 4648), 160 bits recommended.
+    // GenerateQrCodeUri: builds an otpauth:// URI (issuer, account, secret) for the enrollment
+    //   QR code — the authenticator app scans this to import the secret.
+    // ValidateCode: computes the expected code for the current time step and the adjacent
+    //   step on each side (see Validation Window rule), constant-time-compares against the
+    //   submitted code.
+    // GenerateBackupCodes: cryptographically random codes (e.g. 10 groups of 8 alphanumeric
+    //   characters), returned once in plaintext to the caller for display — never persisted
+    //   in plaintext; the caller bcrypt-hashes each before storing in UserTotpBackupCode.
+}
+```
+
+### TOTP Enrollment & Verification Flow
+
+**Step 1 — Begin Enrollment**
+
+```
+POST /api/v1/accounts/totp/begin-enroll
+
+Response: { "secret": "...", "qrCodeUri": "otpauth://totp/...", "backupCodes": ["..." x10] }
+```
+
+Server generates a secret and backup codes, stores the secret **encrypted** and the backup codes
+**hashed** with `IsVerified = 0`, and returns the plaintext secret/QR URI/backup codes to the
+client **once**. The client displays the QR code (for scanning) and the backup codes (for the user
+to save securely) — neither is retrievable from the server again after this response.
+
+**Step 2 — Confirm Enrollment**
+
+```
+POST /api/v1/accounts/totp/confirm-enroll
+{ "code": "123456" }
+
+Response: { "isVerified": true }
+```
+
+Server validates the submitted code against the stored (decrypted) secret. On success, sets
+`IsVerified = 1`, `VerifiedDateUtc = GETUTCDATE()`. On failure, enrollment remains unconfirmed;
+the user can retry or restart enrollment (which invalidates the prior secret and backup codes).
+
+**Step 3 — Use for MFA**
+
+Once verified, TOTP becomes an available channel in the MFA Login Flow above. The user is prompted
+for their authenticator app's current code — no code is sent by the server.
+
+**Backup Code Redemption**
+
+A user who has lost access to their authenticator app may submit a backup code in place of a TOTP
+code at the MFA challenge step. The server checks it against `UserTotpBackupCode` (bcrypt-verify,
+`IsUsed = 0`), marks it consumed (`IsUsed = 1`, `UsedDateUtc = GETUTCDATE()`) on success, and treats
+it as a completed MFA challenge. Each backup code is single-use.
+
+### Validation Window
+
+Clock drift between the server and the user's device is inevitable, so the server validates against
+the current 30-second time step and one step on either side (a 90-second effective window), never
+wider. Widening the window further meaningfully increases the odds of a code being guessed or
+reused within the accepted range.
+
+### Tradeoffs
+
+**Advantages:**
+- ✅ No per-code delivery cost or carrier dependency (unlike SMS)
+- ✅ Works offline — the app generates codes without network access
+- ✅ No SIM-swap exposure, since there is no phone-number-based delivery
+- ✅ Industry-standard, widely supported by existing authenticator apps
+
+**Disadvantages:**
+- ❌ Requires the user to install and maintain a separate authenticator app
+- ❌ Device loss without saved backup codes means a support-mediated account recovery
+- ❌ Clock drift on either side, beyond the validation window, causes valid-looking codes to fail
+
+### Rules
+
+- **MUST** The TOTP secret is stored encrypted, never in plaintext, and is never returned by any
+  API response after the initial enrollment step.
+- **MUST** Enrollment is not considered complete, and the channel is not available for MFA, until
+  the user confirms with one valid generated code (`IsVerified = 1`).
+- **MUST** Backup codes are shown to the user exactly once, at enrollment, and are stored only as
+  bcrypt hashes (cost ≥ 12) thereafter.
+- **MUST** Each backup code is single-use; mark it consumed immediately on successful redemption.
+- **MUST** Code validation uses a constant-time comparison and checks only the current time step
+  and one adjacent step on either side (see Validation Window above) — never a wider range.
+- **MUST** Restarting enrollment invalidates the prior secret and all prior backup codes.
+- **SHOULD** Allow the user to regenerate backup codes at any time from account settings, which
+  invalidates all previously issued backup codes.
+- **MUST** Where the user's email address is known, notify the user by email when TOTP is
+  enrolled, disabled, or when backup codes are regenerated, so the legitimate user is aware of the
+  change in the event the account is compromised.
 
 ## Email Verification Token Lifecycle
 
@@ -572,7 +795,7 @@ The plaintext token is sent in the email URL. Only the bcrypt hash is stored. Va
 - **MUST** Default token expiry is 24 hours. Projects must document any override.
 - **MUST** A resend issues a new token row — it does not invalidate the prior token. If the user clicks an older link it still validates (unless expired or already consumed).
 - **MUST** Nightly cleanup runs to prevent unbounded table growth from abandoned tokens.
-- **SHOULD** Verification failure responses are generic and do not indicate which validation check failed, to prevent token enumeration.
+- **MUST** Verification failure responses are generic and do not indicate which validation check failed, to prevent token enumeration.
 
 ## Security Questions Architecture
 
@@ -736,7 +959,7 @@ POST /api/v1/accounts/verify-security-answers
 - **MUST** Do not short-circuit answer verification. Validate all provided answers against the hash before returning success or failure to prevent answer enumeration via timing.
 - **MUST** Each user can set a distinct answer per question. Reusing the same answer across multiple questions is allowed but not recommended in UI guidance.
 - **SHOULD** At registration, require at least 2 security questions (configurable per-solution via `SolutionAccountFieldRequirement`). 2–5 questions is typical.
-- **SHOULD** Security questions are re-verified as a second factor during sensitive operations: email change, password reset completion, or admin actions.
+- **SHOULD** Where a user has security questions configured, answering them correctly is accepted as an alternative to the Reset PIN for re-authentication during sensitive operations: email change, password reset completion, or admin actions. The Reset PIN remains the primary re-authentication factor for these operations.
 - **SHOULD** Users can update their security answers in the account settings panel. The update flow is identical to initial setup (normalize, hash, replace prior answers).
 
 ## Key Rotation Lifecycle
@@ -780,32 +1003,32 @@ If a private key is suspected compromised:
 
 ## Roles & Authorization
 
-Roles are stored in the app DB (see `## App DB Role Tables` in Chapter 7 — Database Architecture) and stamped into the JWT as `role` claims at login time. Each solution maintains its own role assignments; a user may hold different roles across solutions.
+Roles are stored in the app DB (see `## App DB Role Tables` in Chapter 7 — Database Architecture) and stamped into the JWT as `role` claims at login time, with each role's `RoleCategory` (where set) also stamped as a `roleCategory` claim — see Chapter 7's Role Rules. Each solution maintains its own role assignments; a user may hold different roles across solutions.
 
 ### Standard Roles
 
 The following three roles are seeded by the framework and are present in every solution:
 
-| Role | Default | Purpose |
-|------|---------|--------|
-| `User` | Yes — generic framework default | Standard authenticated user |
-| `Admin` | No | Full solution administration — activates Admin Panel in the UI |
-| `Dev` | No | Internal developer and debug access — activates Dev Toolbar in the UI |
+| Role | RoleCategory | Default | Purpose |
+|------|--------------|---------|--------|
+| `User` | NULL | Yes — generic framework default | Standard authenticated user |
+| `Admin` | `AdminAccess` | No | Full solution administration — activates Admin Panel in the UI |
+| `Dev` | `DeveloperAccess` | No | Internal developer and debug access — activates Dev Toolbar in the UI |
 
-The project documentation defines any additional app-specific roles. The project may also override the registration default (e.g., VegaDrop assigns `Player` instead of `User` as the default role).
+The project documentation defines any additional app-specific roles. The project may also override the registration default (e.g., VegaDrop assigns `Player` instead of `User` as the default role). A project may also rename `Dev` to any title that fits its org (`Developer`, `DevOps`, `Programmer`, etc.) without losing developer-tier access — see Chapter 7's `RoleCategory` mechanism.
 
 ### Role Rules
 
 - **MUST** Role names are `public const string` fields in a static `RoleDefs` class in `{AppName}.Domain` or `{AppName}.Contracts`. Never use magic strings for role names anywhere in application code.
-- **MUST** At JWT generation, query the app DB `UserRole` table for the user's active roles and include them as `role` claims in the token.
+- **MUST** At JWT generation, query the app DB `UserRole` table for the user's active roles, include them as `role` claims, and include each role's non-null `RoleCategory` as a `roleCategory` claim in the token.
 - **MUST** For sensitive or destructive operations, re-validate roles against the app DB at request time — do not rely solely on JWT claims, which reflect roles at token issuance.
 - **MUST** Pages requiring authentication inherit from `SecurePageBase`. Public pages inherit from `PageBase`.
 - **MUST** `app.UseHttpsRedirection()` appears in the pipeline before any auth middleware. iOS ATS and Android NSC reject plain HTTP in production.
 - **MUST** JWT secrets are stored in User Secrets locally and in environment variables or Key Vault in production. Never in `appsettings.json`.
 - **SHOULD** Use policy-based authorization over direct role checks for fine-grained permissions.
-- **SHOULD** A user may hold multiple roles simultaneously. Authorization policies should evaluate the full role set.
+- **MUST** A user may hold multiple roles simultaneously. Authorization policies must evaluate the full role set.
 
-### Admin Panel
+## Admin Panel
 
 When the authenticated user holds the `Admin` role, the UI must expose an Admin Panel (or equivalent admin navigation section). This panel is invisible to all other roles and is never rendered unless the current user's active JWT claims include `Admin`.
 
@@ -824,6 +1047,7 @@ When the authenticated user holds the `Admin` role, the UI must expose an Admin 
 | System Announcements | Create, update, or remove global banners or notices displayed to all users in the UI. |
 | Maintenance Mode | Toggle maintenance mode for the solution. While active, non-admin users receive a maintenance page rather than the app. |
 | Feature Flags | Enable or disable named feature flags at runtime. Applied immediately without redeployment. |
+| Data Access Tracking | Log and query who accessed or changed which record, when, and via which stored procedure — see Chapter 8's **Data Access Tracking (DAT)** section for the schema, SP surface, and per-SP logging rule. Required for regulated data (e.g. medical) where "who accessed what, when" must be demonstrable. |
 
 **Project-specific admin features** (e.g., game stats, IAP/purchase history, leaderboard management, content moderation queues) must be defined in the project documentation.
 
@@ -833,7 +1057,7 @@ When the authenticated user holds the `Admin` role, the UI must expose an Admin 
 - **MUST** All destructive admin actions (deactivate account, revoke role, unlock lockout) require re-validation of the acting admin's `Admin` role against the app DB at request time — do not rely solely on the JWT.
 - **MUST** All admin actions are audit-logged: actor account ID, target account ID (if applicable), action name, timestamp, and before/after values where relevant.
 - **SHOULD** The Admin Panel uses the same auth token as the main application. No separate admin login is required.
-- **SHOULD** Admin list views are paginated server-side. Never load all user records in a single query.
+- **MUST** Admin list views are paginated server-side. Never load all user records in a single query.
 
 ## Required Middleware Order
 
@@ -856,22 +1080,5 @@ app.MapControllers();            // 7 — execute endpoint
 - **MUST** Reset tokens are single-use. The `jti` claim is recorded in `ConsumedResetTokens` on first use and rejected on any replay attempt.
 - **MUST** Account lockout is tracked per `UserSolutionCredential` row. A lockout on Solution A does not affect the user's access to Solution B.
 - **MUST** The Reset PIN can only be changed by providing the current Reset PIN. It must never be changeable via an email link alone.
-- **SHOULD** The "email sent" confirmation screen always displays regardless of internal PIN validation outcome, to prevent user enumeration via timing differences.
+- **MUST** The "email sent" confirmation screen always displays regardless of internal PIN validation outcome, to prevent user enumeration via timing differences.
 - **SHOULD** Clearly label the Reset PIN in all UI as a distinct credential from solution passwords, with explicit guidance not to reuse a solution password as the Reset PIN.
-
----
-
-## CHANGELOG
-
-| Version | Date | Change | Source |
-|---------|------|--------|--------|
-| 1.11 | 2026-05-19 | Added `## Token Lifetime Defaults` — 15-min access token, 30-day refresh token baselines | Migrated from VegaIdentity RF, Critical Gap 3 |
-| 1.11 | 2026-05-19 | Added `## Account Lockout Baselines` — 5 attempts / 30-min window / 30-min lockout with override support | Migrated from VegaIdentity RF, Critical Gap 2 |
-| 1.11 | 2026-05-19 | Added `## Rate Limiting Architecture` — SlidingWindowRateLimiter, default policies, per-solution override pattern | Migrated from VegaIdentity RF, Critical Gap 5 |
-| 1.11 | 2026-05-19 | Added `## JWKS Endpoint & Key Rotation` — RS256 JWKS endpoint, kid format, 30-day overlap, consumer cache strategy | Migrated from VegaIdentity RF, Critical Gap 4 |
-| 1.11 | 2026-05-19 | Added `## Client-Side Token Storage Strategies` — encrypted localStorage with replay detection | Migrated from VegaIdentity RF, Blocking Decision OQ-7 |
-| 1.11 | 2026-05-19 | Added `## Email Verification Token Lifecycle` — dedicated table, bcrypt hash, 24h expiry, nightly cleanup | Migrated from VegaIdentity RF, Critical Gap 1 |
-| 1.11 | 2026-05-19 | Added `## Key Rotation Lifecycle` — quarterly cadence, emergency rotation checklist, audit log requirements | Migrated from VegaIdentity RF, Critical Gaps 4 + Blocking Decisions OQ-11/OQ-12 |
-| 1.12 | 2026-05-21 | Added `## SMS Verification via Email-to-SMS Gateways` — carrier gateway pattern, schema, service implementation, phone registration flow | Migrated from VegaIdentity Review Findings, Section 2.85 (SMS Integration) |
-| 1.12 | 2026-05-21 | Added `## Multi-Factor Authentication (MFA) Strategy` — email + SMS channels, login flow, code delivery rules, resend strategy | Migrated from VegaIdentity Review Findings, Section 2.85 (SMS Integration) + MFA design decisions |
-| 1.13 | 2026-05-21 | Added `## Security Questions Architecture` — predefined question library, answer normalization + bcrypt hashing, per-solution assignment, verification flow, DevOps dashboard management | User requirements: per-solution demographic fields (birthYear, birthMonth, country, timezone) + security questions for account recovery |

@@ -102,7 +102,8 @@ pass, adjacent to the existing top-level fields).
 Before suggesting, selecting, or introducing a language, runtime, framework, library/package (any
 source/registry), IDE/tool/plugin, database/data-platform engine, cloud/hosting provider,
 third-party API/service, or anything similar that is not already explicitly settled — in `.speq`
-(project-scoped, from Phase 7 onward) or, pre-Phase-7, in `01_concept.md`/`03_expanded_concept.md`/
+(project-scoped, from Phase 7 onward) or, pre-Phase-7, in this cycle's own
+`[CycleNNN]-[CycleName]/001_concept.md`/`[CycleNNN]-[CycleName]/003_expanded_concept.md`/
 a prior resolved Material Decision Escalation record — or an architectural pattern with no GPG
 precedent: stop. If `SDP-Config.json` `materialDecisionEscalation.enabled` is `true` (default), do
 not proceed. Halt per the bootstrap doc's Halt Behavior Contract instead — set `workflow_status:
@@ -169,9 +170,11 @@ path applies. If `current_phase` is absent or null: phases 1–7 have not starte
 finished — see Step 2d below) for this solution; skip this step, proceed to whichever of Step 2's
 branches applies.
 
-**No cron job ever exists while this step's path is active** — phases 1–7 are always human-gated,
-direct session-by-session dispatch (bootstrap doc, Loop Entry Point). This step's logic only ever
-runs from a manually-invoked `sdp-solution-coordinator` session, never from a recurring loop fire.
+**Both manual and automated invocation are valid for this step.** Phases 1-7 can be driven by a
+directly, manually-invoked `sdp-solution-coordinator` session, or by a subagent dispatched from
+the recurring `sdp-solution-phase-state-loop` loop (started via `/sdp-solution-phase-auto`) —
+this step's own logic is identical either way; it does not need to know which triggered it, and
+nothing below this line changes dispatch-target decisions based on invocation context.
 
 1. Read `.sdp-solution-workflow/state.json` for `current_phase` and `phase_gate.status`.
 2. Duplicate `sdp-project-coordinator/SKILL.md` Step 4's decision algorithm exactly (REJECTED-priority
@@ -403,16 +406,43 @@ Mirrors `sdp-project-coordinator/SKILL.md` Step 4 sub-step 5's `"blocked"` branc
 called — boundary invariant), operating on the solution's own state instead of a project's. Runs
 whenever Step 2a finds `phase_gate.status == "blocked"` for the solution's `current_phase`.
 
-1. Check whether the GATE_BLOCKED blockquote in `sdp-solution-docs/07_phase_readiness.md`
+0. **Disambiguate first, using `phase_gate.gate_review_attempts` — never blockquote content, and
+   never assume the relevant document is the current cycle's `007_phase_readiness.md`.**
+   `phase_gate.status == "blocked"` means one of two distinct things: a real
+   `sdp-solution-phase-gate-review` verdict returned GATE_BLOCKED for whatever phase is *currently*
+   current, or item 3.b below force-set it on a target/intermediate phase to require a fresh gate.
+   Append-Only Discipline means a cycle's own `[CycleNNN]-[CycleName]/007_phase_readiness.md`
+   Remediation Proposals heading, once written, is never removed — so checking that fixed file
+   unconditionally, regardless of what `current_phase` actually is, would make every later
+   `"blocked"` occurrence for any phase misread as "the same unresolved proposals," forever, once a
+   single regression has ever happened. Instead:
+   - **`gate_review_attempts == 0`:** No `sdp-solution-phase-gate-review` has fired against this
+     phase since `"blocked"` was most recently set — a real GATE_BLOCKED verdict always leaves
+     `gate_review_attempts >= 1` (the counter increments the moment a GATE_REVIEWER dispatch
+     fires). This can only mean item 3.b just force-set it and this phase's fresh WORKER → REVIEWER
+     cycle has now reached all-VERIFIED. Treat exactly like a first gate: dispatch
+     `sdp-solution-phase-gate-review` via Step 2a's normal dispatch logic (item 4), including a
+     `Re-Gate Trigger:` line in the session file summarizing the triggering entry from
+     `phase_readiness.regressions[]` (item 3.d's schema). Do not perform steps 1-2 below for this
+     branch — there is no blockquote to check.
+   - **`gate_review_attempts >= 1`:** A real verdict exists. Proceed to step 1, which reads *the
+     current phase's own document* — `sdp-solution-docs/` plus the Phase File column value from
+     `registry.md` for the row matching `current_phase` — not a hardcoded path, and not always the
+     current cycle's `007_phase_readiness.md`.
+1. Check whether the GATE_BLOCKED blockquote in the current phase's own document (resolved above)
    contains a `**Remediation Proposals:**` heading (Task 7's sixth-criterion finding format,
-   always produced by `sdp-solution-phase-gate-review` for a Phase Readiness gate at this scope).
+   always produced by `sdp-solution-phase-gate-review` for a Phase Readiness gate at this scope —
+   see the disambiguation note above for why this heading can only appear when `current_phase`
+   contains the substring "Phase Readiness", not necessarily an exact match, since every cycle's
+   row is named e.g. "Phase Readiness — GPGDocEval" under the current cycle-folder convention).
 2. **Remediation Proposals present:** halt per the Halt Behavior Contract —
    `workflow_status = "halted"`, `halt_reason = "Phase Readiness gate found a traceability gap —
-   read the Remediation Proposals in sdp-solution-docs/07_phase_readiness.md and select one before
-   resuming."` Surface all numbered proposals (each with its `Target Phase:` value) verbatim as
-   plain markdown first — a banner row can't hold a list — then invoke `/sdp-create-banner` with a
-   `Readiness` row carrying a short version of this, e.g.
-   `icon=error row=0 row: Readiness | Traceability gap found — see sdp-solution-docs/07_phase_readiness.md. Select a remediation proposal above before resuming.`
+   read the Remediation Proposals in [resolved phase document path, e.g.
+   sdp-solution-docs/009-GPGDocEval/007_phase_readiness.md] and select one before resuming."`
+   Surface all numbered proposals (each with its `Target Phase:`
+   value) verbatim as plain markdown first — a banner row can't hold a list — then invoke
+   `/sdp-create-banner` with a `Readiness` row carrying a short version of this, e.g.
+   `icon=error row=0 row: Readiness | Traceability gap found — see [resolved phase document path]. Select a remediation proposal above before resuming.`
    Terminate — never pick a proposal automatically.
 3. **On the next invocation, once the user has stated their chosen proposal:**
    a. Read the chosen proposal's `Target Phase:` value — the exact `.sdp-solution-workflow/

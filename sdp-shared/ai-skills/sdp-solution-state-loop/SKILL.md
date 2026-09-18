@@ -97,7 +97,7 @@ Skipped entirely when `skipDispatchThisFire` is `true` — proceed directly to S
    while phases 1–7 are active (Loop Entry Point invariant). Record `action = STOP`,
    `reason = "current_phase is not null — phases 1-7 appear active; this loop should not be
    running (see sdp-solution-new-concept-intake's cron-cancel step)"`. Invoke
-   `/sdp-create-banner icon=error row=0 row: Status | sdp-solution-state-loop: current_phase is set — this loop should not be active during phases 1-7. Cancel it and use direct sdp-solution-phase-coordinator dispatch instead.`
+   `/sdp-create-banner icon=error row=0 row: Status | sdp-solution-state-loop: current_phase is set — this loop should not be active during phases 1-7. This loop will stop itself automatically (Step 5 sub-step 0); use direct sdp-solution-phase-coordinator dispatch to continue phases 1-7.`
    Proceed to Step 5, then stop.
 
 ### Step 4: Dispatch-Gating Fire
@@ -112,6 +112,14 @@ own "never parse subagent text" discipline. Record `action = DISPATCH_GATING_PAS
 
 ### Step 5: Record the Fire
 
+0. **Self-cancel the recurring loop on a terminal outcome.** If this fire's recorded `action` is
+   `STOP` or `halted` is `true`, **and** `/sdp-cancel-auto` was not already invoked earlier in this
+   same fire (Step 1 sub-steps 4-5, the RESPAWN case — never invoke it twice in one fire): invoke
+   `/sdp-cancel-auto` to stop the recurring loop. A STOP here (workflow halted, or `current_phase`
+   unexpectedly non-null) cannot change on a later fire without a human resolving it — continuing
+   to fire at the configured interval only repeats an identical, wasted STOP. `/sdp-cancel-auto` is
+   the sole place cron cancellation logic lives; this skill never duplicates it. If
+   `/sdp-cancel-auto` reports no matching cron job: treat this as a normal no-op, not an error.
 1. Append one line to today's `.sdp-solution-workflow/logging/loop-logs/loop-metrics-*.jsonl`,
    mirroring `sdp-project-state-loop` Step 6's envelope shape (fire timestamp, action, reason,
    halted flag). When `skipDispatchThisFire` was `true` (Steps 2–4 were skipped this fire), this
@@ -180,6 +188,9 @@ own "never parse subagent text" discipline. Record `action = DISPATCH_GATING_PAS
 
 ## Outputs
 
+- Every fire ending in `STOP` or a halt: `/sdp-cancel-auto` invoked (Step 5 sub-step 0) to stop the
+  recurring loop — skipped if the RESPAWN path (Step 1) already invoked it this fire; a no-op if
+  no matching cron job exists.
 - One dispatch-gating pass performed per fire (zero or more projects' `sdp-project-coordinator`
   invoked) — skipped entirely on a `hardStopCount`-tier fire (Step 1 sub-step 5).
 - `.sdp-solution-workflow/logging/loop-logs/loop-metrics-*.jsonl` — one appended fire record,

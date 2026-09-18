@@ -15,13 +15,25 @@ the state file is updated.
 All paths below are relative to the solution root — there is no project to resolve.
 
 - `.sdp-solution-workflow/sessions/session-NNN.md` — role assignment, phase identifier, phase
-  document path, flags, and any COORDINATOR instructions. Session number is read from
-  `.sdp-solution-workflow/state.json`'s `last_session` field. Never carries a `Project:` field —
-  its absence is the signal this is a solution-scoped dispatch (`sdp-solution-phase-coordinator`
-  Step 2a item 4 deliberately omits it).
-- Phase document — `sdp-solution-docs/[NN_phase_name].md` (e.g. `sdp-solution-docs/01_concept.md`,
-  `sdp-solution-docs/07_phase_readiness.md`), named by `current_phase` in
-  `.sdp-solution-workflow/state.json`; task description and full task spec.
+  document path (`Phase Document:` field), a `Pipeline:` field when this task belongs to a
+  disambiguated cycle (every cycle under the current cycle-folder convention, including a
+  solution's first and only cycle — see `sdp-solution-new-concept-intake` Step 4 item 2), flags,
+  and any COORDINATOR instructions. Session number is read
+  from `.sdp-solution-workflow/state.json`'s `last_session` field. Never carries a `Project:`
+  field — its absence is the signal this is a solution-scoped dispatch
+  (`sdp-solution-phase-coordinator` Step 2a item 4 deliberately omits it).
+- Phase document — the `Phase Document:` field value taken from the session dispatch file (Step
+  2) is **always relative to `sdp-solution-docs/`, never including that prefix itself** (confirmed
+  2026-09-10 against `sdp-solution-phase-gate-review/SKILL.md` Step 8, which applies the same
+  literal prefix to the identically-scoped field its own setup script reports). Elsewhere in this
+  document that bare value is written as `[phase_file]` shorthand, always preceded by the
+  literal `sdp-solution-docs/` (e.g. `sdp-solution-docs/009-GPGDocEval/001_concept.md`) — it is
+  not a positional convention to re-derive independently, since the value is always the full
+  `[CycleNNN]-[CycleName]/[PhaseNNN]_phase_name.md` registry Phase File entry for this cycle's
+  row, with no fixed positional filename to guess; only `[phase_file]` comes from the dispatch
+  file, the `sdp-solution-docs/` prefix is always literal. `[phase_file]` already carries the
+  `.md` extension — never write `[phase_file].md`; the phase state file variant replaces that
+  trailing `.md` with `_state.json` (written below as `[phase_file]_state.json`).
 - `.sdp-solution-workflow/state.json` — `gpg_version`, `last_session`, `current_phase`
 - `.sdp-solution-workflow/registry.md` — phase row status, Depends On column (read for context;
   not written here except by the Phase 7 decomposition sub-step)
@@ -61,7 +73,10 @@ documents, not implementation code.
    proceeding.
 2. Read the session dispatch file (`.sdp-solution-workflow/sessions/session-NNN.md` — session
    number from `.sdp-solution-workflow/state.json`'s `last_session` field). Confirm role
-   assignment is WORKER. Note any flags or Superpowers instructions included by
+   assignment is WORKER. Record the `Phase Document:` field value — this is `[phase_file]`
+   wherever it appears below. If a `Pipeline:` field is present, state it back to the user before
+   beginning task work, e.g. `icon=info row=0 row: Pipeline | [pipeline field text]` — confirming
+   scope before drafting, not after. Note any flags or Superpowers instructions included by
    `sdp-solution-phase-coordinator`.
 3. Read `.sdp-solution-workflow/state.json` — confirm `current_phase` and any flags.
 
@@ -70,7 +85,8 @@ documents, not implementation code.
 Before suggesting, selecting, or introducing a language, runtime, framework, library/package (any
 source/registry), IDE/tool/plugin, database/data-platform engine, cloud/hosting provider,
 third-party API/service, or anything similar that is not already explicitly settled — in `.speq`
-(project-scoped, from Phase 7 onward) or, pre-Phase-7, in `01_concept.md`/`03_expanded_concept.md`/
+(project-scoped, from Phase 7 onward) or, pre-Phase-7, in this cycle's own
+`[CycleNNN]-[CycleName]/001_concept.md`/`[CycleNNN]-[CycleName]/003_expanded_concept.md`/
 a prior resolved Material Decision Escalation record — or an architectural pattern with no GPG
 precedent: stop. If `SDP-Config.json` `materialDecisionEscalation.enabled` is `true` (default), do
 not proceed. Halt per the bootstrap doc's Halt Behavior Contract instead — set `workflow_status:
@@ -80,23 +96,30 @@ section (Dispatch and Halt Contracts).
 
 ### Step 3: Load Task Context
 
-1. If `current_phase` is an architecture-class phase (Architecture, Implementation Overview):
-   read the relevant GPG section file(s) — per the bootstrap doc's GPG Reading Map — before
-   forming an approach. Note applicable GPG patterns.
-2. Read the full phase document at `sdp-solution-docs/[NN_phase_name].md`. Understand the
+1. If `current_phase` is an architecture-class phase (Architecture, Implementation Overview) —
+   meaning it equals that name exactly, **or** starts with that name followed by `" — "` (a
+   disambiguated cycle's Phase-column text is never the bare canonical name alone —
+   see `sdp-solution-new-concept-intake` Step 4 item 2): read the relevant GPG section file(s) —
+   per the bootstrap doc's GPG Reading Map — before forming an approach. Note applicable GPG
+   patterns.
+2. Read the full phase document at `sdp-solution-docs/[phase_file]` (the literal
+   `sdp-solution-docs/` prefix plus the `Phase Document:` value recorded in Step 2 — never the
+   `Phase Document:` value alone, which is bare). Understand the
    assigned task in the context of the whole document — the same task-item format (checkbox +
    Completed/Eval/Verified blockquotes) the bootstrap doc defines for any phase document applies
    here unchanged.
-2a. **Phase 3 (Expanded Concept) only:** also read `sdp-solution-docs/01_concept.md` and
-    `sdp-solution-docs/02_research_findings.md` before drafting — the expanded concept must
+2a. **Phase 3 (Expanded Concept) only** (`current_phase` equals `"Expanded Concept"` exactly, or
+    starts with `"Expanded Concept — "`)**:** also read this cycle's
+    `sdp-solution-docs/[CycleNNN]-[CycleName]/001_concept.md` and
+    `sdp-solution-docs/[CycleNNN]-[CycleName]/002_research_findings.md` before drafting — the expanded concept must
     address every research angle from Phase 2, cited by angle, and build on Phase 1's concept
     rather than restate it. Also check this cycle's Concept phase state file for a
     `source_document` field (written by `sdp-solution-new-concept-intake` Step 4 item 5); if present, read
     the tracked source file(s) it points to under `sdp-solution-docs/user-design-docs/processed/`
     (section-by-section if a `[doc_name]_Sections/[doc_name]_TOC.md` folder exists, same
     convention as `sdp-solution-source-coverage-check`) — the expanded concept must not lose detail present
-    in the original source that the Phase 1 concept compressed away. If
-    `sdp-solution-docs/03_expanded_concept.md` already contains COORDINATOR-captured brainstorming
+    in the original source that the Phase 1 concept compressed away. If this cycle's
+    `sdp-solution-docs/[CycleNNN]-[CycleName]/003_expanded_concept.md` already contains COORDINATOR-captured brainstorming
     material (per the bootstrap doc's "Phase 1 / Phase 3 — Interactive Capture Mechanics"), treat
     that material as the starting point to finish and formalize — do not originate content that
     contradicts or ignores it.
@@ -145,7 +168,7 @@ to `[resolved_project]` and forbids searching the solution root) — it is not i
 Instead, apply the bootstrap doc's generic Pre-Work Verification Protocol directly, scoped to
 this solution-level phase document:
 
-1. **Scan for prior artifacts.** Check whether `sdp-solution-docs/[NN_phase_name].md` already
+1. **Scan for prior artifacts.** Check whether `sdp-solution-docs/[phase_file]` already
    has substantive content for the assigned task beyond a template stub, and whether the task's
    checkbox is already `[x]` with a Completed blockquote present.
 2. **Classify state:** Not Started (stub only, no Completed blockquote) / In Progress or
@@ -182,7 +205,7 @@ this solution-level phase document:
 
 ### Step 6: Record Completion and Update State
 
-1. Mark the task checkbox `[x]` in `sdp-solution-docs/[NN_phase_name].md`.
+1. Mark the task checkbox `[x]` in `sdp-solution-docs/[phase_file]`.
 2. Append a Completed blockquote immediately after the task item:
    ```
    > **Completed: [YYYY-MM-DD HH:MM]** — [What was done. Decisions made. Any deviations from
@@ -194,13 +217,13 @@ this solution-level phase document:
    build-phase task was assigned to a project's own `.sdp-workflow/registry.md`, and
    `.sdp-solution-workflow/dependencies.json` parses with every edge carrying its required
    fields (per Step 3 item 5 / `sdp-solution-phase-coordinator` Step 2b's Confirm-outcome check).
-3. If `sdp-solution-docs/[NN_phase_name].md` has a top-level `**Status:**` header (the standard
+3. If `sdp-solution-docs/[phase_file]` has a top-level `**Status:**` header (the standard
    document template in `SDP-Workspace-Setup.md` includes one) and its current value does not
    reflect this task's new `WORK_COMPLETE` state: strike it through in place and append the
    corrected value immediately after, per Append-Only Discipline — e.g. `**Status:**
    ~~PENDING.~~ **WORK_COMPLETE** [DATE, this session].` Do not silently overwrite the header.
    A phase document with no `**Status:**` header needs no action here.
-4. Update `sdp-solution-docs/[NN_phase_name]_state.json` (the phase document's path with `.md`
+4. Update `sdp-solution-docs/[phase_file]_state.json` (the phase document's path with `.md`
    replaced by `_state.json`):
    - Set the task's `status` to `"WORK_COMPLETE"`
    - Set `last_session` to the current session identifier
@@ -260,10 +283,10 @@ this solution-level phase document:
 
 ## Outputs
 
-- Phase document (`sdp-solution-docs/[NN_phase_name].md`) updated: task checkbox `[x]`, Completed
+- Phase document (`sdp-solution-docs/[phase_file]`) updated: task checkbox `[x]`, Completed
   blockquote appended, top-level `**Status:**` header synced to `WORK_COMPLETE` if present and
   stale
-- Phase state file (`sdp-solution-docs/[NN_phase_name]_state.json`) updated: task `status` →
+- Phase state file (`sdp-solution-docs/[phase_file]_state.json`) updated: task `status` →
   `WORK_COMPLETE`, `last_session`, `last_updated`
 - `.sdp-solution-workflow/state.json` updated: `last_session`, `updated`, `phase_gate.status` set
   to `"pending"` on first WORK_COMPLETE for the phase
