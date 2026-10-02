@@ -115,6 +115,22 @@ top-level fields).
 6. **Resume** — normal operation begins from the reconciled state, no different from a solution
    that started under this design from day one.
 
+### Step 0b: Halt Check
+
+Read `workflow_status` from `.sdp-solution-workflow/state.json`. If `"halted"`: invoke
+`/sdp-create-banner icon=error row=0 row: Status | Halted — [halt_reason]. Resolve this condition and run sdp-solution-phase-coordinator to resume.`
+(substitute the actual `halt_reason` field value, or "No halt reason recorded in state.json" if
+absent), do not proceed to any subsequent step, and terminate.
+
+This check runs directly against `state.json`, independent of Step 1's backing script. The
+script's own halt detection (`sdp-solution-phase-coordinator.ps1`, inherited from
+`sdp-solution-coordinator.ps1`) executes only after its `active_solution_task` null-check's early
+return (`status: "no_shared_task"`) — unreachable on every phases-1-7 dispatch, since a null
+`active_solution_task` is this skill's expected, common case. This step is the only halt check
+that actually runs on that path, and must run on both manual and loop-orchestrated invocation
+(`sdp-solution-phase-state-loop` performs its own equivalent check before dispatching this skill,
+but a directly/manually invoked session has no other check standing between it and Step 2a).
+
 ### Material Decision Escalation Check
 
 Before suggesting, selecting, or introducing a language, runtime, framework, library/package (any
