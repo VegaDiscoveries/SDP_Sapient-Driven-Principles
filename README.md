@@ -35,6 +35,15 @@ Three distinct roles operate in the workflow. A single session must never perfor
 | **WORKER** | Implements a single assigned task, appends a Completed blockquote, updates state to `WORK_COMPLETE` |
 | **REVIEWER** | Independently verifies WORKER output against acceptance criteria, appends Eval + Verified blockquotes, updates state to `VERIFIED` or `REJECTED` |
 
+### Two Workflow Types
+
+SDP work falls into two categories, sharing the same three-role state machine below:
+
+- **Phase work** — the solution-scoped Phases 1-7, driven by `sdp-solution-phase-*` skills. Settles everything that must be decided before coding work begins: define the idea/concept (Phase 1, Phase 3), research it (Phase 2), settle the solution/project architecture (Phase 4, Phase 5), surface and resolve any third-party service or credential needs before they can stall implementation (Material Decision Escalation — concentrated in Phase 4, Phase 5, but can trigger in any phase), and produce a coding plan — acceptance criteria plus build-phase decomposition (Phase 6, Phase 7). Runs once per concept cycle; its output seeds project work.
+- **Coding work** — the project-level Implementation Loop, driven by `sdp-project-*` skills. Runs per-project, per build-phase task, once Phase 7's decomposition has assigned work.
+
+Phase work has one additional state-machine branch beyond the base cycle below — **Accepted Variance**, covered after the diagram.
+
 ### State Machine
 
 Each task transitions through formal states recorded in `[phase]_state.json`:
@@ -66,6 +75,38 @@ REVIEWER session  ← new subagent, isolated context window
     ▼
 (next COORDINATOR session reads outcome from disk — repeat)
 ```
+
+**Phase work only — Accepted Variance.** The REJECTED branch above is the full picture for
+coding work. Phase work adds one branch: not every REJECTED finding justifies a full
+WORKER→REVIEWER redispatch — a finding whose impact on a future agent's eventual code
+generation is low (a stale narrative note, a cosmetic phrasing issue, a non-blocking
+clarification) can cost a full cycle to correct something that was never going to mislead
+anyone. Accepted Variance closes such a finding without that cycle, while keeping the decision
+fully disclosed — rated against a fixed doc-fix-impact scale and recorded in the phase document —
+and never silently overriding REVIEWER's own verdict:
+
+```
+REJECTED  (phases 1-7 only)
+    │ sdp-solution-phase-coordinator invokes sdp-eval-and-address-phase-issues,
+    │ scoped to this task's own REJECTED Eval blockquote
+    ▼
+  any finding disposed "fix"? ──yes──► PENDING ──► WORKER (ordinary redispatch,
+    │                                              scoped to the "fix"-disposed findings only)
+    no — every finding "accept"
+    ▼
+  Accepted Variance blockquote appended (band, rationale, disposition source)
+    ▼
+  REVIEWER session  ← confirming pass, self-detected from the blockquote sequence
+    │ confirms the Accepted Variance record, never re-runs a fresh evaluation
+    ▼
+  VERIFIED
+```
+
+Accepted Variance never writes `VERIFIED` directly — only this confirming REVIEWER pass does,
+preserving the same Role Separation guarantee as the base mechanism above. See the bootstrap
+doc's State Machine section ("Accepted Variance" addition) for the full rules, and
+`sdp-eval-and-address-phase-issues` in the Skills Inventory below for what drives the
+fix/accept disposition.
 
 ### Key Principles
 
