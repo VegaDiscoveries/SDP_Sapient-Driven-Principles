@@ -58,7 +58,7 @@ function Set-JsonFileWithRetry($obj, [string]$path, [int]$depth) {
     $json = $obj | ConvertTo-Json -Depth $depth
     for ($attempt = 1; $attempt -le 3; $attempt++) {
         try {
-            Set-Content -Path $path -Value $json -Encoding UTF8
+            Set-Content -Path $path -Value $json -Encoding UTF8 -ErrorAction Stop
             return $true
         } catch {
             if ($attempt -eq 3) { return $false }

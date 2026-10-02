@@ -389,7 +389,7 @@ items are checked.
 - [ ] File writes use `-Encoding UTF8` and specify `-Depth` on `ConvertTo-Json`
 - [ ] Permission entry added to `.claude/settings.local.json` `permissions.allow`
 - [ ] Permission entry verified by re-reading `.claude/settings.local.json`
-- [ ] If project-scoped: `file-exists` entry added to `SDP-Workspace-Setup.json`; if solution-root: name added to `SDP-Workspace-Setup.md` setup checklist permission step
+- [ ] If project-scoped: `file-exists` entry added to `SDP-Workspace-Setup.json`; if solution-root: `file-exists` and `json-array-contains` (permissions.allow) entries added to `SDP-Solution-Setup.json` instead — see Bootstrap Integration above. `SDP-Workspace-Setup.md`'s own Setup Checklist explicitly defers to that manifest as data rather than hand-enumerating scripts in its prose.
 - [ ] If skill-invoked: skill Level 2 SKILL.md documents the script's expected stdout format
       and how the skill branches on `status`; project-scoped scripts note the `-workspaceRoot` requirement
 - [ ] If this script handles steps from an existing skill: run `/sdp-evaluate-skill [parent-skill-name]`

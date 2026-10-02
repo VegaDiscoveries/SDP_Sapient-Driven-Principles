@@ -9,14 +9,18 @@ acceptance criteria, is judgment; everything else is mechanical), attempt a boun
 mechanical findings, then evaluate the phases-1-7 dispatch sentinel and dispatch a single
 action — or stop if judgment is required. This skill never handles post-Phase-7 dispatch
 (`sdp-solution-state-loop`'s exclusive job) or project-level dispatch
-(`sdp-project-state-loop`'s exclusive job).
+(`sdp-project-state-loop`'s exclusive job). Before any of that, every fire first checks whether
+an earlier fire's own dispatched subagent has actually returned yet (Step 0) — deferring rather
+than dispatching a second one on top of it.
 
 ## Inputs
 
 - Current conversation context (API error scan only — no file tools)
 - `.sdp-solution-workflow/state.json` — `workflow_status`, `halt_reason`, `current_phase`,
-  `phase_gate` (`status`, `gate_review_attempts`), `last_session`, and this skill's own private
-  bookkeeping field `phase_loop_mechanical_resolution` (read and written across Steps 5 and 7)
+  `phase_gate` (`status`, and `gate_review_attempts` — read every fire, and the one field this
+  skill writes, incrementing it by 1 immediately before a `GATE_REVIEWER` subagent spawn; see Step
+  7 EXECUTE sub-step 1), `last_session`, and this skill's own private bookkeeping field
+  `phase_loop_mechanical_resolution` (read and written across Steps 5 and 7)
 - `.sdp-solution-workflow/registry.md` — Phase File column and phase-type (via the ` — `
   disambiguation-suffix convention) for the row matching `current_phase`
 - `SDP-Solution.json` — `projects[]`, for the Architecture-phase web-project-type check
@@ -40,6 +44,21 @@ action — or stop if judgment is required. This skill never handles post-Phase-
   `sdp-solution-state-loop` already share.
 
 ## Procedure
+
+### Step 0: In-Flight Dispatch Check
+
+Runs before any other step, every fire — no exceptions, and before Step 1's API-error scan.
+
+1. Call `ListAgents`.
+2. If it lists one or more agents (this session's own dispatch capacity is occupied by a
+   subagent — WORKER, REVIEWER, GATE_REVIEWER, or a coordinator/priming subagent from Step 7's
+   GENERATE/REPAIR/API_RECOVERY/EXECUTE branches, or from a mechanical-fix dispatch — spawned on
+   an earlier fire that has not yet returned): invoke
+   `/sdp-create-banner icon=warning row=0 row: Status | sdp-solution-phase-state-loop: a previously-dispatched subagent is still running — deferring this fire, no dispatch.`
+   Record `action = DEFERRED_DISPATCH_IN_FLIGHT`, `reason = "prior dispatch still in flight per ListAgents"`.
+   Proceed directly to Step 8 to record the fire, then stop — do not proceed to Step 1, do not
+   read any workflow file, do not touch `state.json`.
+3. If `ListAgents` lists nothing: proceed to Step 1.
 
 ### Step 1: API Error Pre-Check
 
@@ -578,7 +597,19 @@ Act based on the `action` recorded by Step 1, Step 4, Step 5, or Step 6.
    other field in it is untouched. Since Step 6 only ever reaches `EXECUTE` for a session file
    this fire has not executed before (the sentinel-reset invariant guarantees a fresh session
    file per execution — see Step 6's own note), this append happens exactly once per session
-   file, with no risk of duplicating the field on a later fire. Invoke
+   file, with no risk of duplicating the field on a later fire.
+
+   **If the sentinel's `role` is `GATE_REVIEWER`:** write `phase_gate.gate_review_attempts + 1`
+   to `.sdp-solution-workflow/state.json` before spawning below — mirrors `sdp-project-state-loop`
+   EXECUTE sub-step 3's identical mechanism for the project-level pipeline. This is the only place
+   in the phases-1-7 pipeline that increments this field; a real GATE_BLOCKED verdict always
+   leaves it `>= 1` once this fires, which is what `sdp-solution-phase-coordinator`'s own `"blocked"`-branch
+   disambiguation (Step 2e item 0) depends on to distinguish a real prior block from a Phase
+   Readiness Regression's administrative force-set. **Known, accepted gap:** a GATE_REVIEWER
+   dispatched outside this loop (direct/manual `sdp-solution-phase-coordinator` invocation, or
+   agent-orchestrated dispatch) does not increment this field — the same limitation the
+   project-level pipeline already has in human-gated/agent-orchestrated mode (see the bootstrap
+   doc's Stuck-Loop Detection section). Invoke
    `/sdp-create-banner icon=in-progress row=0 row: Action | Sentinel valid ([current_phase] / [role]) — spawning subagent to execute via sdp-solution-run-prompt.`
    Spawn a subagent via the Agent tool: "You are an SDP workflow dispatch subagent. Invoke
    `sdp-solution-run-prompt` to execute the current dispatch prompt at
@@ -679,10 +710,13 @@ root — the same file `sdp-project-state-loop` and `sdp-solution-state-loop` al
    `/sdp-cancel-auto` is the sole place cron cancellation logic (`CronList`/`CronDelete`) lives in
    SDP; this skill never duplicates that mechanism itself. If `/sdp-cancel-auto` reports no
    matching cron job: this fire was not actually running under a recurring loop (e.g. a manual
-   invocation) — treat this as a normal no-op, not an error, and continue to sub-step 1.
+   invocation) — treat this as a normal no-op, not an error, and continue to sub-step 1. **Never
+   self-cancel for `DEFERRED_DISPATCH_IN_FLIGHT`** (Step 0) — that action is neither `STOP` nor
+   `halted`, by construction: a busy loop is not a terminal condition, and cancelling it here would
+   stop the loop for the crime of the prior dispatch still doing its job.
 1. Assemble:
    ```json
-   {"timestamp":"[ISO 8601, e.g. via Get-Date -Format o]","scope":"solution-phase","action":"[API_RECOVERY|GENERATE|REPAIR|EXECUTE|STOP]","current_phase":"[current_phase or null]","reason":"[reason recorded for this fire, or null]","halted":[true|false],"halt_reason":"[halt_reason or null]"}
+   {"timestamp":"[ISO 8601, e.g. via Get-Date -Format o]","scope":"solution-phase","action":"[API_RECOVERY|GENERATE|REPAIR|EXECUTE|DEFERRED_DISPATCH_IN_FLIGHT|STOP]","current_phase":"[current_phase or null]","reason":"[reason recorded for this fire, or null]","halted":[true|false],"halt_reason":"[halt_reason or null]"}
    ```
    `halted` is `true` only where a step explicitly instructed recording `halted = true` for this
    fire (every already-real or newly-set halt path in Step 4 and Step 5, and REPAIR's failed-
@@ -703,6 +737,10 @@ root — the same file `sdp-project-state-loop` and `sdp-solution-state-loop` al
 
 ## Constraints
 
+- Step 0's in-flight check must run before any other step, every fire, including before Step 1's
+  API-error scan — never skip it or reorder it.
+- `DEFERRED_DISPATCH_IN_FLIGHT` never reads or writes any workflow file and never triggers
+  Step 8 sub-step 0's self-cancel — deferring one fire must not stop the recurring loop.
 - Do not invoke any SDP skill directly — all dispatch is via the Agent tool (subagent), except
   the narrow, explicit session-file/prompt-file writes Step 5 sub-step 5 performs directly for a
   mechanical-fix dispatch (mirrors the same exception already granted to
@@ -732,8 +770,10 @@ root — the same file `sdp-project-state-loop` and `sdp-solution-state-loop` al
   halt only — this skill never clears a halt it did not itself set), `auto_actions` (mechanical-
   fix attempt history and deferred-item entries — see Step 5 sub-steps 1 and 5), and the
   loop-metrics/workflow-log append targets.
-- Never write `phase_gate.gate_review_attempts` — this skill only reads it (Step 2, for
-  informational banner/logging content — no step in this skill's own Procedure branches on it).
+- The only write this skill makes to `phase_gate.gate_review_attempts` is the `+ 1` increment in
+  Step 7 EXECUTE sub-step 1, immediately before spawning a `GATE_REVIEWER` subagent for a normal
+  sentinel-valid dispatch. Never write it anywhere else, and never write it for a mechanical-fix
+  dispatch (Step 5 sub-step 5 always dispatches `WORKER`, never `GATE_REVIEWER`).
 - Never scan more than the current conversation's most recent 10 lines for API-error detection,
   and never search files for it (mirrors `sdp-project-state-loop`'s identical constraint).
 - Never read more than the first line of `sdp-solution-docs/00_solution_prompt.txt` in Step 6 —
@@ -761,6 +801,9 @@ root — the same file `sdp-project-state-loop` and `sdp-solution-state-loop` al
 
 ## Outputs
 
+- **DEFERRED_DISPATCH_IN_FLIGHT:** no file read or written, no subagent spawned; only the fire's
+  own Step 8 metrics line records it. The recurring loop is not cancelled — the next scheduled
+  fire runs Step 0 again.
 - **REPAIR:** subagent spawned, outcome confirmed from a file re-read after return (session file
   match).
 - **EXECUTE:** subagent spawned, outcome confirmed from the phase state file's `tasks` map after
@@ -782,8 +825,9 @@ root — the same file `sdp-project-state-loop` and `sdp-solution-state-loop` al
 - `.sdp-solution-workflow/state.json`: `phase_loop_mechanical_resolution` (this skill's private
   bookkeeping), `last_session` (mechanical-fix dispatches), `workflow_status`/`halt_reason` on a
   halt (never cleared by this skill), `auto_actions` (mechanical-fix attempt history and
-  deferred-item entries). `phase_gate.gate_review_attempts` is read, never written, by
-  this skill.
+  deferred-item entries), and `phase_gate.gate_review_attempts` (`+ 1`, Step 7 EXECUTE sub-step 1,
+  immediately before spawning a `GATE_REVIEWER` subagent — the only write this skill makes to that
+  field).
 - Phase state file: `eval_cycle_attempts` (this skill's field, alongside the existing ones
   `sdp-solution-phase-worker`/`-reviewer` already own).
 - `.sdp-solution-workflow/sessions/session-[N].md` and `sdp-solution-docs/00_solution_prompt.txt`

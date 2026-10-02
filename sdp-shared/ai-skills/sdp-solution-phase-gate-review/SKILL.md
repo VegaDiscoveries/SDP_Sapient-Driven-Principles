@@ -318,7 +318,10 @@ here. Do not spawn subagents. Do not perform `sdp-solution-phase-coordinator` ac
   script's line-numbered `phase_document_content` already provides everything needed to cite
   findings by line.
 - Do not advance `current_phase`, reset `phase_gate`, or spawn subagents.
-- Do not write `gate_review_attempts` — owned by `sdp-solution-state-loop`.
+- Do not write `gate_review_attempts` — owned by `sdp-solution-phase-state-loop` (its Step 7
+  EXECUTE sub-step 1, incremented before every `GATE_REVIEWER` subagent spawn), not
+  `sdp-solution-state-loop` — that skill never runs during phases 1-7 and has no such machinery
+  at all.
 - A GATE_PASSED verdict requires all four criteria — five when the Concept/Expanded Concept
   source-coverage criterion or the Architecture/Implementation Overview Pros-Cons-Gaps criterion
   applies (never both — the two phase sets are disjoint), or, for Phase Readiness, all eleven — to

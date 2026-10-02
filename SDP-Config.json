@@ -24,12 +24,35 @@
     "notes": "Gates the Material Decision Escalation rule (bootstrap doc, Dispatch and Halt Contracts section). When enabled, any dispatched session (any role) must halt rather than suggest, select, or introduce an external dependency not already named in .speq, or an architectural pattern with no GPG precedent, until the user resolves it. This field is loop-owned by policy: no skill, in any role, may write it. Changing it requires a human editing SDP-Config.json directly, outside any dispatched session.",
     "enabled": true
   },
+  "solutionPhaseLoop": {
+    "notes": "Gates sdp-solution-phase-state-loop's own start-of-cycle mechanical-vs-judgment triage. When enabled (default), a halt/block/discovery classified as mechanical (reuses Material Decision Escalation's own triggers as the judgment anchor: anything tripping either of those, or changing scope/behavior/acceptance criteria, is judgment; everything else is mechanical) gets a bounded fix-and-verify attempt, capped by autoResolveHalt.evalCycleAttemptThreshold, before the loop gives up and surfaces it like any other halt. When false, every non-judgment halt/discovery is treated as a plain STOP instead — the loop never attempts an auto-fix. This field is loop-owned by policy, same as materialDecisionEscalation.enabled: no skill, in any role, may write it.",
+    "autoResolveMechanicalFindings": {
+      "enabled": true
+    }
+  },
+  "prosConsGapsModelDiversity": {
+    "notes": "Gates sdp-solution-phase-coordinator's model-diversity rotation for Architecture/Implementation Overview Pros-Cons-Gaps cycles. When enabled (default), each cycle in a phase's cycle set is dispatched on a different model than every other cycle in that set (round-robin over the roster's standard-and-above tiers), never below standard tier. When false, Pros-Cons-Gaps dispatch reverts to today's behavior (no model specified, subagent inherits the dispatching session's model). This field is loop-owned by policy: no skill, in any role, may write it.",
+    "enabled": true
+  },
   "sessionSubagentBudget": {
     "notes": "Controls when sdp-solution-state-loop respawns itself into a fresh terminal session to avoid Claude Code's hard per-session, cumulative-lifetime subagent-spawn cap. maxSubagentsPerSession documents the platform ceiling (currently 200; not enforced by this config, informational). respawnAtCount: agent count at or above which the loop cancels its own cron job and launches a replacement terminal before continuing (this fire's own already-due dispatch still runs). hardStopCount: agent count at or above which the loop cancels its own cron job, launches a replacement terminal, and SKIPS this fire's own dispatch entirely, leaving it for the new session's first fire. autoRespawn: when false, the budget check is skipped entirely (no session_id/agent-count lookups performed). See ~SDP-Maintenance/~docs/subagent-budget-respawn-design.md for the full design.",
     "maxSubagentsPerSession": 200,
     "respawnAtCount": 150,
     "hardStopCount": 190,
     "autoRespawn": true
+  },
+  "phaseIssuePolicy": {
+    "notes": "Read by sdp-eval-and-address-phase-issues. The skill extracts open findings (unresolved Gap Resolution Format gaps, open Quick-Decision-Format questions, open Pros-Cons-Gaps cycle gaps, GATE_BLOCKED issues whose gate hasn't since passed, the current REJECTED task's findings, and disclosed Issues: bullets) from phase documents -- it never evaluates or reports on whether any WORKER/REVIEWER/GATE_REVIEWER session itself was necessary or skippable, only on individual findings. bandDisposition maps each of the 8 fixed doc-fix-impact bands (Required > Critical > Structural > Material > Clarifying > Contextual > Cosmetic > Administrative, highest to lowest impact on a future agent's code-generation correctness) to 'fix' (queued in the skill's worklist as a candidate correction) or 'accept' (logged with its rationale as a disclosed, intentionally-accepted open item -- never fixed, never silently dropped). The skill halts if any of the 8 bands is missing or holds a value other than 'fix'/'accept'. The default below is the 'Required-through-Material only' policy the band taxonomy's own originating exercise tested. Editing this map is the only way to move which bands get fixed.",
+    "bandDisposition": {
+      "Required": "fix",
+      "Critical": "fix",
+      "Structural": "fix",
+      "Material": "fix",
+      "Clarifying": "accept",
+      "Contextual": "accept",
+      "Cosmetic": "accept",
+      "Administrative": "accept"
+    }
   },
   "tones": "Tone/tune configuration moved to SDP-Tones.json (see SDP-Tone-Notifications.md). This key is a pointer only; sdp-tone.ps1 no longer reads SDP-Config.json.",
   "newTerminalNotes": "The newTerminals array is read by sdp-claude-new-terminal.ps1. initialPrompt is passed as the positional argument to `claude` when a new terminal window is spawned; empty string launches interactive Claude Code with no initial prompt. startingDirectory sets the new window's working directory - absolute path, or relative to the solution root; empty/absent defaults to the solution root. hoursToSaveSessionHistory controls SDP-Terminal-Sessions.json retention: on every invocation the script checks each recorded pid; a process no longer running is marked status=not_running with a notRunningAt timestamp, and any not_running entry older than this many hours is deleted from the registry. Per-profile hoursToSaveSessionHistory, if present, wins; otherwise falls back to newTerminalDefaultHoursToSaveSessionHistory below; if that is also absent/invalid, the script's own last-resort default (168 hours, one week) applies. permissionMode sets the starting permission mode via `claude --permission-mode <value>`; empty string passes no flag (Claude Code's own default). See permissionModeOptions for the exact accepted values.",

@@ -111,8 +111,23 @@ section (Dispatch and Halt Contracts).
 4. **Architecture / Implementation Overview only.** Read this phase's own `[phase]_state.json`
    for `pros_cons_gaps.cycle_target` and `pros_cons_gaps.cycle_count` (written by
    `sdp-solution-phase-coordinator` before this dispatch — `cycle_count` is 0 on the first
-   cycle). Form independent criteria as a Pros-Cons-Gaps assessment instead of an
-   acceptance-criteria checklist — see Step 5 for the required format.
+   cycle). **If `cycle_count >= cycle_target` already:** the Pros-Cons-Gaps cycle concluded on a
+   prior dispatch — this cannot happen on a fresh cycle, since `cycle_count` only ever advances
+   in this skill's own Step 6, so the genuine final cycle always enters with `cycle_count ==
+   cycle_target - 1`. This dispatch is a confirming pass over work made after the cycle
+   concluded (e.g. a narrow mechanical fix WORKER applied against an already-`VERIFIED` task) —
+   form ordinary acceptance criteria against the WORKER's claimed fix instead, per Step 5 item 3's
+   format, not a Pros-Cons-Gaps assessment. **Otherwise:** form independent criteria as a
+   Pros-Cons-Gaps assessment instead of an acceptance-criteria checklist — see Step 5 for the
+   required format.
+5. **Confirming pass detection — any phase.** Before forming acceptance criteria, check whether
+   this task's most recent phase-document blockquote(s), immediately following its last REJECTED
+   Eval, are one or more `**Accepted Variance —**` entries (bootstrap doc, State Machine section)
+   with no intervening Completed blockquote from WORKER. If so: this is a confirming pass, not a
+   fresh evaluation cycle — no corrective WORKER work occurred, every finding from that Eval was
+   disposed `"accept"` by `sdp-eval-and-address-phase-issues` and recorded as Accepted Variance.
+   Skip forming ordinary acceptance criteria; proceed directly to Step 5 item 3's confirming-pass
+   format instead of item 2 or an ordinary item 3 evaluation.
 
 ### Step 4: Independent Verification
 
@@ -175,8 +190,9 @@ section (Dispatch and Halt Contracts).
 
 1. Determine the current eval cycle number N: read `eval_cycles` for the assigned task from
    this phase's own `[phase]_state.json` and add 1.
-2. **Architecture / Implementation Overview:** append a Pros-Cons-Gaps evaluation instead of the
-   ordinary Eval N blockquote below, per the bootstrap doc's Pros-Cons-Gaps Cycle section:
+2. **Architecture / Implementation Overview, fresh cycle (`cycle_count < cycle_target` — see Step
+   3 item 4):** append a Pros-Cons-Gaps evaluation instead of the ordinary Eval N blockquote
+   below, per the bootstrap doc's Pros-Cons-Gaps Cycle section:
    ```
    ## Pros-Cons-Gaps — Cycle [pros_cons_gaps.cycle_count + 1] — [YYYY-MM-DD HH:MM]
    ### Pros
@@ -192,21 +208,33 @@ section (Dispatch and Halt Contracts).
    the reason explicitly as "cycle target reached with N gaps still open," never worded as if
    the remaining gaps were resolved. Otherwise **non-compliant**. Skip item 3 below for this
    phase — do not also write the ordinary Eval N blockquote format.
-3. **All other phases:** append an Eval N blockquote to `sdp-solution-docs/[phase_file]`
-   immediately after the most recent blockquote for this task:
+3. **All other phases, or an Architecture / Implementation Overview confirming pass
+   (`cycle_count >= cycle_target` already — see Step 3 item 4):** append an Eval N blockquote to
+   `sdp-solution-docs/[phase_file]` immediately after the most recent blockquote for this task:
    ```
    > **Eval N — [YYYY-MM-DD HH:MM]:** [Compliance assessment against task spec, criterion by
    > criterion. Outcome: compliant / partially compliant / non-compliant.
    > If non-compliant: specific, actionable notes for the next WORKER session.]
    ```
    - Re-evaluation cycles begin with `Re-evaluation trigger: [describe what changed].`
+   - A confirming pass over a post-cycle-target mechanical fix begins instead with `Confirming
+     pass — Pros-Cons-Gaps cycle already concluded ([cycle_count] of [cycle_target]); evaluating
+     [the WORKER's claimed fix] only, not a fresh cycle.`
+   - A confirming pass over an Accepted Variance closure (Step 3 item 5, any phase) begins instead
+     with `Confirming pass — Accepted Variance recorded for all findings from Eval [N]; no
+     corrective WORKER work occurred. Confirming closure only, not a fresh cycle.`
    - State the outcome explicitly on its own line.
 4. **If compliant or partially compliant (either item 2 or item 3 above):** append a Verified N
    blockquote immediately after:
    ```
    > **Verified N — [YYYY-MM-DD HH:MM]:** [Independent confirmation. What was read/run to
    > verify. Outcome: Verified. For a cycle-target-reached Pros-Cons-Gaps compliance: name the
-   > gaps still open and note they carry forward to gate review, not silently resolved.]
+   > gaps still open and note they carry forward to gate review, not silently resolved. For a
+   > confirming pass over a post-cycle-target fix: confirm only the narrow fix itself — do not
+   > re-assert the standing Pros-Cons-Gaps gaps' status, which this pass did not re-examine. For a
+   > confirming pass over an Accepted Variance closure: confirm the Accepted Variance record(s)
+   > are complete, accurate, and correctly reference Eval [N]'s findings — do not re-assert
+   > compliance with the original acceptance criteria, which this pass does not re-examine.]
    ```
 5. **If non-compliant:** do NOT write a Verified N blockquote. The task returns to
    `sdp-solution-phase-worker` via `sdp-solution-phase-coordinator`. For Pros-Cons-Gaps: WORKER
@@ -222,10 +250,16 @@ section (Dispatch and Halt Contracts).
      a second consecutive partial verdict — `sdp-solution-phase-coordinator` must flag it for design
      review before dispatching another WORKER session)
    - **Non-compliant:** status → `"REJECTED"`, increment `eval_cycles` by 1
-   - **Architecture / Implementation Overview only:** also increment `pros_cons_gaps.cycle_count`
-     by 1, regardless of the compliant/non-compliant outcome — it tracks cycles run, not cycles
-     passed. Never write or modify `pros_cons_gaps.cycle_target` — that field is
-     `sdp-solution-phase-coordinator`'s to set, once, before the first cycle.
+   - **Architecture / Implementation Overview, fresh cycle (`cycle_count < cycle_target` at Step
+     3 item 4):** also increment `pros_cons_gaps.cycle_count` by 1, regardless of the
+     compliant/non-compliant outcome — it tracks cycles run, not cycles passed. Never write or
+     modify `pros_cons_gaps.cycle_target` — that field is `sdp-solution-phase-coordinator`'s to
+     set, once, before the first cycle.
+   - **Architecture / Implementation Overview, confirming pass (`cycle_count >= cycle_target`
+     already, per Step 3 item 4):** leave `pros_cons_gaps.cycle_count` unchanged — this dispatch
+     evaluated a post-cycle mechanical fix, not a Pros-Cons-Gaps cycle, and counting it would make
+     `cycle_count` no longer mean "cycles run." Never write or modify `pros_cons_gaps.cycle_target`
+     on this path either.
    - Set `last_session` and `updated`
    - **If status became `"VERIFIED"`:** play the notification tone (non-blocking): run
      `./sdp-shared/scripts/sdp-tone.ps1 -trigger "milestone.task_verified"` via the PowerShell
@@ -259,7 +293,8 @@ section (Dispatch and Halt Contracts).
 - Never auto-trigger Superpowers code review — it must be invoked explicitly.
 - GPG alignment scope is limited to topics directly affected by this task.
 - Never write `pros_cons_gaps.cycle_target` — owned solely by `sdp-solution-phase-coordinator`,
-  set once before the first cycle. REVIEWER only increments `cycle_count`.
+  set once before the first cycle. REVIEWER only increments `cycle_count`, and only on a fresh
+  cycle (`cycle_count < cycle_target` at Step 3 item 4) — never on a confirming pass.
 - Never spawn a Step 4 item 4 verification sub-agent on a `least_capable`-tier model — these
   dispatches feed a formal Eval verdict with no downstream safety net. Use the roster
   (`sdp-shared/scripts/script-support/sdp-subagent-model-roster.json`) to identify the current
@@ -274,6 +309,7 @@ section (Dispatch and Halt Contracts).
 - Phase state file (`sdp-solution-docs/[phase_file]_state.json`) updated: task status →
   `VERIFIED` or `REJECTED`; `eval_cycles` incremented; `PARTIAL_COMPLIANCE`/
   `PARTIAL_COMPLIANCE_ESCALATE` flags if applicable; for Architecture/Implementation Overview,
-  `pros_cons_gaps.cycle_count` also incremented
+  `pros_cons_gaps.cycle_count` also incremented on a fresh cycle, left unchanged on a confirming
+  pass (`cycle_count >= cycle_target` already at dispatch)
 - `.sdp-solution-workflow/logging/workflow-logs/workflow-log-<local-yyyyMMdd>.jsonl` — one
   `reviewer.eval` entry (non-blocking side effect, via `sdp-workflow-log.ps1`)

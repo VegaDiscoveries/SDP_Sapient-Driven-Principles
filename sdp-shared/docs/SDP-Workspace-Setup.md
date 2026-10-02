@@ -127,6 +127,16 @@ folders alongside the actual code project folders.
 ├── sdp-shared/                              ← SDP framework: Level 2 skills + scripts (shared)
 │   ├── ai-skills/                           ← Level 2 skill procedures — one subfolder per skill
 │   │   └── [skill-name]/SKILL.md
+│   ├── docs/                                ← shared reference docs (not the bootstrap doc itself — that lives at solution root; see below)
+│   │   ├── SDP-Workspace-Setup.md           ← this file
+│   │   ├── SDP-Document-List.solution-root.template.json ← template copied to the solution root as SDP-Document-List.json at Step 1.6
+│   │   ├── SDP-Skill-Authoring.md           ← skill authoring reference
+│   │   ├── SDP-Script-Authoring.md          ← script authoring reference
+│   │   ├── SDP-Tone-Notifications.md        ← tone/tune notification reference
+│   │   ├── SDP-Changelog.md                 ← bootstrap doc version history
+│   │   ├── SDP-Standards-Setup.md           ← custom-standards-doc migration guide
+│   │   ├── SDP-Project-Evolution.md         ← script-extraction research log
+│   │   └── SDP-Flowchart.md                 ← workflow flowchart reference
 │   ├── scripts/                             ← deterministic scripts invoked by skills or hooks; each requires a permissions.allow entry in .claude/settings.local.json
 │   │   ├── sdp-tone.ps1
 │   │   ├── sdp-create-prompt.ps1
@@ -203,14 +213,11 @@ folders alongside the actual code project folders.
 │       ├── GenericProjectGuidlines_TOC.md
 │       └── GenericProjectGuidlines_[ChapterName].md
 │
-├── SDP_Sapient-Driven-Principles_vX.X.X.md        ← bootstrap doc (shared)
-├── SDP-Workspace-Setup.md                   ← this file (shared)
-├── SDP-Skill-Authoring.md                   ← skill authoring reference (shared)
-├── SDP-Script-Authoring.md                  ← script authoring reference (shared)
-├── SDP-Tone-Notifications.md                ← tone/tune notification reference (shared)
+├── SDP_Sapient-Driven-Principles_vX.X.X.md        ← bootstrap doc (shared — the only doc of its kind actually at solution root; SDP-Workspace-Setup.md and the other reference docs live under sdp-shared/docs/, shown above)
 ├── SDP-Config.json                          ← loop/halt/preflight policy config (shared — solution root only)
 ├── SDP-Solution.json                        ← solution registry, active project, active task (shared)
 ├── SDP-Solution-Setup.json                  ← solution-level preflight manifest (shared — solution root only; read by sdp-preflight.ps1 -workspaceRoot .)
+├── SDP-Document-List.json                   ← solution-level doc registry — Pathway 1 read list for sdp-solution-read-docs (shared — solution root only; created at Step 1.6 from SDP-Document-List.solution-root.template.json)
 │
 ├── sdp-project_[AppName.API]/               ← SDP workflow for the API project
 ├── sdp-project_[AppName.Domain]/            ← SDP workflow for the Domain project
@@ -387,7 +394,7 @@ automatically — no manual pre-read needed.
 | Document | Purpose |
 |----------|---------|
 | `SDP_Sapient-Driven-Principles_v*.md` | Master workflow reference |
-| `SDP-Workspace-Setup.md` | Setup procedure and file templates |
+| `sdp-shared/docs/SDP-Workspace-Setup.md` | Setup procedure and file templates |
 | `SDP-Solution.json` | Project registry and active state |
 | `SDP-Config.json` | Loop, halt, and preflight policy |
 ```
@@ -1176,6 +1183,18 @@ Setup is two-level: first establish the solution root (steps 1–4), then add ea
          `~/.claude/CLAUDE.md`, skipped" / "conduct rules: 14 of 22 were net-new, added to
          `sdp-agent-conduct.md`" / "conduct rules: none found, added in full." No separate
          confirmation gate — this follows the same single Step 0 confirmation as Steps 2–3.5.
+- [ ] **Step 1.6 — Create solution-root `SDP-Document-List.json`** — Step 1 copies the bootstrap
+      doc and the `sdp-shared/docs/` reference set into the solution root, but nothing yet
+      registers them for `sdp-solution-read-docs`'s Pathway 1 (solution-level doc loading) to
+      find. Without this file, Pathway 1 silently loads nothing at every session start, including
+      the bootstrap doc itself — confirmed missing from every solution scaffolded before this
+      step existed (2026-09-17 addition; see `SDP-Changelog.md`). Copy
+      `sdp-shared/docs/SDP-Document-List.solution-root.template.json` to the solution root as
+      `SDP-Document-List.json`, then fill in its two placeholders: `[VERSION]` (the bootstrap
+      doc's version, from the filename Step 1 just copied) and `[GPG_VERSION]` (the version-key
+      segment confirmed at Step 0 Q6 — same extraction rule used for `state.json`'s `gpg_version`
+      field). No ordering constraint applies here — unlike the per-project list
+      (`sdp-docs/00_prompt.txt` must be last), Pathway 1 has no equivalent file to protect.
 - [ ] **Step 2 — Create solution-level workflow folders at the solution root:**
       - `.sdp-solution-workflow/` — create with `state.json` stub, `sessions/` subfolder,
         and `logging/` with its
@@ -1639,6 +1658,19 @@ as needed; do not nest unrelated config under existing sections. Tone/tune confi
       "enabled": true
     }
   },
+  "phaseIssuePolicy": {
+    "notes": "Read by sdp-eval-and-address-phase-issues. bandDisposition maps each of the 8 fixed doc-fix-impact bands (Required > Critical > Structural > Material > Clarifying > Contextual > Cosmetic > Administrative, highest to lowest impact on a future agent's code-generation correctness) to 'fix' (queued in the skill's worklist as a candidate correction) or 'accept' (logged with its rationale as a disclosed, intentionally-accepted open item -- never fixed, never silently dropped). The skill halts if any of the 8 bands is missing or holds a value other than 'fix'/'accept'. The default below is the 'Required-through-Material only' policy the band taxonomy's own originating exercise tested. Editing this map is the only way to move which bands get fixed.",
+    "bandDisposition": {
+      "Required": "fix",
+      "Critical": "fix",
+      "Structural": "fix",
+      "Material": "fix",
+      "Clarifying": "accept",
+      "Contextual": "accept",
+      "Cosmetic": "accept",
+      "Administrative": "accept"
+    }
+  },
   "tones": "Tone/tune configuration moved to SDP-Tones.json (see SDP-Tone-Notifications.md). This key is a pointer only; sdp-tone.ps1 no longer reads SDP-Config.json.",
   "newTerminalNotes": "The newTerminals array is read by sdp-claude-new-terminal.ps1. initialPrompt is passed as the positional argument to `claude` when a new terminal window is spawned; empty string launches interactive Claude Code with no initial prompt. startingDirectory sets the new window's working directory - absolute path, or relative to the solution root; empty/absent defaults to the solution root. hoursToSaveSessionHistory controls SDP-Terminal-Sessions.json retention: on every invocation the script checks each recorded pid; a process no longer running is marked status=not_running with a notRunningAt timestamp, and any not_running entry older than this many hours is deleted from the registry. Per-profile hoursToSaveSessionHistory, if present, wins; otherwise falls back to newTerminalDefaultHoursToSaveSessionHistory below; if that is also absent/invalid, the script's own last-resort default (168 hours, one week) applies. permissionMode sets the starting permission mode via `claude --permission-mode <value>`; empty string passes no flag (Claude Code's own default). See newTerminalPermissionModeOptions for the exact accepted values.",
   "newTerminalDefaultHoursToSaveSessionHistory": 168,
@@ -1679,6 +1711,11 @@ as needed; do not nest unrelated config under existing sections. Tone/tune confi
   `sdp-solution-phase-state-loop`'s mechanical-fix-and-verify auto-resolution. Default: `true`.
   Loop-owned by policy — no skill, in any role, may write this field; changing it requires a
   human editing `SDP-Config.json` directly, outside any dispatched session.
+- `phaseIssuePolicy.bandDisposition` — maps each of `sdp-eval-and-address-phase-issues`'s 8 fixed
+  doc-fix-impact bands to `"fix"` or `"accept"`. Default: the "Required-through-Material only"
+  policy (`Required`/`Critical`/`Structural`/`Material` → `"fix"`;
+  `Clarifying`/`Contextual`/`Cosmetic`/`Administrative` → `"accept"`). That skill halts if any of
+  the 8 bands is missing or holds any other value — user-editable, not loop-owned.
 - `tones` — a pointer string only. All tone/tune configuration lives in `SDP-Tones.json`.
 - `newTerminals` — array of named launch profiles read by `sdp-claude-new-terminal.ps1`. Each
   entry is selected by the script's `-terminal` parameter (matched by numeric `id` first, then by

@@ -4,10 +4,10 @@
 
 | Field | Value |
 |-------|-------|
-| **Version** | 1.1.1 |
+| **Version** | 1.1.2 |
 | **Patterns** | 0 |
-| **Updated** | 2026-08-13 |
-| **File** | `SDP_Sapient-Driven-Principles_v1.1.1.md` |
+| **Updated** | 2026-10-02 |
+| **File** | `SDP_Sapient-Driven-Principles_v1.1.2.md` |
 
 **Purpose:** When this file is read by an agent in a new workspace, it serves as complete instructions
 for setting up the workspace structure and initiating the development workflow described herein.
@@ -421,13 +421,68 @@ Valid transitions:
 PENDING
   └─► WORK_COMPLETE  (WORKER appends Completed blockquote + updates state file)
         └─► VERIFIED     (REVIEWER appends Eval+Verified blockquotes, outcome pass)
-        └─► REJECTED     (REVIEWER appends Eval+Verified blockquotes, outcome fail)
+        └─► ~~REJECTED     (REVIEWER appends Eval+Verified blockquotes, outcome fail)~~
+        └─► REJECTED     (REVIEWER appends Eval blockquote only, outcome fail) [2026-10-02:
+              corrected — no Verified blockquote is ever written for a non-compliant eval, per
+              the REVIEWER role's own rule]
               └─► PENDING (COORDINATOR resets; REJECTED task takes dispatch priority)
 ```
 
 COORDINATOR reads all phase state files before each dispatch. A REJECTED task blocks
 dispatch of new tasks in the same phase until resolved. Tasks in other phases may proceed
 if they have no dependency on the rejected phase.
+
+> **Addition — 2026-10-02 — Accepted Variance: closing a REJECTED finding without a corrective
+> fix.** The REJECTED → PENDING → WORKER path above assumes every REJECTED finding gets a
+> corrective fix. Not every finding justifies one: a finding whose impact on a future agent's
+> eventual code generation is low (a stale narrative note, a cosmetic phrasing issue, a
+> non-blocking clarification) can cost a full WORKER→REVIEWER cycle to correct something that was
+> never going to mislead anyone. **Accepted Variance** is the mechanism for closing such a finding
+> without that cycle, while keeping the decision fully disclosed and never silently overriding
+> REVIEWER's own verdict.
+>
+> **Trigger:** before re-dispatching WORKER against a REJECTED task, the driving COORDINATOR skill
+> invokes `sdp-eval-and-address-phase-issues`, scoped to that task's own most recent non-compliant
+> Eval blockquote. The skill rates each discrete finding in that blockquote against its fixed
+> 8-band doc-fix-impact scale and applies `SDP-Config.json`'s `phaseIssuePolicy.bandDisposition`
+> map, producing a `"fix"` or `"accept"` disposition per finding — see that skill's own SKILL.md
+> for the full rating/reconciliation procedure.
+>
+> **If any finding is disposed `"fix"`:** proceed exactly as before — COORDINATOR resets the task
+> to PENDING and dispatches WORKER, with corrective notes scoped to the `"fix"`-disposed findings
+> only. A finding already recorded as an Accepted Variance (below) is not corrective-work scope
+> for this dispatch.
+>
+> **If every finding is disposed `"accept"`:** no corrective WORKER dispatch occurs. COORDINATOR
+> appends one Accepted Variance blockquote per accepted finding to the phase document, immediately
+> after the REJECTED Eval blockquote it responds to — append-only; the original Eval blockquote is
+> never edited or removed:
+>
+> ```markdown
+> > **Accepted Variance — [YYYY-MM-DD HH:MM]:** [The finding's text, quoted or closely paraphrased
+> > from the REJECTED Eval blockquote.] **Band:** [one of the 8 fixed doc-fix-impact bands].
+> > **Rationale:** [the rating rationale `sdp-eval-and-address-phase-issues` produced].
+> > **Disposition source:** `sdp-eval-and-address-phase-issues`, [output_dir] reference. This
+> > variance is accepted as-is; no corrective WORKER action is required for this finding.
+> ```
+>
+> COORDINATOR then dispatches REVIEWER for a **confirming pass** — not a fresh full Eval cycle —
+> using the same confirming-pass mechanic already documented for a Pros-Cons-Gaps cycle that has
+> already reached its `cycle_target` (see that section): REVIEWER uses the ordinary Eval N format,
+> confirms every finding from the prior REJECTED Eval now carries either an Accepted Variance
+> record or a completed corrective fix, and marks the task VERIFIED. **This confirming REVIEWER
+> pass is mandatory — Accepted Variance is a disclosed record of what will not be fixed, never a
+> direct state transition.** No skill, including `sdp-eval-and-address-phase-issues` itself,
+> writes `VERIFIED` to a task's state file; only REVIEWER does, and only after independently
+> confirming the Accepted Variance record is complete and accurate. This preserves Role Separation
+> and the existing rule that a Verified blockquote is never written directly against a
+> non-compliant evaluation — the confirming pass is itself a fresh, compliant evaluation of the
+> now-explicitly-accepted state, not a retroactive reversal of the original non-compliant one.
+>
+> **Scope of this addition:** applies to an ordinary task-level REJECTED Eval, in any phase. It
+> does not apply to a GATE_BLOCKED phase-gate verdict — the Phase Gate Procedure and Phase
+> Readiness Regression already have their own structured, human-gated resolution paths
+> (Remediation Proposals, GATE_REVIEWER re-dispatch) and are unaffected by this addition.
 
 ---
 
@@ -1777,6 +1832,58 @@ with a clean attempt counter.
 > times (all instances struck through above) — renamed to `sdp-project-state-loop` as part of the
 > `sdp-project-*` scope-prefix rename (see `project-scope-skill-naming-design.md`).
 
+> **Addition — 2026-09-17 — `sdp-solution-phase-state-loop` now owns `gate_review_attempts` for
+> phases 1-7, closing a real misclassification risk.** A running solution-phase workflow reported
+> `phase_gate.gate_review_attempts` reading `0` immediately after a genuine `GATE_BLOCKED`
+> verdict. Root cause: `sdp-solution-phase-gate-review` and `sdp-solution-phase-state-loop` both
+> declined to write the field, each attributing ownership to `sdp-solution-state-loop` — the
+> post-Phase-7 dispatch-gating loop, which never runs during phases 1-7 and has no such
+> machinery at all (confirmed by its own Constraints). Nothing incremented the field for any
+> phases-1-7 gate cycle, ever. This matters because `sdp-solution-phase-coordinator`'s `"blocked"`-branch
+> disambiguation (Step 2e item 0) treats `gate_review_attempts == 0` as proof a Phase Readiness
+> Regression administratively force-set the block — with the field permanently stuck at 0, a
+> *genuine first-ever* `GATE_BLOCKED` verdict would be misread the same way, re-dispatching
+> `GATE_REVIEWER` against the unmodified, still-defective document instead of dispatching `WORKER`
+> to fix the named issues first. `sdp-solution-phase-state-loop`'s Step 7 EXECUTE sub-step 1 now
+> increments `phase_gate.gate_review_attempts` immediately before spawning a `GATE_REVIEWER`
+> subagent — the phases-1-7 mirror of `sdp-project-state-loop`'s own existing mechanism (EXECUTE
+> sub-step 3) for the project-level pipeline.
+>
+> **Known, accepted gap — not closed by this addition, in either pipeline:** a `GATE_REVIEWER`
+> dispatched outside its loop — direct/manual `sdp-solution-phase-coordinator` invocation (the
+> documented default for phases 1-7), or human-gated/agent-orchestrated project-level dispatch —
+> does not increment `gate_review_attempts` at all, in either pipeline; only a loop-spawned
+> `GATE_REVIEWER` does. This was already true of the project-level pipeline before this addition
+> (confirmed: `sdp-project-coordinator`'s own text already documents the field as "owned solely by
+> `sdp-project-state-loop`") and remains true of both after it — a deliberate scope decision, not
+> an oversight, made when this gap was fixed for the loop-orchestrated case: moving the increment
+> to coordinator-authored dispatch time (working in every orchestration mode) was considered and
+> declined, since a coordinator re-invoked against an already-pending, not-yet-executed dispatch
+> would need a new idempotency check to avoid inflating the count without a real intervening
+> review — a larger change than this incident called for. Anyone relying on the `"blocked"`-branch
+> disambiguation for a gate cycle dispatched outside the loop should verify
+> `gate_review_attempts` by hand before trusting it.
+
+> **Addition — 2026-09-17 — every state-loop now checks for an in-flight subagent before doing
+> anything else.** Incident: a COORDINATOR session dispatched a WORKER (via the Agent tool) to
+> resolve an active halt, then reported to the user that the solution-phase loop could be
+> restarted — before that WORKER had actually returned. The user restarted it anyway
+> (`/sdp-solution-phase-auto`), and its own priming dispatch collided with the still-running
+> WORKER. `sdp-project-state-loop`, `sdp-solution-state-loop`, and `sdp-solution-phase-state-loop`
+> each gained a new Step 0, run before any other step every fire: call `ListAgents`; if it lists
+> any subagent this session spawned that has not yet returned, defer the fire outright (a new
+> `DEFERRED_DISPATCH_IN_FLIGHT` action — no state read, no dispatch, and explicitly excluded from
+> each skill's own self-cancel-on-`STOP`/`halted` logic in its Record-the-Fire step, since a busy
+> loop is not a terminal condition) and let the next scheduled fire check again.
+> `sdp-solution-phase-auto`'s own priming dispatch (Step 3) gained the identical check ahead of
+> its own subagent spawn, for the same reason — it is not part of the recurring loop itself, but
+> it spawns a subagent the same way and is exposed to the same collision. No new state field,
+> marker, or script was needed — `ListAgents` already reflects live subagents spawned by the
+> calling session, so there is nothing to persist or go stale. See
+> `sdp-project-state-loop/SKILL.md` Step 0, `sdp-solution-state-loop/SKILL.md` Step 0,
+> `sdp-solution-phase-state-loop/SKILL.md` Step 0, and `sdp-solution-phase-auto/SKILL.md` Step 3
+> sub-step 0 for the corresponding procedure steps.
+
 ### Phase Readiness Regression Bookkeeping
 
 > **Addition — 2026-07-18:** `eval_cycle_attempts` (per task) and `gate_review_attempts` (per
@@ -2722,12 +2829,31 @@ deferral before the gap is considered resolved.
 
 **Solution root setup** (once per solution):
 - [ ] `SDP-Solution.json` created at solution root (solution name, empty `projects` array)
+- [ ] `SDP-Document-List.json` created at solution root, from
+      `sdp-shared/docs/SDP-Document-List.solution-root.template.json`, with the bootstrap doc and
+      GPG standards version placeholders filled in and only the bootstrap doc entry
+      `includeInReadDocs: true`
 - [ ] `.sdp-solution-workflow/` created with `state.json` stub and `sessions/` subfolder
 - [ ] `sdp-solution-docs/` created with `00_solution_prompt.txt` and `00_user_notes.txt` stubs
 - [ ] `sol-shared/` placeholder created at solution root
 - [ ] `.claude/rules/sdp-core-invariants.md` present (ships as a real file — no action needed)
 - [ ] `.claude/rules/sdp-agent-conduct.md` present, or explicitly skipped with the dedup-check
       rationale logged in the setup plan
+
+> **Addition — 2026-09-17 — solution-root `SDP-Document-List.json` was never actually created by
+> setup.** Confirmed across multiple independently-scaffolded solutions: `sdp-solution-read-docs`
+> Pathway 1 (solution-level doc loading, including this bootstrap doc itself) requires a
+> solution-root `SDP-Document-List.json`, but no version of the Setup Checklist above or
+> `SDP-Workspace-Setup.md`'s Solution Setup procedure ever created one — every session on every
+> affected solution has been loading zero solution-level docs automatically, silently, since that
+> solution's setup. This repo's own root `SDP-Document-List.json` predates the current checklist
+> and was never itself produced by this procedure (it originated as a file rename), so the gap
+> went unnoticed here too. `SDP-Workspace-Setup.md` Step 1.6 now creates the file from
+> `sdp-shared/docs/SDP-Document-List.solution-root.template.json`, and `SDP-Solution-Setup.json`
+> now checks for its presence (`setup` tier), so `sdp-preflight.ps1` catches a missing one on any
+> future solution. An already-scaffolded solution missing the file can be backfilled the same
+> way: copy the template, fill in the two placeholders, done — no other setup step depends on
+> when in the solution's life this file is added.
 
 **Per-project setup** (repeat for each project added to the solution):
 - [ ] `sdp-project_[name]/` folder created and registered in `SDP-Solution.json` `projects` array
@@ -2967,4 +3093,4 @@ all dispatch files for the life of the project.
 
 ---
 
-*End of bootstrap document. Version 1.1.1 — 2026-08-13.*
+*End of bootstrap document. Version 1.1.2 — 2026-10-02.*

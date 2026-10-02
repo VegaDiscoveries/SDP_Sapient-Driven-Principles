@@ -6,7 +6,9 @@ action — or stop if the workflow requires human input.
 
 Each loop fire takes exactly one action: GENERATE (write next dispatch prompt), EXECUTE (run
 current dispatch prompt), GATE_REPAIR (dispatch COORDINATOR to complete a gate dispatch that
-never got its session file), API_RECOVERY (resume interrupted session), or STOP.
+never got its session file), API_RECOVERY (resume interrupted session),
+DEFERRED_DISPATCH_IN_FLIGHT (a prior fire's subagent has not yet returned — skip this fire), or
+STOP.
 
 ## Inputs
 
@@ -25,6 +27,19 @@ when multiple projects are listed). All file paths in this skill use `[resolved_
 their root.
 
 ## Procedure
+
+### Step 0: In-Flight Dispatch Check
+
+Runs before any other step, every fire — no exceptions.
+
+1. Call `ListAgents`.
+2. If it lists one or more agents (this session's own dispatch capacity is occupied by a
+   subagent from an earlier fire that has not yet returned): invoke
+   `/sdp-create-banner icon=warning row=0 row: Status | sdp-project-state-loop: a previously-dispatched subagent is still running — deferring this fire, no dispatch.`
+   Record `action = DEFERRED_DISPATCH_IN_FLIGHT`, `reason = "prior dispatch still in flight per ListAgents"`.
+   Proceed directly to Step 6 to record the fire, then stop — do not proceed to Step 1, do not
+   read any workflow file, do not touch `state.json`.
+3. If `ListAgents` lists nothing: proceed to Step 1.
 
 ### Step 1: API Error Pre-Check
 
@@ -560,11 +575,14 @@ workflow action — there is no "current run" to look up, just today's date.
    place cron cancellation logic (`CronList`/`CronDelete`) lives in SDP; this skill never
    duplicates that mechanism itself. If `/sdp-cancel-auto` reports no matching cron job: this fire
    was not actually running under a recurring loop (e.g. a manual invocation) — treat this as a
-   normal no-op, not an error, and continue to sub-step 1.
+   normal no-op, not an error, and continue to sub-step 1. **Never self-cancel for
+   `DEFERRED_DISPATCH_IN_FLIGHT`** — that action is neither `STOP` nor `halted`, by construction:
+   a busy loop is not a terminal condition, and cancelling it here would stop the loop for the
+   crime of the prior dispatch still doing its job.
 1. Assemble the JSON object using the values recorded earlier in this fire. Fields not
    applicable to this action's path are written as `null`:
    ```json
-   {"timestamp":"[ISO 8601 timestamp, e.g. via Get-Date -Format o]","project":"[resolved_project]","action":"[API_RECOVERY|GENERATE|EXECUTE|GATE_REPAIR|STOP]","work_item":"[active_work_item or null]","role":"[sentinel_role or null]","reason":"[reason recorded for this fire, or null]","status_before":"[status_before or null]","status_after":"[status_after or null]","halted":[true|false],"halt_reason":"[halt_reason or null]"}
+   {"timestamp":"[ISO 8601 timestamp, e.g. via Get-Date -Format o]","project":"[resolved_project]","action":"[API_RECOVERY|GENERATE|EXECUTE|GATE_REPAIR|DEFERRED_DISPATCH_IN_FLIGHT|STOP]","work_item":"[active_work_item or null]","role":"[sentinel_role or null]","reason":"[reason recorded for this fire, or null]","status_before":"[status_before or null]","status_after":"[status_after or null]","halted":[true|false],"halt_reason":"[halt_reason or null]"}
    ```
 2. Append the line via the PowerShell tool, targeting today's file by name — do not overwrite:
    ```
@@ -588,6 +606,10 @@ workflow action — there is no "current run" to look up, just today's date.
 
 ## Constraints
 
+- Step 0's in-flight check must run before any other step, every fire — never skip it because a
+  state read seems safe, and never reorder it behind Step 1's API-error check.
+- `DEFERRED_DISPATCH_IN_FLIGHT` never reads or writes any workflow file and never triggers
+  Step 6 sub-step 0's self-cancel — deferring one fire must not stop the recurring loop.
 - Do not invoke any SDP skill directly — all dispatch (WORKER, REVIEWER, GATE_REVIEWER,
   COORDINATOR, or dispatch-repair) is via the Agent tool (subagent). The one exception:
   `/sdp-cancel-auto`, invoked directly (Step 6 sub-step 0) when this fire's outcome is `STOP` or a
@@ -641,6 +663,9 @@ workflow action — there is no "current run" to look up, just today's date.
 
 ## Outputs
 
+- **DEFERRED_DISPATCH_IN_FLIGHT:** no file read or written, no subagent spawned; only the fire's
+  own Step 6 metrics line records it. The recurring loop is not cancelled — the next scheduled
+  fire runs Step 0 again.
 - **API_RECOVERY:** Subagent spawned to invoke `sdp-project-run-prompt`; outcome reported on return.
 - **GENERATE:** Subagent spawned to invoke `sdp-project-create-prompt`; reason for generation reported.
 - **EXECUTE:** Subagent spawned to invoke `sdp-project-run-prompt`; new task status read from phase

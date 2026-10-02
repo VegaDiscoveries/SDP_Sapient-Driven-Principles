@@ -245,6 +245,22 @@ and nothing below this line changes dispatch-target decisions based on invocatio
    > here, not in `sdp-project-coordinator`. See the design doc's Section 6 for the full reasoning behind
    > this accepted, one-directional limitation.
 
+   > **Addition — 2026-10-02 — Accepted Variance trigger on the REJECTED branch.** Before this
+   > algorithm's REJECTED-priority branch re-dispatches WORKER against a REJECTED task, invoke
+   > `sdp-eval-and-address-phase-issues` in single-task mode, scoped to that task's `phaseFile` and
+   > `taskId` — see the bootstrap doc's State Machine section, "Accepted Variance" addition, for
+   > the full mechanism. Read `findings_disposed.json` from the skill's output folder:
+   > - **Any finding disposed `"fix"`:** proceed with the ordinary REJECTED-priority dispatch below,
+   >   scoping WORKER's corrective notes (written into the session dispatch file at item 4) to the
+   >   `"fix"`-disposed findings only.
+   > - **Every finding disposed `"accept"`:** do not dispatch WORKER this cycle. Append one
+   >   Accepted Variance blockquote per finding to the phase document (bootstrap doc's exact
+   >   format), immediately after the REJECTED Eval blockquote it responds to. Then proceed to
+   >   item 4 below with the dispatch target role set to **REVIEWER**, not WORKER — this is the
+   >   confirming-pass dispatch `sdp-solution-phase-reviewer` self-detects from the phase
+   >   document's own blockquote sequence (its Step 3 item 5); no special session-file flag is
+   >   needed for this.
+
 2b. **SOURCE COVERAGE CHECK** — Before advancing `current_phase` past the `"Concept"`- or
    `"Expanded Concept"`-type phase (per the phase-type definition above) in item 3 below (i.e. when `phase_gate.status` is `"passed"` and the just-completed
    phase is one of those two): read that phase's own `[phase]_state.json` for a

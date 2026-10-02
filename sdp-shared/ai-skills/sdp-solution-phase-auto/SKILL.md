@@ -71,6 +71,16 @@ other SDP skill — calling it from within an automated path would cause loop pr
 
 ### Step 3: Prime the Dispatch Prompt
 
+0. **In-flight check.** Call `ListAgents`. If it lists one or more agents (e.g., a WORKER or
+   other subagent this same session dispatched moments earlier — to resolve a halt, or for any
+   other reason — that has not yet returned): do not spawn the priming subagent below. Skip
+   sub-steps 1–2 entirely and invoke
+   `/sdp-create-banner icon=warning row=0 row: Status | sdp-solution-phase-auto: a subagent is still running in this session — skipping the priming dispatch.`
+   Proceed directly to sub-step 3's "no valid sentinel was written" branch (there is no fresh
+   sentinel to read back, since priming never ran) — the loop still starts; its own Step 0
+   (`sdp-solution-phase-state-loop`) will see the same still-running subagent on its first fire
+   and defer correctly rather than dispatching a second one on top of it. If `ListAgents` lists
+   nothing: proceed to sub-step 1.
 1. Invoke
    `/sdp-create-banner icon=in-progress row=0 row: Status | Priming dispatch prompt — spawning a COORDINATOR subagent so sdp-solution-docs/00_solution_prompt.txt is accurate before the loop's first fire.`
 2. Spawn a subagent via the Agent tool: "You are an SDP COORDINATOR priming subagent. Invoke
@@ -106,10 +116,16 @@ other SDP skill — calling it from within an automated path would cause loop pr
   halts first.
 - The priming subagent must not spawn a WORKER, REVIEWER, or GATE_REVIEWER — Step 3 sub-step 2's
   prompt forbids it explicitly.
+- Never spawn the priming subagent while `ListAgents` shows another subagent from this session
+  still running — Step 3 sub-step 0 checks first and skips priming rather than stacking a second
+  dispatch on top of one already in flight.
 
 ## Outputs
 
-- Loop started: `loop` skill running `sdp-solution-phase-state-loop` at the configured interval.
+- Loop started: `loop` skill running `sdp-solution-phase-state-loop` at the configured interval —
+  started regardless of whether priming ran or was skipped for an in-flight subagent.
 - `sdp-solution-phase-coordinator` subagent spawned to prime an accurate dispatch prompt and
-  session file; sentinel read back to confirm.
+  session file, unless Step 3 sub-step 0 found a subagent still in flight, in which case priming
+  is skipped and the loop's own first fire primes and dispatches once it sees that subagent has
+  returned.
 - This skill writes no project or solution-phase files directly.

@@ -34,6 +34,22 @@ cap ever fires mid-dispatch.
 
 ## Procedure
 
+### Step 0: In-Flight Dispatch Check
+
+Runs before any other step, every fire — including before the Subagent Budget Check, since
+there is no reason to spend a budget-check subagent call on a fire that is going to defer
+anyway.
+
+1. Call `ListAgents`.
+2. If it lists one or more agents (this session's own dispatch capacity is occupied by a
+   subagent from an earlier fire — Step 4's dispatch-gating spawn, or Step 2's API_RECOVERY
+   spawn — that has not yet returned): invoke
+   `/sdp-create-banner icon=warning row=0 row: Status | sdp-solution-state-loop: a previously-dispatched subagent is still running — deferring this fire, no dispatch.`
+   Record `action = DEFERRED_DISPATCH_IN_FLIGHT`, `reason = "prior dispatch still in flight per ListAgents"`.
+   Proceed directly to Step 5 to record the fire, then stop — do not proceed to Step 1, do not
+   read any workflow file, do not touch `state.json`.
+3. If `ListAgents` lists nothing: proceed to Step 1.
+
 ### Step 1: Subagent Budget Check
 
 1. Run via the PowerShell tool — reads `sessionSubagentBudget` from `SDP-Config.json` and, only
@@ -120,11 +136,14 @@ own "never parse subagent text" discipline. Record `action = DISPATCH_GATING_PAS
    to fire at the configured interval only repeats an identical, wasted STOP. `/sdp-cancel-auto` is
    the sole place cron cancellation logic lives; this skill never duplicates it. If
    `/sdp-cancel-auto` reports no matching cron job: treat this as a normal no-op, not an error.
+   **Never self-cancel for `DEFERRED_DISPATCH_IN_FLIGHT`** (Step 0) — that action is neither `STOP`
+   nor `halted`, by construction: a busy loop is not a terminal condition.
 1. Append one line to today's `.sdp-solution-workflow/logging/loop-logs/loop-metrics-*.jsonl`,
    mirroring `sdp-project-state-loop` Step 6's envelope shape (fire timestamp, action, reason,
    halted flag). When `skipDispatchThisFire` was `true` (Steps 2–4 were skipped this fire), this
    line records `action: "SKIPPED_FOR_RESPAWN"` instead of a normal dispatch action, so the
-   metrics stream doesn't misreport a dispatch that never ran.
+   metrics stream doesn't misreport a dispatch that never ran. When Step 0 deferred this fire,
+   it records `action: "DEFERRED_DISPATCH_IN_FLIGHT"` instead, for the same reason.
 2. **If `respawnPending` is `true`:**
    a. Launch the replacement terminal:
       ```
@@ -167,6 +186,10 @@ own "never parse subagent text" discipline. Record `action = DISPATCH_GATING_PAS
 
 ## Constraints
 
+- Step 0's in-flight check must run before any other step, every fire, including before the
+  Subagent Budget Check — never skip it or reorder it behind Step 1.
+- `DEFERRED_DISPATCH_IN_FLIGHT` never reads or writes any workflow file and never triggers
+  Step 5 sub-step 0's self-cancel — deferring one fire must not stop the recurring loop.
 - Never installed during phases 1–7 — Step 3's `current_phase` check is a defensive guard, not
   the primary enforcement (the primary enforcement is `sdp-solution-new-concept-intake`'s cron-cancel step
   and `sdp-auto`/`sdp-state-loop-start`'s Phase-7-gate precondition, Task 14).
@@ -188,6 +211,9 @@ own "never parse subagent text" discipline. Record `action = DISPATCH_GATING_PAS
 
 ## Outputs
 
+- **DEFERRED_DISPATCH_IN_FLIGHT:** no file read or written, no subagent spawned; only the fire's
+  own metrics line (Step 5 sub-step 1) records it. The recurring loop is not cancelled — the
+  next scheduled fire runs Step 0 again.
 - Every fire ending in `STOP` or a halt: `/sdp-cancel-auto` invoked (Step 5 sub-step 0) to stop the
   recurring loop — skipped if the RESPAWN path (Step 1) already invoked it this fire; a no-op if
   no matching cron job exists.

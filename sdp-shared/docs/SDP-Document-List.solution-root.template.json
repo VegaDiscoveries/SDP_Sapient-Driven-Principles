@@ -1,0 +1,62 @@
+[
+  {
+    "path": "SDP_Sapient-Driven-Principles_v[VERSION].md",
+    "name": "Sapient Driven Principles version [VERSION]",
+    "role": "bootstrap",
+    "includeInReadDocs": true
+  },
+  {
+    "path": "standards/GenericProjectGuidlines_V[GPG_VERSION].md",
+    "name": "Generic Project Guidelines v[GPG_VERSION]",
+    "role": "standards",
+    "includeInReadDocs": false
+  },
+  {
+    "path": "sdp-shared/docs/SDP-Workspace-Setup.md",
+    "name": "SDP Workspace Setup",
+    "role": "workspace-setup",
+    "includeInReadDocs": false
+  },
+  {
+    "path": "sdp-shared/docs/SDP-Skill-Authoring.md",
+    "name": "SDP Skill Authoring Reference",
+    "role": "skill-authoring",
+    "includeInReadDocs": false
+  },
+  {
+    "path": "sdp-shared/docs/SDP-Script-Authoring.md",
+    "name": "SDP Script Authoring Reference",
+    "role": "script-authoring",
+    "includeInReadDocs": false
+  },
+  {
+    "path": "sdp-shared/docs/SDP-Tone-Notifications.md",
+    "name": "SDP Tone & Tune Notifications Reference",
+    "role": "tone-notifications",
+    "includeInReadDocs": false
+  },
+  {
+    "path": "sdp-shared/docs/SDP-Changelog.md",
+    "name": "SDP Bootstrap Changelog",
+    "role": "changelog",
+    "includeInReadDocs": false
+  },
+  {
+    "path": "sdp-shared/docs/SDP-Standards-Setup.md",
+    "name": "SDP Standards Setup",
+    "role": "standards-setup",
+    "includeInReadDocs": false
+  },
+  {
+    "path": "sdp-shared/docs/SDP-Project-Evolution.md",
+    "name": "SDP Project Evolution",
+    "role": "reference",
+    "includeInReadDocs": false
+  },
+  {
+    "path": "sdp-shared/docs/SDP-Flowchart.md",
+    "name": "SDP Flowchart",
+    "role": "reference",
+    "includeInReadDocs": false
+  }
+]

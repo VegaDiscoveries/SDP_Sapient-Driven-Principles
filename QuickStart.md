@@ -123,9 +123,10 @@ the bootstrap document's Phase 1-3 authorship exception).
 
 ## Before an Unattended Run
 
-`/sdp-auto` refuses to start until solution-level Phase 7's gate has passed — phases 1–7 are
-always human-gated, direct `/sdp-solution-coordinator` dispatch, with no cron job involved at any
-point during that stage.
+`/sdp-auto` delegates to `/sdp-solution-phase-auto` while solution-level Phase 7's gate has not
+yet passed — phases 1–7 can be driven by a direct, manually-invoked `/sdp-solution-phase-coordinator`
+session or by the recurring `sdp-solution-phase-state-loop` that `/sdp-solution-phase-auto` starts,
+rather than by any cron job `/sdp-auto` itself would start directly.
 
 **The first time** Phase 7's gate passes for this solution, run `/sdp-solution-loop-prep` once
 before starting `/sdp-auto` — triggered by (and only valid at) that Phase-7-passed transition, it

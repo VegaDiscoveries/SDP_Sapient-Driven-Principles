@@ -132,6 +132,10 @@ section (Dispatch and Halt Contracts).
 4. If the task has a prior non-compliant Eval blockquote: read it carefully before beginning
    work. The corrective notes from the REVIEWER are the starting point.
    If Superpowers is installed: invoke `/receiving-code-review` before beginning corrective work.
+   **If one or more `**Accepted Variance —**` blockquotes (bootstrap doc, State Machine section)
+   appear between that Eval blockquote and this dispatch:** those specific findings are already
+   closed by `sdp-eval-and-address-phase-issues`'s disposition — do not re-address them. Scope
+   corrective work to only the findings from that Eval not covered by an Accepted Variance record.
 4a. **Architecture / Implementation Overview — prior Pros-Cons-Gaps cycle.** If item 4's prior
    evaluation is a `## Pros-Cons-Gaps — Cycle N` entry rather than an ordinary Eval N blockquote:
    each open gap in its Gaps section is the actual work item for this session — address every
@@ -139,6 +143,18 @@ section (Dispatch and Halt Contracts).
    block, GPG Reference when applicable), appended below the gap it resolves, never replacing
    the original gap text. This is the concrete form item 4's "corrective notes" take for this
    phase, not a separate procedure.
+4b. **Mechanical-fix pass against an already-`VERIFIED` task (`Fix Focus:` field present in the
+   session dispatch file).** Distinct from item 4/4a above — the task's prior outcome is
+   `VERIFIED`, not `REJECTED`; this is not a corrective redo of a failed eval. It arises when
+   `sdp-solution-phase-state-loop`'s mechanical-fix mechanism (or an equivalent
+   coordinator-authored dispatch) asks WORKER to address a narrow, non-blocking item disclosed in
+   a prior session's `**Issues:**` sub-heading, after the task already passed review. Scope is
+   strictly the item(s) named in `Fix Focus:` — a stale citation, a narrative inaccuracy, a
+   dispatch-authoring note, or similarly narrow and non-substantive. **Never** use this path for a
+   change that would alter the document's architectural substance, scope, or acceptance criteria
+   — that is ordinary task work, not a mechanical fix, and belongs in a fresh REJECTED/PENDING
+   cycle instead, not a `Fix Focus:` dispatch. See Step 4 below for how this changes Pre-Work
+   Verification classification, and Step 6 item 2 for the required disclosure.
 5. **Phase 7 only — read the decomposition instructions.** If `current_phase` contains the
    substring "Phase Readiness" and the assigned task is the decomposition task itself (not a
    downstream GATE_REVIEWER pass), the session dispatch file carries additional instructions
@@ -174,11 +190,18 @@ this solution-level phase document:
 2. **Classify state:** Not Started (stub only, no Completed blockquote) / In Progress or
    Incomplete (partial content, or a Completed blockquote with a prior non-compliant Eval and no
    corrective work yet) / Complete (Completed blockquote present, task checkbox `[x]`, no open
-   REJECTED cycle).
-3. **Act:** Not Started → proceed to Step 5. In Progress/Incomplete → invoke
+   REJECTED cycle). **A dispatch carrying a `Fix Focus:` field (Step 3 item 4b) always classifies
+   as In Progress/Incomplete, regardless of checkbox or prior-VERIFIED state** — the mechanical
+   fix named in `Fix Focus:` is itself the incomplete item; a `VERIFIED` task with no open
+   REJECTED cycle would otherwise read as Complete and be skipped.
+3. **Act:** Not Started → proceed to Step 5. **`Fix Focus:` present (Step 3 item 4b)** → proceed
+   directly to Step 5 without pausing for confirmation — the fix is already fully scoped by the
+   dispatch, and this path routinely runs unattended under `sdp-solution-phase-state-loop`'s
+   mechanical-fix mechanism, where no human is available to answer a confirmation prompt. In
+   Progress/Incomplete with no `Fix Focus:` → invoke
    `/sdp-create-banner icon=warning row=0 row: Findings | [what was found] row: | row: Confirm | Continue from this partial state, or handle differently?`
-   and await the user's response before continuing. Complete → do not proceed to Step 5; notify
-   `sdp-solution-phase-coordinator` that the task is already done.
+   and await the user's response before continuing. Complete (no `Fix Focus:`) → do not proceed
+   to Step 5; notify `sdp-solution-phase-coordinator` that the task is already done.
 
 ### Step 5: Implement the Task
 
@@ -211,6 +234,13 @@ this solution-level phase document:
    > **Completed: [YYYY-MM-DD HH:MM]** — [What was done. Decisions made. Any deviations from
    > spec and why.]
    ```
+   **Mechanical-fix pass (Step 3 item 4b):** the Completed blockquote must state explicitly that
+   this is a narrow mechanical fix against a task whose status immediately before this session
+   was `VERIFIED`, made in response to a `Fix Focus:` dispatch, and must confirm the fix did not
+   touch the document's Pros-Cons-Gaps substance, architecture, scope, or acceptance criteria.
+   This disclosure is what lets the dispatched REVIEWER
+   (`sdp-solution-phase-reviewer/SKILL.md` Step 3 item 4's confirming-pass branch) and any human
+   reader recognize the pass as a confirmation rather than a fresh cycle.
    Phase 7's decomposition task's Completed blockquote must also confirm: every project newly
    receiving tasks this cycle has its `.speq.md`/`[PROJECT]-Context.md` populated with real
    content (no template placeholders remaining); every decomposed
@@ -229,7 +259,7 @@ this solution-level phase document:
    - Set `last_session` to the current session identifier
    - Set `last_updated` to today's ISO date
    - Do **not** write, add, or modify `eval_cycle_attempts` — owned solely by
-     `sdp-solution-state-loop` (mirrors the bootstrap Stuck-Loop Detection table exactly; a
+     `sdp-solution-phase-state-loop` (mirrors the bootstrap Stuck-Loop Detection table exactly; a
      WORKER write here corrupts REVIEWER-attempt accounting).
 5. Update `.sdp-solution-workflow/state.json`:
    - Set `phase_gate.status` to `"pending"` if this was the phase's first task reaching
@@ -237,7 +267,8 @@ this solution-level phase document:
      transitions are `sdp-solution-phase-gate-review`'s job, not WORKER's).
    - Set `last_session` to the current session identifier.
    - Set `updated` to today's ISO date.
-   - Do **not** write, add, or modify `eval_cycle_attempts` — owned solely by `sdp-solution-state-loop`
+   - Do **not** write, add, or modify `eval_cycle_attempts` — owned solely by
+     `sdp-solution-phase-state-loop`
      (mirrors the bootstrap Stuck-Loop Detection table exactly; a WORKER write here corrupts
      REVIEWER-attempt accounting).
 6. Mirror phase document changes to the parent solution documents per the sync rule notice, if
@@ -275,7 +306,7 @@ this solution-level phase document:
 - `/execute-plan` review checkpoints are prohibited — they violate Bootstrap context isolation.
 - Never skip TDD or four-phase debugging discipline merely because Superpowers is not installed
   — apply both manually where the task has a test surface.
-- Never write `eval_cycle_attempts` — owned solely by `sdp-solution-state-loop`.
+- Never write `eval_cycle_attempts` — owned solely by `sdp-solution-phase-state-loop`.
 - Never mark the task complete when a push fails or CI returns `red`.
 - For Phase 7 specifically: never write a `CROSS_PROJECT_BLOCKED`-style flag into any project's
   own state file — dependency-ledger data lives exclusively in

@@ -231,6 +231,8 @@ The temp file is both the handoff point between tiers and a permanent debug arti
 | `sdp-solution-phase-gate-review` | Hybrid (multi-boundary) | Solution-scoped companion to `sdp-project-gate-review` — identical three-script-bracket pattern, always resolves the solution root, no `-scope` parameter needed (there is only one scope) |
 | `sdp-solution-phase-worker` | LLM-only | Implementation of a solution-scoped phases 1-7 task — the same reasoning `sdp-project-worker` provides, at solution scope |
 | `sdp-solution-phase-reviewer` | LLM-only | Independent evaluation of a solution-scoped phases 1-7 task — the same reasoning `sdp-project-reviewer` provides, at solution scope |
+| `sdp-report-workflow-analysis` | Hybrid | Six scripts compute every mechanically-derivable part of the report; one independent blind session-classification pass (reconciled against the scripts' own mechanical draft category) is the only step requiring judgment |
+| `sdp-eval-and-address-phase-issues` | Hybrid | Four scripts (enumerate/extract/reconcile/worklist) cover every deterministic step; the two independently-blind doc-fix-impact rating passes are the only irreducibly LLM-only content — see this skill's own eval report for the full step-by-step classification |
 
 Most hybrid skills split into one script-then-LLM handoff. `sdp-project-gate-review` is the framework's
 first **multi-boundary hybrid**: the phase-gate procedure has two distinct points requiring
@@ -276,9 +278,12 @@ that should have been blocked.
 | `sdp-solution-create-prompt` | Write `sdp-solution-docs/00_solution_prompt.txt` for the next solution session — either a shared cross-project task, or a phases-1-7 dispatch (`current_phase`/`phase_gate`-driven) |
 | `sdp-solution-run-prompt` | Read the solution prompt and invoke the indicated skill automatically |
 | `sdp-solution-read-docs` | Load solution-root docs and active project docs; index other registered project doc lists in context; invoked internally by `sdp-initialize-sdp`, the actual `SessionStart` hook target |
+| `sdp-solution-phase-coordinator` | Solution-scoped COORDINATOR for phases 1-7 (Concept through Phase Readiness) — dispatches WORKER/REVIEWER/GATE_REVIEWER, owns the cross-project dependency ledger, and gates post-Phase-7 project dispatch |
 | `sdp-solution-phase-worker` | WORKER session for a solution-scoped phases 1-7 task (Concept through Phase Readiness, including Phase 7's build-phase decomposition) — dispatched by `sdp-solution-phase-coordinator` Step 2a; never used for project-level tasks |
 | `sdp-solution-phase-reviewer` | REVIEWER session for a solution-scoped phases 1-7 task — same dispatch path as `sdp-solution-phase-worker`; never used for project-level tasks |
 | `sdp-solution-phase-gate-review` | GATE_REVIEWER session for a solution-scoped phases 1-7 gate — dedicated companion to `sdp-project-gate-review`, used exclusively for phases 1-7; `sdp-project-gate-review` itself is never given a solution-level dispatch |
+| `sdp-solution-phase-auto` | Opt-in to automated loop mode for the solution's own phases 1-7 — validates preconditions, guards against a duplicate loop, starts the recurring `sdp-solution-phase-state-loop`, and primes the first fire via one `sdp-solution-phase-coordinator` pass |
+| `sdp-solution-phase-state-loop` | Recurring loop for phases 1-7 — start-of-cycle mechanical-vs-judgment triage (bounded auto-fix for mechanically-classified halts/blocks/discoveries), evaluates the phases-1-7 dispatch sentinel, and dispatches WORKER/REVIEWER/GATE_REVIEWER or stops for human input |
 
 **Shared** — invoked from both project and solution flows:
 
@@ -290,7 +295,7 @@ that should have been blocked.
 | `sdp-tone` | Emit audible start/end/event tones via `sdp-tone.ps1`; called by every skill at both levels |
 | `sdp-create-banner` | Render a fixed-border status/error banner from caller-supplied label/content pairs via `sdp-create-banner.ps1`; called by any SDP skill needing a mid-process banner |
 
-**Reporting** — on-demand log/metrics reports, solution-root scoped (manual invocation, no `[resolved_project]` involved):
+**Reporting and auditing** — on-demand log/metrics reports and phase-document audits, solution-root scoped (manual invocation, no `[resolved_project]` involved):
 
 | Skill | Purpose |
 |-------|---------|
@@ -300,6 +305,8 @@ that should have been blocked.
 | `sdp-report-logs-combine` | Data-prep step (not a report) — merge one day's `loop-metrics`/`hook-log`/`workflow-log` jsonl into a single normalized `combined-log-yyyyMMdd.jsonl` |
 | `sdp-report-log-combined-metrics` | Generate a combined-metrics report from a selected `combined-log-*.jsonl` file — depends on `sdp-report-logs-combine`'s output already existing for the target day |
 | `sdp-report-logs-auto-generate` | Caller-invoked only (not manual) — generates all 4 reports over the period since the last auto-report when `sdp-solution-phase-coordinator` detects every project is `work_complete`; also cancels any active state loop and records the completion |
+| `sdp-report-workflow-analysis` | Generate a combined workflow-analysis report (design docs/phase-cycle/registry counts, session-to-registry mapping with an independently-verified category matrix, hook-log/loop-log/workflow-log breakdowns) for the current solution |
+| `sdp-eval-and-address-phase-issues` | Extract every open finding (unresolved gaps, open questions, gate-blocked issues, rejected-task findings, disclosed issues) from phase documents, rate each against a fixed 8-band doc-fix-impact scale via two independently-blind passes, apply `SDP-Config.json`'s `phaseIssuePolicy.bandDisposition` map, and produce a prioritized fix/accept worklist — never evaluates session-level skippability |
 
 ### PowerShell Scripts
 
@@ -321,9 +328,21 @@ that should have been blocked.
 | `sdp-report-log-loop-metrics.ps1` | Reads a selected `loop-logs/loop-metrics-*.jsonl` file and produces the time-accounting/halt/task-outcome report |
 | `sdp-report-log-workflow-metrics.ps1` | Reads a selected `workflow-logs/workflow-log-*.jsonl` file and produces the trigger/role/outcome breakdown and chronological event report |
 | `sdp-report-logs-merge-range.ps1` | Concatenates one source log type's per-day files across a date range into a single `range-merges/` jsonl file — feeds the 4 report scripts a genuine multi-day period; used by `sdp-report-logs-auto-generate` |
+| `sdp-report-workflow-analysis-inventory.ps1` | Computes design docs processed, phase-1-7 cycle counts, and solution/project registry row counts for the workflow-analysis report |
+| `sdp-report-workflow-analysis-sessions.ps1` | Enumerates every `session-NNN.md` across the solution and all projects, extracts header fields, and assigns a mechanical draft category |
+| `sdp-report-workflow-analysis-hooklogs.ps1` | Parses `hook-log-*.jsonl` files and produces the tool/level/session breakdown for the workflow-analysis report |
+| `sdp-report-workflow-analysis-looplogs.ps1` | Parses `loop-metrics-*.jsonl` files and produces the kind-of-work breakdown for the workflow-analysis report |
+| `sdp-report-workflow-analysis-workflowlogs.ps1` | Parses `workflow-log-*.jsonl` files and produces the trigger/role/outcome breakdown and Concerning Events list for the workflow-analysis report |
+| `sdp-report-workflow-analysis-reconcile.ps1` | Reconciles the sessions script's mechanical draft category against an independent blind agent classification pass, recording every disagreement |
+| `sdp-report-workflow-analysis-combine.ps1` | Merges the inventory/sessions/hooklogs/looplogs/workflowlogs/reconcile outputs into one combined JSON for the top-level report |
+| `sdp-eval-and-address-phase-issues-enumerate.ps1` | Enumerates every phase document in scope (whole-solution sweep or single-task mode) via `registry.md` |
+| `sdp-eval-and-address-phase-issues-extract.ps1` | Extracts every open finding across phase documents in scope using the six fixed finding shapes |
+| `sdp-eval-and-address-phase-issues-reconcile.ps1` | Reconciles two independent blind rating passes per finding (escalating disagreements to the higher-impact band) and applies the accept/fix policy |
+| `sdp-eval-and-address-phase-issues-worklist.ps1` | Joins disposed findings back against extracted findings and assembles the band-grouped prioritized worklist (JSON + Markdown) |
 | `sdp-claude-new-terminal.ps1` | Spawns a new Claude Code terminal window from a named launch profile; tracks the instance in `SDP-Terminal-Sessions.json` |
 | `sdp-preflight.ps1` | Manifest-driven workspace validation; emits JSON envelope with pass/fail per check |
 | `sdp-run-prompt.ps1` | Resolves the active project, reads `sdp-docs/00_prompt.txt`, and emits the next skill to invoke as JSON |
+| `sdp-select-model.ps1` | Read-only model-tier resolution for a pending dispatch (role/phase/flags/cycle history against `sdp-subagent-model-roster.json`); emits a JSON envelope (`resolved`, `model_id`, `tier`, `reason`) or `resolved:false` when the task's own text must be read to decide |
 | `sdp-solution-coordinator.ps1` | Reads all child project states, enforces the cycle sync invariant, and writes session dispatch files |
 | `sdp-solution-create-prompt.ps1` | Reads `SDP-Solution.json` and solution workflow state for `sdp-solution-create-prompt`'s dispatch prompt template |
 | `sdp-solution-reviewer.ps1` | Verifies child preconditions, confirms reviewer outcomes, resolves cascades, and finalizes the solution task verdict |
@@ -588,4 +607,4 @@ The [Superpowers plugin](https://github.com/obra/superpowers) provides TDD, syst
 | `sdp-shared/docs/SDP-Standards-Setup.md` | Standards doc replacement procedure, amendment rules, migration guide |
 | `sdp-shared/docs/SDP-Tone-Notifications.md` | Audible notification reference (palettes, sequences, events) |
 | `sdp-shared/docs/SDP-Workspace-Setup.md` | Full setup procedure with folder diagrams and file templates |
-| `SDP_Sapient-Driven-Principles_v1.1.1.md` | Master bootstrap — complete workflow reference |
+| `SDP_Sapient-Driven-Principles_v1.1.2.md` | Master bootstrap — complete workflow reference |
