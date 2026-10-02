@@ -110,6 +110,11 @@ fix/accept disposition.
 
 ### Key Principles
 
+SDP's governing objective is a correct, complete coded solution, produced reliably across however
+many sessions it takes — autonomously where possible, always auditable. The principles below exist
+to serve that objective, not as ends in themselves.
+
+- **Phase work serves code, not the reverse** — Phase documents (Concept through Phase Readiness) are how an agent gets to the right code; they are not SDP's deliverable in themselves. An inaccuracy in a phase document is acceptable exactly when it would not mislead a future agent's post-phase-work code generation — not a general license for sloppiness. This is the stated rationale behind the Accepted Variance mechanism (see State Machine above) and the Gap Resolution Criteria's Deferred/out-of-scope closure paths.
 - **Append-only documentation** — Code shows what was built; it does not show what alternatives were considered and why they were rejected. Strikethrough for superseded content and dated evaluations appended in place make rationale permanently available to any agent or human, regardless of how many sessions have elapsed.
 - **Context isolation** — An agent that implements a feature and then reviews it has its full prior reasoning in context; self-review produces approval, not evaluation. Work and review are enforced in separate subagent invocations with no shared conversation history. `/clear` does not satisfy this requirement.
 - **Explicit machine-readable state** — Without state files, each new session re-derives its position from documentation prose and may reach a different conclusion than the prior session. State files make the status of every work item a fact the agent reads, not a conclusion it draws.

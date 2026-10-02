@@ -109,7 +109,14 @@ This is detected at first read; the procedure runs before any other action is ta
 
 ## Workflow Philosophy
 
-This workflow is built on four principles derived from direct experience with AI-assisted development:
+> **Addition — 2026-10-02 — Governing objective, and a fifth principle (Phase work serves code,
+> not the reverse).** SDP's job is a correct, complete coded solution, produced reliably across
+> however many sessions it takes — autonomously where possible, always auditable. The principles
+> below exist to serve that objective, not as ends in themselves. The fifth principle below states
+> the rationale the Gap Resolution Criteria's Deferred/out-of-scope closure paths and the Accepted
+> Variance mechanism (State Machine section) already apply in practice without ever stating why.
+
+This workflow is built on five principles derived from direct experience with AI-assisted development:
 
 1. **Context isolation between work and review.** An agent that performs work and then reviews its
    own work operates with confirmation bias and full context contamination. Work and review must
@@ -128,6 +135,14 @@ This workflow is built on four principles derived from direct experience with AI
 
 4. **Explicit state, not prose procedures.** Work item state is machine-readable. An agent reads
    state before acting and writes state after acting. No agent infers current position from prose.
+
+5. **Phase work serves code, not the reverse.** Phase documents (Concept through Phase Readiness)
+   exist to get a future agent to the right code — they are not themselves SDP's deliverable. A
+   phase-document inaccuracy is acceptable exactly when it would not mislead a future agent's
+   post-phase-work code generation; where it would, it must be resolved. This is the standing
+   rationale behind the Gap Resolution Criteria's Deferred/out-of-scope closure paths and the
+   Accepted Variance mechanism (State Machine section) — both already apply this test; this
+   principle states why.
 
 ---
 
